@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage x:Class="TheBleedingDeacons.Intergroup.Register.Views.GsrRegistrationPage"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodels="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
+             x:DataType="viewmodels:GsrVerifyViewModel"
+             Title="{Binding Title}">
+
+    <ContentPage.Resources>
+        <Style x:Key="HeaderLabelStyle" TargetType="Label">
+            <Setter Property="FontSize" Value="24"/>
+            <Setter Property="FontAttributes" Value="Bold"/>
+            <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"/>
+            <Setter Property="Margin" Value="0,0,0,10"/>
+        </Style>
+
+        <Style x:Key="FieldLabelStyle" TargetType="Label">
+            <Setter Property="FontSize" Value="20"/>
+            <Setter Property="FontAttributes" Value="Bold"/>
+            <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}"/>
+            <Setter Property="Margin" Value="0,0,0,5"/>
+        </Style>
+
+        <Style x:Key="ValueLabelStyle" TargetType="Label">
+            <Setter Property="FontSize" Value="20"/>
+            <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"/>
+            <Setter Property="Margin" Value="0,0,0,15"/>
+        </Style>
+
+        <Style x:Key="StatusLabelStyle" TargetType="Label">
+            <Setter Property="FontSize" Value="20"/>
+            <Setter Property="FontAttributes" Value="Bold"/>
+            <Setter Property="Margin" Value="0,0,0,15"/>
+        </Style>
+    </ContentPage.Resources>
+
+    <Grid>
+        <!-- Loading Indicator -->
+        <ActivityIndicator IsVisible="{Binding IsLoading}" 
+                          IsRunning="{Binding IsLoading}"
+                          HorizontalOptions="Center"
+                          VerticalOptions="Center"
+                          Color="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"/>
+
+        <!-- Main Content -->
+        <ScrollView IsVisible="{Binding IsLoading, Converter={StaticResource InvertedBoolConverter}}">
+            <StackLayout Padding="20" Spacing="10">
+
+                    <StackLayout>
+                        <Label Text="Group Service Representative" 
+                               Style="{StaticResource HeaderLabelStyle}"/>
+
+                        <!-- GSR Name -->
+                        <Label Text="Name" Style="{StaticResource FieldLabelStyle}"/>
+                        <Label Text="{Binding Group.GsrName}" Style="{StaticResource ValueLabelStyle}"/>
+
+                        <!-- GSR Email -->
+                        <Label Text="Personal Email" Style="{StaticResource FieldLabelStyle}"/>
+                        <Label Text="{Binding Group.GsrEmailPersonal}" Style="{StaticResource ValueLabelStyle}" />
+
+                        <!-- GSR Phone -->
+                        <Label Text="Mobile Phone" Style="{StaticResource FieldLabelStyle}"/>
+                        <Label Text="{Binding Group.GsrPhone}" Style="{StaticResource ValueLabelStyle}" />
+                    </StackLayout>
+
+                <Label x:Name="QuestionLabel"
+                    FontSize="32"
+                    FontAttributes="Bold"
+                    Text="Is this correct?"
+                    HorizontalOptions="Center" />
+
+                <!-- Action Buttons -->
+                <FlexLayout Direction="Row" 
+			        JustifyContent="SpaceEvenly" 
+			        AlignItems="Center"
+			        Margin="0,20,0,0">
+
+                    <Button Text="Yes" 
+			            Command="{Binding YesCommand}"
+                        IsEnabled="{Binding CanRegister}"
+			            Style="{StaticResource PrimaryButtonStyle}"
+			            TextColor="White"
+			            CornerRadius="25"
+			            HeightRequest="100"
+			            FlexLayout.Grow="1"
+			            Margin="0,0,7.5,0"/>
+
+                    <Button Text="No" 
+			            Command="{Binding NoCommand}"
+			            Style="{StaticResource PrimaryButtonStyle}"
+			            TextColor="White"
+			            CornerRadius="25"
+			            HeightRequest="100"
+			            FlexLayout.Grow="1"
+			            Margin="7.5,0,7.5,0"/>
+
+                    <Button Text="Cancel" 
+			            Command="{Binding CancelCommand}"
+			            Style="{StaticResource PrimaryButtonStyle}"
+			            TextColor="White"
+			            CornerRadius="25"
+			            HeightRequest="100"
+			            FlexLayout.Grow="1"
+			            Margin="7.5,0,0,0"/>
+
+                </FlexLayout>
+
+            </StackLayout>
+        </ScrollView>
+    </Grid>
+</ContentPage>

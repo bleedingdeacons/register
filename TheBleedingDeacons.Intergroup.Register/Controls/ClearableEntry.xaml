@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="TheBleedingDeacons.Intergroup.Register.Controls.ClearableEntry"
+             x:Name="RootView">
+
+    <Border BackgroundColor="{Binding BackgroundColor, Source={x:Reference RootView}}"
+            Stroke="{Binding BorderColor, Source={x:Reference RootView}}"
+            StrokeThickness="{Binding BorderThickness, Source={x:Reference RootView}}"
+            HeightRequest="{Binding ControlHeight, Source={x:Reference RootView}}">
+        <Border.StrokeShape>
+            <RoundRectangle CornerRadius="{Binding CornerRadius, Source={x:Reference RootView}}"/>
+        </Border.StrokeShape>
+
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Text Entry -->
+            <Entry x:Name="InternalEntry"
+                   Grid.Column="0"
+                   Text="{Binding Text, Source={x:Reference RootView}}"
+                   Placeholder="{Binding Placeholder, Source={x:Reference RootView}}"
+                   BackgroundColor="Transparent"
+                   Margin="10,0,5,0"
+                   TextChanged="OnTextChanged"/>
+
+            <!-- Clear Button -->
+            <Button x:Name="ClearButton"
+                    Grid.Column="1"
+                    Text="✕"
+                    FontSize="16"
+                    BackgroundColor="Transparent"
+                    TextColor="{Binding ClearButtonColor, Source={x:Reference RootView}}"
+                    BorderWidth="0"
+                    WidthRequest="30"
+                    HeightRequest="30"
+                    Margin="0,5,5,5"
+                    IsVisible="False"
+                    Clicked="OnClearClicked"/>
+        </Grid>
+    </Border>
+
+</ContentView>

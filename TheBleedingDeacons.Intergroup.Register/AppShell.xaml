@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Shell x:Class="TheBleedingDeacons.Intergroup.Register.AppShell"
+       xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+       xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+       xmlns:local="clr-namespace:TheBleedingDeacons.Intergroup.Register.Views"
+       Shell.FlyoutBehavior="Flyout">
+
+    <ShellContent Title="Home"
+                  Icon="home.png"
+                  ContentTemplate="{DataTemplate local:MainPage}"
+                  Route="MainPage" />
+
+    <!--<ShellContent Title="Groups"
+                  Icon="groups.png"
+                  ContentTemplate="{DataTemplate local:GroupListPage}"
+                  Route="GroupListPage" />-->
+    
+    <ShellContent Title="Settings"
+              Icon="settings.png"
+              ContentTemplate="{DataTemplate local:SettingsPage}"
+              Route="SettingsPage" />
+
+    <ShellContent Title="Import/Export"
+          Icon="settings.png"
+          ContentTemplate="{DataTemplate local:ImportExportPage}"
+          Route="ImportExportPage"
+          IsVisible="False" />
+
+    <ShellContent Title="Mail"
+          Icon="settings.png"
+          ContentTemplate="{DataTemplate local:MailSettingsPage}"
+          Route="MailSettingsPage"
+          IsVisible="False" />
+
+    <ShellContent Title="Database"
+      Icon="database.png"
+      ContentTemplate="{DataTemplate local:DatabaseBackupPage}"
+      Route="DatabaseBackupPage"
+      IsVisible="False" />
+
+    <ShellContent Title="Email Status"
+      Icon="settings.png"
+      ContentTemplate="{DataTemplate local:EmailStatusPage}"
+      Route="EmailStatusPage" 
+      IsVisible="False" />
+    
+    
+</Shell>

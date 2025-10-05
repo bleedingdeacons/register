@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage x:Class="TheBleedingDeacons.Intergroup.Register.Views.DatabaseBackupPage"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodels="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
+             Title="Database Backup">
+
+    <ContentPage.BindingContext>
+        <viewmodels:DatabaseBackupViewModel />
+    </ContentPage.BindingContext>
+
+    <ScrollView>
+        <VerticalStackLayout Spacing="20" Padding="30">
+
+            <!-- Header -->
+            <Label Text="Database Backup" 
+                   FontSize="24" 
+                   FontAttributes="Bold" 
+                   HorizontalOptions="Center"
+                   Margin="0,0,0,10" />
+
+            <!-- Info Card -->
+            <Frame BackgroundColor="{AppThemeBinding Light=#F5F5F5, Dark=#2D2D30}"
+                   BorderColor="{AppThemeBinding Light=#E0E0E0, Dark=#404040}"
+                   CornerRadius="10"
+                   HasShadow="True"
+                   Padding="20">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="💾 Database Backup" 
+                           FontSize="18" 
+                           FontAttributes="Bold" />
+                    <Label Text="Create a backup copy of your SQLite database in the downloads folder. This backup can be used to restore your data if needed."
+                           FontSize="14"
+                           TextColor="{AppThemeBinding Light=#666666, Dark=#CCCCCC}"
+                           LineBreakMode="WordWrap" />
+                </VerticalStackLayout>
+            </Frame>
+
+            <!-- Database Files List -->
+            <Frame BackgroundColor="{AppThemeBinding Light=#FFFFFF, Dark=#1E1E1E}"
+                   BorderColor="{AppThemeBinding Light=#E0E0E0, Dark=#404040}"
+                   CornerRadius="8"
+                   Padding="15">
+                <VerticalStackLayout Spacing="10">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Text="Available Database Files:" 
+                               FontAttributes="Bold" 
+                               FontSize="16"
+                               Grid.Column="0" />
+                        <Button Text="🔄"
+                                Command="{Binding RefreshDatabaseListCommand}"
+                                BackgroundColor="Transparent"
+                                TextColor="{AppThemeBinding Light=#007ACC, Dark=#0E7ACC}"
+                                FontSize="16"
+                                WidthRequest="40"
+                                HeightRequest="40"
+                                Grid.Column="1" />
+                    </Grid>
+
+                    <CollectionView ItemsSource="{Binding DatabaseFiles}"
+                                    SelectionMode="Single"
+                                    SelectedItem="{Binding SelectedDatabaseFileInfo}"
+                                    MaximumHeightRequest="200">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate>
+                                <Border Margin="0,2">
+                                    <Border.Triggers>
+                                        <DataTrigger TargetType="Border" Binding="{Binding IsSelected}" Value="True">
+                                            <Setter Property="BackgroundColor" Value="{AppThemeBinding Light=#E3F2FD, Dark=#1E3A5F}" />
+                                            <Setter Property="Stroke" Value="{AppThemeBinding Light=#1976D2, Dark=#42A5F5}" />
+                                            <Setter Property="StrokeThickness" Value="2" />
+                                        </DataTrigger>
+                                        <DataTrigger TargetType="Border" Binding="{Binding IsSelected}" Value="False">
+                                            <Setter Property="BackgroundColor" Value="{AppThemeBinding Light=#F8F9FA, Dark=#2D2D30}" />
+                                            <Setter Property="Stroke" Value="{AppThemeBinding Light=#E9ECEF, Dark=#404040}" />
+                                            <Setter Property="StrokeThickness" Value="1" />
+                                        </DataTrigger>
+                                    </Border.Triggers>
+                                    <Border.StrokeShape>
+                                        <RoundRectangle CornerRadius="5" />
+                                    </Border.StrokeShape>
+                                    <Border.GestureRecognizers>
+                                        <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:DatabaseBackupViewModel}}, Path=SelectDatabaseCommand}"
+                                                            CommandParameter="{Binding FullPath}" />
+                                    </Border.GestureRecognizers>
+
+                                    <Grid Padding="12" 
+                                          ColumnDefinitions="*,Auto"
+                                          RowDefinitions="Auto,Auto">
+
+                                        <Label Text="{Binding FileName}" 
+                                               FontAttributes="Bold"
+                                               FontSize="14"
+                                               Grid.Column="0" 
+                                               Grid.Row="0" />
+                                        <Label Text="{Binding SizeText}" 
+                                               FontSize="12"
+                                               TextColor="{AppThemeBinding Light=#666666, Dark=#CCCCCC}"
+                                               Grid.Column="1" 
+                                               Grid.Row="0" />
+                                        <Label Grid.Column="0" Grid.Row="1" Grid.ColumnSpan="2">
+                                            <Label.FormattedText>
+                                                <FormattedString>
+                                                    <Span Text="{Binding Location}" 
+                                                          FontSize="12"
+                                                          TextColor="{AppThemeBinding Light=#888888, Dark=#AAAAAA}" />
+                                                    <Span Text=" • " 
+                                                          FontSize="12"
+                                                          TextColor="{AppThemeBinding Light=#888888, Dark=#AAAAAA}" />
+                                                    <Span Text="{Binding LastModifiedText}" 
+                                                          FontSize="12"
+                                                          TextColor="{AppThemeBinding Light=#888888, Dark=#AAAAAA}" />
+                                                </FormattedString>
+                                            </Label.FormattedText>
+                                        </Label>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+
+                    <Label Text="No database files found"
+                           IsVisible="{Binding DatabaseFiles.Count, Converter={StaticResource CountToBoolConverter}}"
+                           HorizontalOptions="Center"                           
+                           TextColor="{AppThemeBinding Light=#666666, Dark=#CCCCCC}" />
+                </VerticalStackLayout>
+            </Frame>
+
+            <!-- Selected Database Info -->
+            <Frame BackgroundColor="{AppThemeBinding Light=#F0F8FF, Dark=#1A1F2E}"
+                   BorderColor="{AppThemeBinding Light=#007ACC, Dark=#0E7ACC}"
+                   CornerRadius="8"
+                   Padding="15"
+                   IsVisible="{Binding SelectedDatabaseFile, Converter={StaticResource StringToBoolConverter}}">
+                <VerticalStackLayout Spacing="5">
+                    <Label Text="Selected Database:" 
+                           FontAttributes="Bold" 
+                           FontSize="14" />
+                    <Label Text="{Binding SelectedDatabaseFile}" 
+                           FontSize="12"
+                           LineBreakMode="TailTruncation"
+                           TextColor="{AppThemeBinding Light=#333333, Dark=#DDDDDD}" />
+                </VerticalStackLayout>
+            </Frame>
+
+            <!-- Status Information -->
+            <Frame BackgroundColor="{AppThemeBinding Light=#FFFFFF, Dark=#1E1E1E}"
+                   BorderColor="{AppThemeBinding Light=#E0E0E0, Dark=#404040}"
+                   CornerRadius="8"
+                   Padding="15">
+                <VerticalStackLayout Spacing="5">
+                    <Label Text="Status:" 
+                           FontAttributes="Bold" 
+                           FontSize="16" />
+                    <Label Text="{Binding StatusMessage}" 
+                           FontSize="14"
+                           LineBreakMode="WordWrap" />
+                    <Label Text="{Binding LastBackupDate}" 
+                           FontSize="12"
+                           TextColor="{AppThemeBinding Light=#888888, Dark=#AAAAAA}"
+                           Margin="0,5,0,0" />
+                </VerticalStackLayout>
+            </Frame>
+
+            <!-- Backup Button -->
+            <Button Text="Create Backup"
+                    Command="{Binding BackupDatabaseCommand}"
+                    BackgroundColor="{AppThemeBinding Light=#007ACC, Dark=#0E7ACC}"
+                    TextColor="White"
+                    FontSize="16"
+                    FontAttributes="Bold"
+                    CornerRadius="8"
+                    HeightRequest="50"
+                    IsEnabled="{Binding IsBackupInProgress, Converter={StaticResource InvertedBoolConverter}}" />
+
+            <!-- Progress Indicator -->
+            <ActivityIndicator IsVisible="{Binding IsBackupInProgress}"
+                             IsRunning="{Binding IsBackupInProgress}"
+                             Color="{AppThemeBinding Light=#007ACC, Dark=#0E7ACC}"
+                             HeightRequest="30" />
+
+            <!-- Loading Text -->
+            <Label Text="Backing up database..."
+                   IsVisible="{Binding IsBackupInProgress}"
+                   HorizontalOptions="Center"
+                   FontSize="14"
+                   TextColor="{AppThemeBinding Light=#666666, Dark=#CCCCCC}" />
+
+            <!-- Instructions -->
+            <Frame BackgroundColor="{AppThemeBinding Light=#FFF9E6, Dark=#2D2A1F}"
+                   BorderColor="{AppThemeBinding Light=#FFE066, Dark=#665C33}"
+                   CornerRadius="8"
+                   Padding="15"
+                   Margin="0,10,0,0">
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="📝 Instructions:" 
+                           FontAttributes="Bold" 
+                           FontSize="14" />
+                    <Label FontSize="12" LineBreakMode="WordWrap">
+                        <Label.FormattedText>
+                            <FormattedString>
+                                <Span Text="• Select a database file from the list above" />
+                                <Span Text="&#x0a;• The backup will be saved to your device's Downloads folder" />
+                                <Span Text="&#x0a;• Backup files include a timestamp in the filename" />
+                                <Span Text="&#x0a;• Keep backups in a safe location" />
+                                <Span Text="&#x0a;• Regular backups help protect your data" />
+                            </FormattedString>
+                        </Label.FormattedText>
+                    </Label>
+                </VerticalStackLayout>
+            </Frame>
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

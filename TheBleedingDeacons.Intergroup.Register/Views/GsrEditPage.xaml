@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage x:Class="TheBleedingDeacons.Intergroup.Register.Views.GsrEditPage"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+             xmlns:viewmodels="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
+             x:DataType="viewmodels:GsrEditViewModel"
+             Title="{Binding Title}">
+    <!--BindingContext="{x:Reference GsrEditViewModel}">
+
+    <ContentPage.Resources>
+        <viewmodels:GsrEditViewModel x:Key="viewModel" />
+    </ContentPage.Resources>-->
+
+    <ContentPage.Behaviors>
+        <toolkit:StatusBarBehavior StatusBarColor="{AppThemeBinding Light=White, Dark=Black}" 
+                                   StatusBarStyle="{AppThemeBinding Light=DarkContent, Dark=LightContent}" />
+    </ContentPage.Behaviors>
+
+    <!--<Grid BindingContext="{Binding Source={x:Reference viewModel}}">-->
+        <!-- Main Content -->
+    <Grid>
+        <ScrollView>
+            <Grid Padding="20" RowSpacing="20">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <!-- Header -->
+                <Label Grid.Row="0" 
+                       Text="{Binding Title}"
+                       FontSize="24"
+                       FontAttributes="Bold"
+                       HorizontalOptions="Center"
+                       Margin="0,0,0,10" />
+
+                <!-- GSR Name Field -->
+                <StackLayout Grid.Row="1" Spacing="5">
+                    <Label Text="Name" 
+                           FontAttributes="Bold"
+                           FontSize="24"
+                           TextColor="{AppThemeBinding Light=Black, Dark=White}" />
+                    <Entry x:Name="GsrNameEntry"
+                           Text="{Binding GsrName, Mode=TwoWay}"                           
+                           Placeholder="Tap to enter your name..."
+                           FontSize="24"
+                           BackgroundColor="{AppThemeBinding Light=White, Dark=#2D2D30}"
+                           TextColor="{AppThemeBinding Light=Black, Dark=White}"
+                           PlaceholderColor="{AppThemeBinding Light=Gray, Dark=LightGray}">
+                            <Entry.Keyboard>
+                                <Keyboard x:FactoryMethod="Create">
+                                    <x:Arguments>
+                                    <KeyboardFlags>CapitalizeWord</KeyboardFlags>
+                                    </x:Arguments>
+                                </Keyboard>
+                            </Entry.Keyboard>
+                    </Entry>
+                    <Label Text="{Binding GsrNameError}" 
+                           TextColor="Red" 
+                           FontSize="24"
+                           IsVisible="{Binding HasGsrNameError}" />
+                </StackLayout>
+
+                <!-- GSR Phone Field -->
+                <StackLayout Grid.Row="2" Spacing="5">
+                    <Label Text="Mobile Phone" 
+                           FontAttributes="Bold"
+                           FontSize="24"
+                           TextColor="{AppThemeBinding Light=Black, Dark=White}" />
+                    <Entry x:Name="GsrPhoneEntry"
+                           Text="{Binding GsrPhone, Mode=TwoWay}"
+                           FontSize="24"
+                           Placeholder="Tap to enter phone number..."
+                           Keyboard="Telephone"
+                           BackgroundColor="{AppThemeBinding Light=White, Dark=#2D2D30}"
+                           TextColor="{AppThemeBinding Light=Black, Dark=White}"
+                           PlaceholderColor="{AppThemeBinding Light=Gray, Dark=LightGray}" />
+                    <Label Text="{Binding GsrPhoneError}" 
+                           TextColor="Red" 
+                           FontSize="12"
+                           IsVisible="{Binding HasGsrPhoneError}" />
+                </StackLayout>
+
+                <!-- GSR Email Field -->
+                <StackLayout Grid.Row="3" Spacing="5">
+                    <Label Text="Personal Email" 
+                           FontAttributes="Bold"
+                           FontSize="24"
+                           TextColor="{AppThemeBinding Light=Black, Dark=White}" />
+                    <Entry x:Name="GsrEmailEntry"
+                           Text="{Binding GsrEmailPersonal, Mode=TwoWay}"
+                           Placeholder="Tap to enter email address..."
+                           FontSize="24"
+                           Keyboard="Email"
+                           BackgroundColor="{AppThemeBinding Light=White, Dark=#2D2D30}"
+                           TextColor="{AppThemeBinding Light=Black, Dark=White}"
+                           PlaceholderColor="{AppThemeBinding Light=Gray, Dark=LightGray}" />
+                    <Label Text="{Binding GsrEmailError}" 
+                           TextColor="Red" 
+                           FontSize="12"
+                           IsVisible="{Binding HasGsrEmailError}" />
+                </StackLayout>
+
+                <!-- Validation Message -->
+                <!--<Frame Grid.Row="4"
+                       BackgroundColor="{AppThemeBinding Light=#FFF3CD, Dark=#664D03}"
+                       BorderColor="{AppThemeBinding Light=#FFEAA7, Dark=#B58900}"
+                       Padding="15"
+                       CornerRadius="5"
+                       IsVisible="{Binding ShowValidationMessage}">
+                    <Label Text="* GSR Name is required. Please provide either a phone number or email address."
+                           TextColor="{AppThemeBinding Light=#856404, Dark=#FFF}"
+                           FontSize="14"
+                           HorizontalTextAlignment="Center" />
+                </Frame>-->
+
+                <!-- Spacer -->
+                <!--<BoxView Grid.Row="5" />-->
+
+                <!-- Action Buttons -->
+                <Grid Grid.Row="6" ColumnSpacing="15" RowSpacing="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Main Action Buttons -->
+                    <Button Grid.Row="2" Grid.Column="1"
+                            Style="{StaticResource PrimaryButtonStyle}"
+                            Text="{Binding SaveButtonText}"
+                            Command="{Binding SaveCommand}" 
+                            HeightRequest="120" />
+
+                    <Button Grid.Row="2" Grid.Column="0"
+                            Style="{StaticResource PrimaryButtonStyle}"
+                            Text="Cancel"
+                            BackgroundColor="{AppThemeBinding Light=#6C757D, Dark=#495057}"
+                            Command="{Binding CancelCommand}" 
+                            HeightRequest="120" />
+
+                </Grid>
+            </Grid>
+        </ScrollView>
+
+        <!-- Loading Indicator Overlay -->
+        <ActivityIndicator IsVisible="{Binding IsLoading}" 
+                           IsRunning="{Binding IsLoading}"
+                           Color="{AppThemeBinding Light=#007ACC, Dark=#0E639C}"
+                           VerticalOptions="Center"
+                           HorizontalOptions="Center"
+                           Scale="1.5" />
+    </Grid>
+
+</ContentPage>

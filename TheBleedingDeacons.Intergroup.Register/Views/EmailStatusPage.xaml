@@ -1,0 +1,327 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage x:Class="TheBleedingDeacons.Intergroup.Register.Views.EmailStatusPage"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
+             xmlns:models="clr-namespace:TheBleedingDeacons.Intergroup.Register.Models"
+             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+             x:DataType="vm:EmailStatusViewModel"
+             Title="Email Queue Status">
+
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <!-- Converters -->
+            <toolkit:InvertedBoolConverter x:Key="InvertedBoolConverter" />
+
+            <!-- For online status colors -->
+            <toolkit:BoolToObjectConverter x:Key="OnlineStatusToColorConverter" 
+                                           TrueObject="Green" 
+                                           FalseObject="Red" />
+
+            <!-- FAB Button Style -->
+            <Style x:Key="FabButtonStyle" TargetType="Button">
+                <Setter Property="WidthRequest" Value="56" />
+                <Setter Property="HeightRequest" Value="56" />
+                <Setter Property="CornerRadius" Value="28" />
+                <Setter Property="FontSize" Value="16" />
+                <Setter Property="TextColor" Value="White" />
+                <Setter Property="Shadow">
+                    <Setter.Value>
+                        <Shadow Brush="Black" Opacity="0.3" Offset="0,2" Radius="8" />
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- Data templates -->
+            <DataTemplate x:Key="EmailItemTemplate" x:DataType="vm:EmailDisplayModel">
+                <SwipeView>
+                    <!-- Swipe actions -->
+                    <SwipeView.RightItems>
+                        <SwipeItems>
+                            <SwipeItem Text="Retry" 
+                                       BackgroundColor="Orange"
+                                       IsVisible="{Binding CanRetry}"
+                                       Command="{Binding Source={RelativeSource AncestorType={x:Type vm:EmailStatusViewModel}}, Path=RetryEmailCommand}"
+                                       CommandParameter="{Binding .}" />
+                            <SwipeItem Text="Delete" 
+                                       BackgroundColor="Red"
+                                       Command="{Binding Source={RelativeSource AncestorType={x:Type vm:EmailStatusViewModel}}, Path=DeleteEmailCommand}"
+                                       CommandParameter="{Binding .}" />
+                        </SwipeItems>
+                    </SwipeView.RightItems>
+
+                    <Border Stroke="{AppThemeBinding Light=#E0E0E0, Dark=#404040}"
+                            StrokeThickness="1"
+                            BackgroundColor="{AppThemeBinding Light=White, Dark=#2D2D30}"
+                            Padding="12"
+                            Margin="8,4">
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="8" />
+                        </Border.StrokeShape>
+
+                        <Grid RowDefinitions="Auto,Auto,Auto,Auto" ColumnDefinitions="*,Auto">
+                            <!-- Header row -->
+                            <StackLayout Grid.Row="0" Grid.Column="0" Orientation="Horizontal">
+                                <Label Text="{Binding To}" 
+                                       FontAttributes="Bold" 
+                                       FontSize="16"
+                                       TextColor="{AppThemeBinding Light=Black, Dark=White}" />
+                                <Label Text="{Binding StatusText}" 
+                                       FontSize="12"
+                                       FontAttributes="Bold"
+                                       TextColor="{Binding StatusColor}"
+                                       Margin="8,0,0,0" />
+                            </StackLayout>
+
+                            <Label Grid.Row="0" Grid.Column="1"
+                                   Text="{Binding AttemptText}"
+                                   FontSize="12"
+                                   TextColor="{AppThemeBinding Light=#666666, Dark=#CCCCCC}"
+                                   VerticalOptions="Center" />
+
+                            <!-- Subject -->
+                            <Label Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
+                                   Text="{Binding ShortSubject}"
+                                   FontSize="14"
+                                   TextColor="{AppThemeBinding Light=#333333, Dark=#DDDDDD}"
+                                   Margin="0,4,0,0" />
+
+                            <!-- Timestamps -->
+                            <StackLayout Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" 
+                                         Orientation="Horizontal" 
+                                         Margin="0,4,0,0">
+                                <Label Text="Created:" 
+                                       FontSize="12" 
+                                       TextColor="{AppThemeBinding Light=#666666, Dark=#CCCCCC}" />
+                                <Label Text="{Binding CreatedAtText}" 
+                                       FontSize="12" 
+                                       TextColor="{AppThemeBinding Light=#666666, Dark=#CCCCCC}" 
+                                       Margin="4,0,12,0" />
+                                <Label Text="Last Attempt:" 
+                                       FontSize="12" 
+                                       TextColor="{AppThemeBinding Light=#666666, Dark=#CCCCCC}" />
+                                <Label Text="{Binding LastAttemptText}" 
+                                       FontSize="12" 
+                                       TextColor="{AppThemeBinding Light=#666666, Dark=#CCCCCC}" 
+                                       Margin="4,0,0,0" />
+                            </StackLayout>
+
+                            <!-- Error message -->
+                            <Label Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2"
+                                   Text="{Binding LastError}"
+                                   FontSize="12"
+                                   TextColor="Red"
+                                   IsVisible="{Binding HasError}"
+                                   Margin="0,4,0,0" />
+                        </Grid>
+                    </Border>
+                </SwipeView>
+            </DataTemplate>
+        </ResourceDictionary>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="Auto,Auto,*">
+        <!-- Status Bar -->
+        <Border Grid.Row="0"
+                BackgroundColor="{AppThemeBinding Light=#F5F5F5, Dark=#1E1E1E}"
+                Padding="16,12">
+            <Border.StrokeShape>
+                <RoundRectangle CornerRadius="0" />
+            </Border.StrokeShape>
+            <!-- Bottom border effect -->
+            <Border.Shadow>
+                <Shadow Brush="{AppThemeBinding Light=#E0E0E0, Dark=#404040}" 
+                        Offset="0,1" 
+                        Radius="0" 
+                        Opacity="1" />
+            </Border.Shadow>
+
+            <Grid ColumnDefinitions="Auto,*,Auto">
+                <!-- Online/Offline Status -->
+                <StackLayout Grid.Column="0" Orientation="Horizontal">
+                    <Ellipse WidthRequest="12" 
+                             HeightRequest="12" 
+                             Fill="{Binding IsOnline, Converter={StaticResource OnlineStatusToColorConverter}}" 
+                             VerticalOptions="Center" />
+                    <Label Text="{Binding IsOnline, StringFormat='{0}'}" 
+                           FontAttributes="Bold"
+                           FontSize="14"
+                           TextColor="{Binding IsOnline, Converter={StaticResource OnlineStatusToColorConverter}}"
+                           Margin="8,0,0,0"
+                           VerticalOptions="Center" />
+                </StackLayout>
+
+                <!-- Status Message -->
+                <Label Grid.Column="1"
+                       Text="{Binding StatusMessage}"
+                       FontSize="12"
+                       TextColor="{AppThemeBinding Light=#666666, Dark=#CCCCCC}"
+                       HorizontalOptions="Center"
+                       VerticalOptions="Center" />
+
+                <!-- Refresh Button -->
+                <Button Grid.Column="2"
+                        Text="↻"
+                        FontSize="16"
+                        WidthRequest="40"
+                        HeightRequest="40"
+                        BackgroundColor="Transparent"
+                        TextColor="{AppThemeBinding Light=#007ACC, Dark=#4FC3F7}"
+                        Command="{Binding RefreshEmailsCommand}"
+                        IsEnabled="{Binding IsLoading, Converter={StaticResource InvertedBoolConverter}}" />
+            </Grid>
+        </Border>
+
+        <!-- Statistics Bar -->
+        <Border Grid.Row="1"
+                BackgroundColor="{AppThemeBinding Light=White, Dark=#2D2D30}"
+                Padding="16,8">
+            <Border.StrokeShape>
+                <RoundRectangle CornerRadius="0" />
+            </Border.StrokeShape>
+            <!-- Bottom border effect -->
+            <Border.Shadow>
+                <Shadow Brush="{AppThemeBinding Light=#E0E0E0, Dark=#404040}" 
+                        Offset="0,1" 
+                        Radius="0" 
+                        Opacity="1" />
+            </Border.Shadow>
+
+            <Grid ColumnDefinitions="*,*,*,*">
+                <StackLayout Grid.Column="0" HorizontalOptions="Center">
+                    <Label Text="{Binding TotalEmails}" 
+                           FontAttributes="Bold" 
+                           FontSize="18" 
+                           HorizontalOptions="Center"
+                           TextColor="{AppThemeBinding Light=Black, Dark=White}" />
+                    <Label Text="Total" 
+                           FontSize="12" 
+                           HorizontalOptions="Center"
+                           TextColor="{AppThemeBinding Light=#666666, Dark=#CCCCCC}" />
+                </StackLayout>
+
+                <StackLayout Grid.Column="1" HorizontalOptions="Center">
+                    <Label Text="{Binding PendingEmails}" 
+                           FontAttributes="Bold" 
+                           FontSize="18" 
+                           HorizontalOptions="Center"
+                           TextColor="Orange" />
+                    <Label Text="Pending" 
+                           FontSize="12" 
+                           HorizontalOptions="Center"
+                           TextColor="{AppThemeBinding Light=#666666, Dark=#CCCCCC}" />
+                </StackLayout>
+
+                <StackLayout Grid.Column="2" HorizontalOptions="Center">
+                    <Label Text="{Binding SentEmails}" 
+                           FontAttributes="Bold" 
+                           FontSize="18" 
+                           HorizontalOptions="Center"
+                           TextColor="Green" />
+                    <Label Text="Sent" 
+                           FontSize="12" 
+                           HorizontalOptions="Center"
+                           TextColor="{AppThemeBinding Light=#666666, Dark=#CCCCCC}" />
+                </StackLayout>
+
+                <StackLayout Grid.Column="3" HorizontalOptions="Center">
+                    <Label Text="{Binding FailedEmails}" 
+                           FontAttributes="Bold" 
+                           FontSize="18" 
+                           HorizontalOptions="Center"
+                           TextColor="Red" />
+                    <Label Text="Failed" 
+                           FontSize="12" 
+                           HorizontalOptions="Center"
+                           TextColor="{AppThemeBinding Light=#666666, Dark=#CCCCCC}" />
+                </StackLayout>
+            </Grid>
+        </Border>
+
+        <!-- Email List -->
+        <RefreshView Grid.Row="2"
+                     IsRefreshing="{Binding IsRefreshing}"
+                     Command="{Binding RefreshEmailsCommand}">
+
+            <CollectionView ItemsSource="{Binding Emails}"
+                            ItemTemplate="{StaticResource EmailItemTemplate}"
+                            BackgroundColor="{AppThemeBinding Light=#F8F8F8, Dark=#1E1E1E}"
+                            SelectionMode="Single"
+                            SelectedItem="{Binding SelectedEmail}">
+
+                <CollectionView.EmptyView>
+                    <StackLayout HorizontalOptions="Center" 
+                                 VerticalOptions="Center"
+                                 Padding="20">
+                        <Label Text="📧" 
+                               FontSize="48" 
+                               HorizontalOptions="Center" 
+                               TextColor="{AppThemeBinding Light=#CCCCCC, Dark=#666666}" />
+                        <Label Text="No emails in queue" 
+                               FontSize="16" 
+                               HorizontalOptions="Center"
+                               TextColor="{AppThemeBinding Light=#666666, Dark=#CCCCCC}" />
+                        <Button Text="Refresh" 
+                                Command="{Binding LoadEmailsCommand}"
+                                HorizontalOptions="Center"
+                                Margin="0,16,0,0" />
+                    </StackLayout>
+                </CollectionView.EmptyView>
+            </CollectionView>
+        </RefreshView>
+
+        <!-- Loading Overlay -->
+        <Border Grid.Row="0" Grid.RowSpan="3"
+                BackgroundColor="#80000000"
+                IsVisible="{Binding IsLoading}">
+            <ActivityIndicator IsRunning="{Binding IsLoading}"
+                               HorizontalOptions="Center"
+                               VerticalOptions="Center"
+                               Color="{AppThemeBinding Light=#007ACC, Dark=#4FC3F7}" />
+        </Border>
+
+        <!-- Floating Action Menu positioned at bottom right -->
+        <StackLayout Grid.Row="2"
+                     VerticalOptions="End" 
+                     HorizontalOptions="End" 
+                     Margin="16,0,16,100"
+                     Spacing="12">
+
+            <!-- Process Queue -->
+            <Button Text="▶"
+                    Style="{StaticResource FabButtonStyle}"
+                    BackgroundColor="#4CAF50"
+                    Command="{Binding ProcessQueueCommand}"
+                    ToolTipProperties.Text="Process Queue" />
+
+            <!-- Clear Sent Emails -->
+            <Button Text="🗑"
+                    Style="{StaticResource FabButtonStyle}"
+                    BackgroundColor="#FF9800"
+                    Command="{Binding ClearSentEmailsCommand}"
+                    ToolTipProperties.Text="Clear Sent Emails" />
+
+            <!-- Retry Failed -->
+            <Button Text="❗"
+                    Style="{StaticResource FabButtonStyle}"
+                    BackgroundColor="#FF5722"
+                    Command="{Binding RetryFailedEmailsCommand}"
+                    ToolTipProperties.Text="Retry Failed Emails" />
+
+            <!-- Retry All -->
+            <Button Text="🔄"
+                    Style="{StaticResource FabButtonStyle}"
+                    BackgroundColor="#2196F3"
+                    Command="{Binding RetryAllEmailsCommand}"
+                    ToolTipProperties.Text="Retry All Emails" />
+
+            <!-- Toggle Offline Mode -->
+            <Button Text="{Binding IsOnline, StringFormat='{0}'}"
+                    Style="{StaticResource FabButtonStyle}"
+                    BackgroundColor="{Binding IsOnline, Converter={StaticResource OnlineStatusToColorConverter}}"
+                    Command="{Binding ToggleOfflineModeCommand}"
+                    ToolTipProperties.Text="Toggle Online/Offline Mode" />
+        </StackLayout>
+    </Grid>
+
+</ContentPage>

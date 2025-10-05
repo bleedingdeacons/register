@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
+             x:Class="TheBleedingDeacons.Intergroup.Register.Views.MailSettingsPage"
+             x:DataType="vm:MailSettingsViewModel"
+             Title="Mail Settings">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="15">
+
+            <Label Text="SMTP Configuration" 
+                   FontSize="24" 
+                   FontAttributes="Bold"/>
+
+            <!-- Status Message -->
+            <Frame IsVisible="{Binding IsStatusVisible}"
+                   BackgroundColor="{Binding IsStatusError, Converter={StaticResource BoolToColorConverter}}"
+                   BorderColor="Transparent"
+                   Padding="15">
+                <Label Text="{Binding StatusMessage}" 
+                       TextColor="White"
+                       FontAttributes="Bold"/>
+            </Frame>
+
+            <!-- Quick Setup Buttons -->
+            <Frame BackgroundColor="{AppThemeBinding Light=#F5F5F5, Dark=#2D2D30}">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="Quick Setup" 
+                           FontSize="16" 
+                           FontAttributes="Bold"/>
+                    <StackLayout Orientation="Horizontal" Spacing="10">
+                        <Button Text="Gmail" 
+                                Command="{Binding SetGmailDefaultsCommand}"
+                                BackgroundColor="#4285F4"
+                                TextColor="White"
+                                WidthRequest="80"/>
+                        <Button Text="Outlook" 
+                                Command="{Binding SetOutlookDefaultsCommand}"
+                                BackgroundColor="#0078D4"
+                                TextColor="White"
+                                WidthRequest="80"/>
+                        <Button Text="Yahoo" 
+                                Command="{Binding SetYahooDefaultsCommand}"
+                                BackgroundColor="#6001D2"
+                                TextColor="White"
+                                WidthRequest="80"/>
+                    </StackLayout>
+                </VerticalStackLayout>
+            </Frame>
+
+            <!-- SMTP Server Settings -->
+            <Frame BackgroundColor="{AppThemeBinding Light=White, Dark=#2D2D30}" 
+                   BorderColor="{AppThemeBinding Light=LightGray, Dark=Gray}">
+                <VerticalStackLayout Spacing="15">
+
+                    <Label Text="SMTP Server Settings" 
+                           FontSize="18" 
+                           FontAttributes="Bold"/>
+
+                    <VerticalStackLayout>
+                        <Label Text="SMTP Host *"/>
+                        <Entry Text="{Binding Host}" 
+                               Placeholder="smtp.gmail.com"/>
+                    </VerticalStackLayout>
+
+                    <Grid ColumnDefinitions="2*,*" ColumnSpacing="10">
+                        <VerticalStackLayout Grid.Column="0">
+                            <Label Text="Port *"/>
+                            <Entry Text="{Binding Port}" 
+                                   Placeholder="587"
+                                   Keyboard="Numeric"/>
+                        </VerticalStackLayout>
+
+                        <VerticalStackLayout Grid.Column="1">
+                            <Label Text="Enable SSL"/>
+                            <Switch IsToggled="{Binding EnableSsl}" 
+                                    VerticalOptions="Center"/>
+                        </VerticalStackLayout>
+                    </Grid>
+
+                </VerticalStackLayout>
+            </Frame>
+
+            <!-- Authentication -->
+            <Frame BackgroundColor="{AppThemeBinding Light=White, Dark=#2D2D30}" 
+                   BorderColor="{AppThemeBinding Light=LightGray, Dark=Gray}">
+                <VerticalStackLayout Spacing="15">
+
+                    <Label Text="Authentication" 
+                           FontSize="18" 
+                           FontAttributes="Bold"/>
+
+                    <VerticalStackLayout>
+                        <Label Text="Email Address *"/>
+                        <Entry Text="{Binding Username}" 
+                               Placeholder="your-email@gmail.com"
+                               Keyboard="Email"/>
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout>
+                        <Label Text="Password / App Password *"/>
+                        <Entry Text="{Binding Password}" 
+                               Placeholder="Enter password or app password"
+                               IsPassword="True"/>
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout>
+                        <Label Text="From Display Name"/>
+                        <Entry Text="{Binding FromDisplayName}" 
+                               Placeholder="Your App Name"/>
+                    </VerticalStackLayout>
+
+                </VerticalStackLayout>
+            </Frame>
+
+            <!-- Help Section -->
+            <Frame BackgroundColor="{AppThemeBinding Light=#E3F2FD, Dark=#1E3A8A}" 
+                   BorderColor="{AppThemeBinding Light=#2196F3, Dark=#3B82F6}">
+                <VerticalStackLayout>
+                    <Label Text="💡 Gmail Users" 
+                           FontAttributes="Bold" 
+                           TextColor="{AppThemeBinding Light=#1976D2, Dark=#60A5FA}"/>
+                    <Label TextColor="{AppThemeBinding Light=#1565C0, Dark=#93C5FD}">
+                        <Label.FormattedText>
+                            <FormattedString>
+                                <Span Text="• Use smtp.gmail.com, Port 587, SSL enabled"/>
+                                <Span Text="&#x0a;• Use App Password instead of regular password"/>
+                                <Span Text="&#x0a;• Enable 2FA and generate App Password in Google Account settings"/>
+                            </FormattedString>
+                        </Label.FormattedText>
+                    </Label>
+                </VerticalStackLayout>
+            </Frame>
+
+            <!-- Action Buttons -->
+            <VerticalStackLayout Spacing="10">
+                <Button Text="{Binding IsTestingConnection, Converter={StaticResource BoolToTestButtonTextConverter}}" 
+                        Command="{Binding TestConnectionCommand}"
+                        IsEnabled="{Binding IsFormValid}"
+                        BackgroundColor="{AppThemeBinding Light=#4CAF50, Dark=#22C55E}"
+                        TextColor="White">
+                    <Button.Triggers>
+                        <DataTrigger TargetType="Button" 
+                                     Binding="{Binding IsTestingConnection}" 
+                                     Value="True">
+                            <Setter Property="BackgroundColor" Value="Gray"/>
+                        </DataTrigger>
+                    </Button.Triggers>
+                </Button>
+
+                <Button Text="{Binding IsSaving, Converter={StaticResource BoolToSaveButtonTextConverter}}" 
+                        Command="{Binding SaveSettingsCommand}"
+                        IsEnabled="{Binding IsFormValid}"
+                        BackgroundColor="{AppThemeBinding Light=#2196F3, Dark=#3B82F6}"
+                        TextColor="White">
+                    <Button.Triggers>
+                        <DataTrigger TargetType="Button" 
+                                     Binding="{Binding IsSaving}" 
+                                     Value="True">
+                            <Setter Property="BackgroundColor" Value="Gray"/>
+                        </DataTrigger>
+                    </Button.Triggers>
+                </Button>
+            </VerticalStackLayout>
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

@@ -1,0 +1,302 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodels="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
+             x:Class="TheBleedingDeacons.Intergroup.Register.Views.GroupEditPage"
+             x:DataType="viewmodels:GroupEditViewModel"
+             Title="{Binding Title}">
+
+    <ScrollView>
+        <Grid Padding="20"
+              RowSpacing="15">
+
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <!-- Question Label at Top -->
+            <Label Grid.Row="0"
+                   Text="Is this information correct?"
+                   HorizontalOptions="Center"                    
+                   Style="{StaticResource Question}">
+                <Label.IsVisible>
+                    <MultiBinding Converter="{StaticResource QuestionVisibilityConverter}">
+                        <Binding Path="IsEditing" />
+                        <Binding Path="HasValidationErrors" />
+                    </MultiBinding>
+                </Label.IsVisible>
+            </Label>
+
+            <!-- Frame with Drop Shadow containing GSR and Group fields -->
+            <Frame Grid.Row="1"
+                   BackgroundColor="White"
+                   HasShadow="True"
+                   Style="{StaticResource GsrDetails}">
+
+                <Grid RowSpacing="15">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+
+                    <Grid Grid.Row="0">
+                        <Label Text="Group Service Representative" 
+                        Style="{StaticResource HeaderLabelStyle}"/>
+                    </Grid>
+                    <!-- GSR Name Field -->
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="120" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackLayout Grid.Column="0" Orientation="Horizontal" VerticalOptions="Center">
+                            <Label Text="Name:"                                   
+                                   Style="{StaticResource FieldLabelStyle}" />
+                            <Label Text="*"
+                                   TextColor="Red"
+                                   FontAttributes="Bold" />
+                        </StackLayout>
+
+                        <Label Grid.Column="1"                               
+                               Text="{Binding DisplayGsrName}"
+                               VerticalOptions="Center"
+                               IsVisible="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}" 
+                               Style="{StaticResource ValueLabelStyle}" />
+
+                        <Entry Grid.Column="1"
+                               Text="{Binding EditGsrName}"
+                               IsVisible="{Binding IsEditing}"
+                               Placeholder="Tap to enter your name..">
+                            <!--Style="EntryEdit">-->
+                            <Entry.Keyboard>
+                                <Keyboard x:FactoryMethod="Create">
+                                    <x:Arguments>
+                                        <KeyboardFlags>CapitalizeWord</KeyboardFlags>
+                                    </x:Arguments>
+                                </Keyboard>
+                            </Entry.Keyboard>
+                        </Entry>
+                    </Grid>
+
+                    <!-- GSR Email Field -->
+                    <Grid Grid.Row="2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="120" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackLayout Grid.Column="0" Orientation="Horizontal" VerticalOptions="Center">
+                            <Label Text="Email:"                                   
+                                   Style="{StaticResource FieldLabelStyle}" />
+                            <Label Text="*"
+                                   TextColor="Orange"
+                                   FontAttributes="Bold"
+                                   ToolTipProperties.Text="Either email or phone required" />
+                        </StackLayout>
+
+                        <Label Grid.Column="1"
+                               Text="{Binding DisplayGsrEmailPersonal}"
+                                VerticalOptions="Center"
+                               Style="{StaticResource ValueLabelStyle}"
+                               IsVisible="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}" />
+
+                        <Entry Grid.Column="1"
+                               Text="{Binding EditGsrEmailPersonal}"
+                               IsVisible="{Binding IsEditing}"
+                               Keyboard="Email"                               
+                               Placeholder="Tap to enter your email address.." 
+                               Style="{StaticResource EntryEdit}"/>
+                    </Grid>
+
+                    <!-- GSR Phone Field -->
+                    <Grid Grid.Row="3">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="120" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackLayout Grid.Column="0" Orientation="Horizontal" VerticalOptions="Center">
+                            <Label Text="Mobile:"                                   
+                                   Style="{StaticResource FieldLabelStyle}" />
+                            <Label Text="*"
+                                   TextColor="Orange"
+                                   FontAttributes="Bold"
+                                   ToolTipProperties.Text="Either email or phone required" />
+                        </StackLayout>
+
+                        <Label Grid.Column="1"
+                               Text="{Binding DisplayGsrPhone}"
+                               VerticalOptions="Center"
+                                               IsVisible="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}" 
+                               Style="{StaticResource ValueLabelStyle}" />
+
+                        <Entry Grid.Column="1"
+                               Text="{Binding EditGsrPhone}"
+                               IsVisible="{Binding IsEditing}"
+                               Keyboard="Telephone"                               
+                               Placeholder="Tap to enter your mobile number.."  />
+                    </Grid>
+
+                   
+                </Grid>
+            </Frame>
+            <Frame Grid.Row="2">
+                <Grid RowSpacing="15">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <!-- Header -->
+                    <Grid Grid.Row="0">
+                        <Label Text="Group Contact" Style="{StaticResource HeaderLabelStyle}"/>
+                    </Grid>
+
+                    <!-- Group Email and Using Email Fields Side by Side -->
+                    <Grid Grid.Row="1" ColumnSpacing="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Group Email Field -->
+                        <Grid Grid.Column="0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <Label Grid.Row="0"
+                       Text="Group Email:"
+                       HorizontalOptions="Start"
+                       Style="{StaticResource FieldLabelStyle}" />
+
+                            <Label Grid.Row="1"
+                       Text="{Binding DisplayGroupGenericEmail}"
+                       HorizontalOptions="Start"
+                       Style="{StaticResource ValueLabelStyle}" />
+                        </Grid>
+
+                        <!-- Using Email Field -->
+                        <Grid Grid.Column="1">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <Label Grid.Row="0"
+                       Text="Using Email:"
+                       HorizontalOptions="Start"
+                       Style="{StaticResource FieldLabelStyle}">
+                                <Label.IsVisible>
+                                    <MultiBinding Converter="{StaticResource StringNotEmptyConverter}">
+                                        <Binding Path="DisplayGroupGenericEmail" />
+                                        <Binding Path="EditGroupGenericEmail" />
+                                        <Binding Path="IsEditing" />
+                                    </MultiBinding>
+                                </Label.IsVisible>
+                            </Label>
+
+                            <!-- Display label when not editing -->
+                            <Label Grid.Row="1"
+                       Text="{Binding DisplayUsingGeneric, Converter={StaticResource BoolToYesNoConverter}}"
+                       HorizontalOptions="Start"
+                       Style="{StaticResource ValueLabelStyle}">
+                                <Label.IsVisible>
+                                    <MultiBinding Converter="{StaticResource StringNotEmptyAndNotEditingConverter}">
+                                        <Binding Path="DisplayGroupGenericEmail" />
+                                        <Binding Path="IsEditing" />
+                                    </MultiBinding>
+                                </Label.IsVisible>
+                            </Label>
+
+                            <!-- Checkbox when editing -->
+                            <CheckBox Grid.Row="1"
+                          IsChecked="{Binding EditUsingGeneric}"
+                          HorizontalOptions="Start">
+                                <CheckBox.IsVisible>
+                                    <MultiBinding Converter="{StaticResource StringNotEmptyAndEditingConverter}">
+                                        <Binding Path="DisplayGroupGenericEmail" />
+                                        <Binding Path="IsEditing" />
+                                    </MultiBinding>
+                                </CheckBox.IsVisible>
+                            </CheckBox>
+                        </Grid>
+                    </Grid>
+                </Grid>
+            </Frame>
+            <!-- Validation Message (only visible when not editing and has errors) -->
+            <Label Grid.Row="5"
+                   Text="{Binding ValidationMessage}"
+                   FontSize="14"
+                   TextColor="Red"
+                   HorizontalOptions="Center"
+                   Margin="0,10,0,10">
+                <Label.IsVisible>
+                    <MultiBinding Converter="{StaticResource ValidationVisibilityConverter}">
+                        <Binding Path="IsEditing" />
+                        <Binding Path="HasValidationErrors" />
+                    </MultiBinding>
+                </Label.IsVisible>
+            </Label>
+
+            <!-- Spacer -->
+            <BoxView Grid.Row="3" />
+
+            <!-- Button Panel -->
+            <Grid Grid.Row="6"
+                  ColumnSpacing="10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Yes Button (when not editing) -->
+                <Button Grid.Column="0"
+                        Text="Yes"
+                        Command="{Binding ConfirmCommand}"
+                        TextColor="White"
+                        IsEnabled="{Binding CanConfirm}"
+                        IsVisible="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}"
+                        Style="{StaticResource PrimaryButtonStyle}" />
+
+                <!-- Save Button (when editing) -->
+                <Button Grid.Column="0"
+                        Text="Save"
+                        Command="{Binding SaveCommand}"
+                        TextColor="White"
+                        IsEnabled="{Binding CanSave}"
+                        IsVisible="{Binding IsEditing}"
+                        Style="{StaticResource PrimaryButtonStyle}"/>
+
+                <!-- No Button (when not editing) -->
+                <Button Grid.Column="1"
+                        Text="No"
+                        Command="{Binding StartEditCommand}"
+                        BackgroundColor="Orange"
+                        TextColor="White"
+                        IsVisible="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}"
+                        Style="{StaticResource PrimaryButtonStyle}"/>
+
+                <!-- Cancel Button (when editing) -->
+                <Button Grid.Column="1"
+                        Text="Cancel"
+                        Command="{Binding CancelCommand}"
+                        BackgroundColor="Orange"
+                        TextColor="White"
+                        IsVisible="{Binding IsEditing}"
+                        Style="{StaticResource PrimaryButtonStyle}"/>
+            </Grid>
+        </Grid>
+    </ScrollView>
+</ContentPage>

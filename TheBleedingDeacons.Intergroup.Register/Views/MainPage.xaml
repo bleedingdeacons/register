@@ -1,0 +1,79 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage x:Class="TheBleedingDeacons.Intergroup.Register.Views.MainPage"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
+             x:DataType="vm:MainPageViewModel"
+             Title="{Binding Title}">
+
+    <ScrollView>
+        <VerticalStackLayout Spacing="30" Padding="30,0" VerticalOptions="Center">
+
+            <Image Source="badi.png"
+                   HeightRequest="185"
+                   Aspect="AspectFit" />
+
+            <Label x:Name="WelcomeLabel"
+                   FontSize="32"
+                   FontAttributes="Bold"
+                   Text="Welcome to Bristol and District Intergroup"
+                   HorizontalOptions="Center" />
+
+            <!-- Main action buttons -->
+            <FlexLayout Direction="Row" 
+                Wrap="Wrap" 
+                JustifyContent="SpaceBetween" 
+                AlignItems="Stretch"
+                AlignContent="Start">
+
+                <Button x:Name="RegisterBtn" Style="{StaticResource PrimaryButtonStyle}"
+                    Text="I'm a Group Service Representative 👆"
+                    Command="{Binding SelectDayCommand}"
+                    IsEnabled="{Binding IsBusy, Converter={StaticResource InvertedBoolConverter}}"
+                    HeightRequest="120"
+                    FlexLayout.Basis="48%"
+                    Margin="0,0,5,10" />
+
+                <Button x:Name="RegisterLOBtn" Style="{StaticResource PrimaryButtonStyle}"
+                    Text="I have an Intergroup Position 👆"                    
+                    Command="{Binding SelectPositionCommand}"
+                    IsEnabled="{Binding IsBusy, Converter={StaticResource InvertedBoolConverter}}"
+                    HeightRequest="120"
+                    FlexLayout.Basis="48%"
+                    Margin="5,0,0,10" />
+
+            </FlexLayout>
+            <!-- Quick info card -->
+            <!--<Border BackgroundColor="{StaticResource Gray50}"
+                   StrokeShape="RoundRectangle 12"
+                   Padding="20"
+                   Stroke="{StaticResource Gray200}"
+                   StrokeThickness="1">
+
+                <StackLayout Spacing="10">
+                    <Label Text="💡 Quick Start"
+                           FontSize="16"
+                           FontAttributes="Bold"
+                           TextColor="{StaticResource Primary}" />
+
+                    <Label FontSize="14"
+                           TextColor="{StaticResource Gray700}"
+                           LineBreakMode="WordWrap">
+                        <Label.Text>
+                            • Use "Register by Day" to find groups by day of the week
+                            • Use "View All Groups" to see the complete list
+                            • Access Settings ⚙️ to import/export Excel files
+                        </Label.Text>
+                    </Label>
+                </StackLayout>
+            </Border>-->
+
+            <ActivityIndicator IsVisible="{Binding IsBusy}"
+                              IsRunning="{Binding IsBusy}"
+                              Color="{StaticResource Primary}"
+                              HorizontalOptions="Center" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

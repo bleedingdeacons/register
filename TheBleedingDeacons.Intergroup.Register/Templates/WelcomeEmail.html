@@ -1,0 +1,129 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title>Welcome to Bristol and District Intergroup!</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .content {
+            padding: 20px 0;
+            line-height: 1.6;
+        }
+
+        .highlight {
+            color: #667eea;
+            font-weight: bold;
+        }
+
+        /* Table Styles - IMPORTANT! */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background-color: #fff;
+        }
+
+        th {
+            background-color: #667eea;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: bold;
+        }
+
+        td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+
+        .info-section {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎉 Welcome to Bristol and District Intergroup!</h1>
+        </div>
+        <div class="content">
+            <h2>Hello {{FirstName}},</h2>
+
+            <p>We have the following information for your group <strong>{{GroupName}}</strong>:</p>
+
+            <div class="info-section">
+                <p><strong>🕐 Time:</strong> {{StartTime}}</p>
+                <p><strong>📍 Location:</strong> {{Location}}</p>
+                <p><strong>🏠 Address:</strong> {{Address}}</p>
+            </div>
+
+            <h3>📋 Group Contacts:</h3>
+
+            {{#if GroupContacts}}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Mobile</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{#each GroupContacts}}
+                    <tr>
+                        <td><strong>{{Name}}</strong></td>
+                        <td>{{Email}}</td>
+                        <td>{{Mobile}}</td>
+                    </tr>
+                    {{/each}}
+                </tbody>
+            </table>
+            {{/if}}
+
+            <p class="highlight">📧 Please could you check and reply to this email if any changes are required.</p>
+
+            <p>If you have any questions or need assistance, please don't hesitate to contact us.</p>
+        </div>
+
+        <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
+            <p>
+                <strong>Thanks!</strong><br />
+                Bristol and District Intergroup Meeting Support
+            </p>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,8 @@
+<maui:MauiWinUIApplication
+    x:Class="TheBleedingDeacons.Intergroup.Register.WinUI.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:maui="using:Microsoft.Maui"
+    xmlns:local="using:TheBleedingDeacons.Intergroup.Register.WinUI">
+</maui:MauiWinUIApplication>
+<!-- The above code is a simplified version of the original App.xaml file for a .NET MAUI application targeting Windows. -->

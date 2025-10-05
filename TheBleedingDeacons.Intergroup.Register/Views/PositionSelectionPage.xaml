@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage x:Class="TheBleedingDeacons.Intergroup.Register.Views.PositionSelectionPage"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
+             xmlns:models="clr-namespace:TheBleedingDeacons.Intergroup.Register.Models"
+             x:DataType="vm:PositionSelectionViewModel"
+             Title="{Binding Title}">
+
+    <Grid>
+        <!-- Main content - hidden while loading -->
+        <Grid RowDefinitions="Auto,Auto,*" IsVisible="{Binding IsDataLoaded}">
+
+            <!-- Header with selected context -->
+            <Border Grid.Row="0" 
+                    BackgroundColor="{StaticResource Primary}"
+                    Padding="20,15"
+                    Margin="0,0,0,10">
+                <StackLayout Orientation="Horizontal" 
+                            HorizontalOptions="CenterAndExpand"
+                            Spacing="10">
+                    <Label Text="👥" 
+                           FontSize="24" 
+                           VerticalOptions="Center" />
+                    <Label Text="{Binding Header}" 
+                           FontSize="20" 
+                           FontAttributes="Bold"
+                           TextColor="White" 
+                           VerticalOptions="Center" />
+                </StackLayout>
+            </Border>
+
+            <!-- Positions list -->
+            <CollectionView Grid.Row="2"
+                           ItemsSource="{Binding Positions}"
+                           SelectionMode="None">
+
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="models:Position">
+                        <Border BackgroundColor="White"
+                               StrokeShape="RoundRectangle 8"
+                               Stroke="{StaticResource Gray200}"
+                               StrokeThickness="1"
+                               Margin="15,5">
+
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type vm:PositionSelectionViewModel}}, Path=SelectPositionCommand}"
+                                                     CommandParameter="{Binding .}" />
+                            </Border.GestureRecognizers>
+
+                            <Grid Padding="15" 
+                                  RowDefinitions="Auto" 
+                                  ColumnDefinitions="*,Auto">
+
+                                <!-- Position Long Name -->
+                                <Label Grid.Row="0" Grid.Column="0"
+                                       Text="{Binding PositionLongName}"
+                                       FontSize="24"
+                                       FontAttributes="Bold"
+                                       TextColor="{StaticResource Gray900}" />
+
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+
+            </CollectionView>
+
+            <!-- Empty state -->
+            <StackLayout Grid.Row="2"
+                        Padding="40"
+                        VerticalOptions="Center"
+                        IsVisible="{Binding IsDataLoaded, Converter={StaticResource InvertedBoolConverter}}">
+
+                <Label Text="👥"
+                       FontSize="64"
+                       HorizontalOptions="Center"
+                       TextColor="{StaticResource Gray300}" />
+
+                <Label Text="No Positions Found"
+                       FontSize="20"
+                       FontAttributes="Bold"
+                       HorizontalOptions="Center"
+                       TextColor="{StaticResource Gray500}"
+                       Margin="0,20,0,0" />
+
+                <Label Text="No positions are currently available for selection."
+                       FontSize="16"
+                       HorizontalOptions="Center"
+                       TextColor="{StaticResource Gray400}"
+                       HorizontalTextAlignment="Center"
+                       Margin="0,10,0,20" />
+
+            </StackLayout>
+
+        </Grid>
+
+        <!-- Loading indicator - centered and visible while loading -->
+        <StackLayout IsVisible="{Binding IsLoading}"
+                     VerticalOptions="CenterAndExpand"
+                     HorizontalOptions="CenterAndExpand">
+            <ActivityIndicator IsRunning="{Binding IsLoading}"
+                              Color="{StaticResource Primary}"
+                              Scale="1.5" />
+            <Label Text="Loading positions..."
+                   HorizontalOptions="Center"
+                   Margin="0,20,0,0"
+                   FontSize="16"
+                   TextColor="{StaticResource Gray600}" />
+        </StackLayout>
+
+    </Grid>
+
+</ContentPage>

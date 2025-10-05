@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage x:Class="TheBleedingDeacons.Intergroup.Register.Views.DaySelectionPage"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
+             xmlns:models="clr-namespace:TheBleedingDeacons.Intergroup.Register.Models"
+             x:DataType="vm:DaySelectionViewModel"
+             Title="{Binding Title}">
+
+    <Grid RowDefinitions="Auto,*" Padding="20">
+
+        <!-- Header -->
+        <StackLayout Grid.Row="0" Spacing="10">
+            <Label x:Name="QuestionLabel"
+                   Style="{StaticResource Question}"
+                   Text="My Meeting is held on?"
+                   HorizontalOptions="Center" />
+        </StackLayout>
+
+        <!-- Days FlexLayout -->
+        <ScrollView Grid.Row="1" VerticalOptions="Center">
+            <FlexLayout BindableLayout.ItemsSource="{Binding Days}"
+                       Direction="Row"
+                       Wrap="Wrap"
+                       JustifyContent="Center"
+                       AlignContent="Center"
+                       Margin="0,30,0,30">
+
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate x:DataType="models:DayItem">
+                        <Button Text="{Binding Name}"
+                               Style="{StaticResource PrimaryButtonStyle}"
+                               HeightRequest="130"
+                               WidthRequest="350"
+                               Margin="7.5"
+                               Command="{Binding Source={RelativeSource AncestorType={x:Type vm:DaySelectionViewModel}}, Path=SelectDayCommand}"
+                               CommandParameter="{Binding .}"/>
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </FlexLayout>
+        </ScrollView>
+
+        <ActivityIndicator IsVisible="{Binding IsBusy}"
+                          IsRunning="{Binding IsBusy}"
+                          Color="{StaticResource Primary}"
+                          HorizontalOptions="Center"
+                          HeightRequest="40" />
+
+    </Grid>
+
+</ContentPage>

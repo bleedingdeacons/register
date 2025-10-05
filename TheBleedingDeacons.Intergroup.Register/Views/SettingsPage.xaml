@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+             x:Class="TheBleedingDeacons.Intergroup.Register.Views.SettingsPage"
+             Title="Settings">
+
+    <ScrollView>
+        <StackLayout Orientation="Vertical" 
+                     Spacing="20" 
+                     Margin="20"
+                     VerticalOptions="Start">
+
+            <Label Text="Settings" 
+                   FontSize="32" 
+                   FontAttributes="Bold" 
+                   HorizontalOptions="Center" 
+                   Margin="0,0,0,30"/>
+
+            <Button x:Name="ImportExportButton"
+                    Text="Import/Export"
+                    FontSize="18"
+                    BackgroundColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
+                    TextColor="White"
+                    CornerRadius="8"
+                    HeightRequest="60"
+                    Command="{Binding NavigateToImportExportCommand}"/>
+
+            <Button x:Name="MailSettingButton"
+                    Text="Mail Settings"
+                    FontSize="18"
+                    BackgroundColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
+                    TextColor="White"
+                    CornerRadius="8"
+                    HeightRequest="60"
+                    Command="{Binding NavigateToMailSettingCommand}"/>
+
+            <Button x:Name="BackupButton"
+                    Text="Database Backup"
+                    FontSize="18"
+                    BackgroundColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
+                    TextColor="White"
+                    CornerRadius="8"
+                    HeightRequest="60"
+                    Command="{Binding NavigateToBackupCommand}"/>
+
+            <Button x:Name="EmailStatusButton"
+                    Text="Email Status"
+                    FontSize="18"
+                    BackgroundColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
+                    TextColor="White"
+                    CornerRadius="8"
+                    HeightRequest="60"
+                    Command="{Binding NavigateToMailStatusCommand}"/>
+
+            <!--<Button x:Name="AboutButton"
+                    Text="About"
+                    FontSize="18"
+                    BackgroundColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
+                    TextColor="White"
+                    CornerRadius="8"
+                    HeightRequest="60"
+                    Command="{Binding NavigateToAboutCommand}"/>-->
+
+        </StackLayout>
+    </ScrollView>
+
+</ContentPage>
