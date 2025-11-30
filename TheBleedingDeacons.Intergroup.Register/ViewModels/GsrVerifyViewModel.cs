@@ -38,7 +38,6 @@ public partial class GsrVerifyViewModel : BaseViewModel
 
     [ObservableProperty]
     private bool canRegister = false;
-    
 
     public GsrVerifyViewModel(DataService registrationService, IAttendanceRegistration<Group> attendanceRegistration, IGroupRepository groupRepository, IPopupNotification popupService)
     {
@@ -116,9 +115,9 @@ public partial class GsrVerifyViewModel : BaseViewModel
             {
                 Group = group;
                 if (!group.Name.Contains(group.Day))
-                    Title = $"Gsr for {group.Name} on {group.Day}";
+                    Title = $"{group.Name} on {group.Day}";
                 else
-                    Title = $"Gsr for {group.Name}";
+                    Title = $"{group.Name}";
 
                 CanRegister = group.HasAll();
             }

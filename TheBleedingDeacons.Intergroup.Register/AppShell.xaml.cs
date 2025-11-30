@@ -15,7 +15,7 @@ public partial class AppShell : Shell
         Routing.RegisterRoute(nameof(GroupSelectionPage), typeof(GroupSelectionPage));
         Routing.RegisterRoute(nameof(PositionSelectionPage), typeof(PositionSelectionPage));
         Routing.RegisterRoute(nameof(ImportExportPage), typeof(ImportExportPage));
-        Routing.RegisterRoute(nameof(GsrRegistrationPage), typeof(GsrRegistrationPage));
+        Routing.RegisterRoute(nameof(GsrVerifyPage), typeof(GsrVerifyPage));
         Routing.RegisterRoute(nameof(GroupEditPage), typeof(GroupEditPage));
         Routing.RegisterRoute(nameof(PositionEditPage), typeof(PositionEditPage));
         Routing.RegisterRoute(nameof(MailSettingsPage), typeof(MailSettingsPage));

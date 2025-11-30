@@ -1,9 +1,11 @@
 ﻿using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Diagnostics;
 
 namespace TheBleedingDeacons.Intergroup.Register.Models;
 
+[DebuggerDisplay("ID={ID}, PositionName={PositionName}")]
 [Table("Positions")]
 public class Position
 {

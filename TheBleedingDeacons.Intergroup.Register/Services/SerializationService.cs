@@ -37,6 +37,7 @@ public class SerializationService
             if (result != null)
             {
                 using var stream = await result.OpenReadAsync();
+
                 await _registrationService.ImportFromExcel(stream);
 
                 await Application.Current!.MainPage!.DisplayAlert("Success",

@@ -41,6 +41,11 @@ public class DataService
 
             RegisterData data = ExcelSerializer.DeserializeFromExcel(excelStream);
 
+            await _context.Groups.ExecuteDeleteAsync();
+            await _context.Positions.ExecuteDeleteAsync();
+
+            await _context.SaveChangesAsync();
+
             foreach (var group in data.Groups)
             {
                 var existingGroup = await _context.Groups.FindAsync(group.ID);
@@ -75,7 +80,7 @@ public class DataService
         }
         catch (Exception ex)
         {
-
+            Log.Error(ex, "Import from Excel Failed!");
         }
     }
 
@@ -83,9 +88,7 @@ public class DataService
     {
         await EnsureDatabaseCreatedAsync();
 
-        // ExcelPackage.License.SetNonCommercialOrganization("Your Organization");
-        OfficeOpenXml.ExcelPackage.LicenseContext = OfficeOpenXml.LicenseContext.NonCommercial;
-
+        ExcelPackage.License.SetNonCommercialOrganization("AABristol");
         using var package = new OfficeOpenXml.ExcelPackage();
 
         // Sort By Day Start on Monday

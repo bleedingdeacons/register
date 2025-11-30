@@ -117,14 +117,14 @@ public partial class GroupSelectionViewModel : BaseViewModel
         var parameters = new Dictionary<string, object> {
                 {"groupId", group.ID.ToString()} };
 
-        await Shell.Current.GoToAsync(nameof(GroupEditPage), parameters);
-
+        //await Shell.Current.GoToAsync(nameof(GroupEditPage), parameters);
+        await Shell.Current.GoToAsync(nameof(GsrVerifyPage), parameters);
     }
 
     private async Task ShowFeedback()
     {
         await Task.Delay(100);
-        await Toast.Make("Loading Group...", ToastDuration.Short).Show();            
+        //await Toast.Make("Loading Group...", ToastDuration.Short).Show();            
     }
 
 }

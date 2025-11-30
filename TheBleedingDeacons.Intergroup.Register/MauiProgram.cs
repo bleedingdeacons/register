@@ -48,6 +48,8 @@ public static class MauiProgram
         builder.Services.AddDbContext<RegisterContext>(options =>
             options.UseSqlite($"Data Source={appDbPath}"));
 
+        Log.Logger.Information("Register Db {databasePath}", appDbPath);
+
         // Mail Database
         var mailDbPath = Path.Combine(FileSystem.AppDataDirectory, MAIL_DATABASE_NAME);
         builder.Services.AddDbContextFactory<MailDbContext>(options =>
@@ -101,7 +103,7 @@ public static class MauiProgram
         builder.Services.AddTransient<TypeSelectionPage>();
         builder.Services.AddTransient<GroupSelectionPage>();
         builder.Services.AddTransient<ImportExportPage>();
-        builder.Services.AddTransient<GsrRegistrationPage>();
+        builder.Services.AddTransient<GsrVerifyPage>();
         builder.Services.AddTransient<GroupEditPage>();
         builder.Services.AddTransient<PositionEditPage>();
         builder.Services.AddTransient<PositionSelectionPage>();

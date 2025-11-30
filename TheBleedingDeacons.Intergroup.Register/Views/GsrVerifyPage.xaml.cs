@@ -4,11 +4,11 @@ using TheBleedingDeacons.Intergroup.Register.ViewModels;
 namespace TheBleedingDeacons.Intergroup.Register.Views;
 
 //[QueryProperty(nameof(GroupId), "groupId")]
-public partial class GsrRegistrationPage : ContentPage
+public partial class GsrVerifyPage : ContentPage
 {
     private readonly GsrVerifyViewModel _viewModel;
     
-    public GsrRegistrationPage(GsrVerifyViewModel viewModel)
+    public GsrVerifyPage(GsrVerifyViewModel viewModel)
     {
         InitializeComponent();
         _viewModel = viewModel;        
