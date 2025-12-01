@@ -50,7 +50,7 @@ public partial class GsrVerifyViewModel : BaseViewModel
     [ObservableProperty]
     private bool isLoading;
 
-    public void ApplyQueryAttributes(IDictionary<string, object> query)
+    public override void ApplyQueryAttributes(IDictionary<string, object> query)
     {
         if (query.ContainsKey("edited") &&
             query["edited"].ToString() == "true")

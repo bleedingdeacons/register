@@ -56,7 +56,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
         private async Task ShowFeedback()
         {
             await Task.Delay(100);
-            await Toast.Make("Loading...", ToastDuration.Short).Show();
+            //await Toast.Make("Loading...", ToastDuration.Short).Show();
         }
     }
 }

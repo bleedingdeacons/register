@@ -31,6 +31,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
         public PositionSelectionViewModel(IPositionRepository positionRepository)
         {
             _positionRepository = positionRepository;
+            Header = "My Intergroup Position is";
         }
 
         [RelayCommand]

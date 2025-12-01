@@ -124,7 +124,7 @@ public partial class GroupSelectionViewModel : BaseViewModel
     private async Task ShowFeedback()
     {
         await Task.Delay(100);
-        //await Toast.Make("Loading Group...", ToastDuration.Short).Show();            
+        await Toast.Make("Loading Group...", ToastDuration.Short).Show();
     }
 
 }
