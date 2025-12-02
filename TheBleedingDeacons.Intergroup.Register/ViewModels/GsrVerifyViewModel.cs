@@ -19,7 +19,7 @@ public partial class GsrVerifyViewModel : BaseViewModel
 {
     private static readonly ILogger Logger = AppLogger.ForContext<GsrVerifyViewModel>();
 
-    private readonly DataService _registrationService;
+    private readonly DataService _dataService;
     private readonly IAttendanceRegistration<Group> _attendanceRegistration;
     private readonly IGroupRepository _groupRepository;
     private readonly IPopupNotification _popupService;
@@ -37,12 +37,15 @@ public partial class GsrVerifyViewModel : BaseViewModel
     private bool edited;
 
     [ObservableProperty]
+    private bool standingIn;
+
+    [ObservableProperty]
     private bool canRegister = false;
 
-    public GsrVerifyViewModel(DataService registrationService, IAttendanceRegistration<Group> attendanceRegistration, IGroupRepository groupRepository, IPopupNotification popupService)
+    public GsrVerifyViewModel(DataService dataService, IAttendanceRegistration<Group> attendanceRegistration, IGroupRepository groupRepository, IPopupNotification popupService)
     {
         _attendanceRegistration = attendanceRegistration;
-        _registrationService = registrationService;
+        _dataService = dataService;
         _groupRepository = groupRepository;
         _popupService = popupService;
     }

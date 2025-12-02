@@ -13,7 +13,7 @@ public partial class GsrEditViewModel : ObservableObject, IQueryAttributable
 {
     private static readonly ILogger Logger = AppLogger.ForContext<GroupSelectionViewModel>();
 
-    private readonly DataService _registrationService;
+    private readonly DataService _dataService;
     
     [ObservableProperty]
     private Group? group;
@@ -61,9 +61,9 @@ public partial class GsrEditViewModel : ObservableObject, IQueryAttributable
     private string saveButtonText = "Save";
 
 
-    public GsrEditViewModel(DataService registrationService)
+    public GsrEditViewModel(DataService dataService)
     {
-        _registrationService = registrationService;
+        _dataService = dataService;
 
         // Initialize with default values
         ValidateForm();
@@ -396,7 +396,7 @@ public partial class GsrEditViewModel : ObservableObject, IQueryAttributable
     // This method should be implemented based on your data access layer
     private async Task SaveToDatabase(Group group)
     {
-        await _registrationService.SaveGroup(group);        
+        await _dataService.SaveGroup(group);        
     }
 
     
