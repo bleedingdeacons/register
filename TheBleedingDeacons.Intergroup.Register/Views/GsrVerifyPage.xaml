@@ -81,7 +81,7 @@
                                        Margin="0"
                                        Grid.Column="0"/>
                                 <CheckBox x:Name="StandingIn" 
-                                          BindingContext="{Binding StandingIn}"
+                                          IsChecked="{Binding StandingIn, Mode=TwoWay}"
                                           Grid.Column="1"
                                           VerticalOptions="Center"/>
                             </Grid>
@@ -93,6 +93,7 @@
                                            Style="{StaticResource FieldLabelStyle}"
                                            Margin="0"/>
                                 <Entry x:Name="StandingInEmail"
+                                           Text="{Binding StandinEmail}"
                                            Placeholder="Enter your email address"
                                            Keyboard="Email"
                                            FontSize="18"

@@ -37,7 +37,10 @@ public partial class GsrVerifyViewModel : BaseViewModel
     private bool edited;
 
     [ObservableProperty]
-    private bool standingIn;
+    private bool standingIn = false;
+
+    [ObservableProperty]
+    private string standinEmail;
 
     [ObservableProperty]
     private bool canRegister = false;
@@ -89,6 +92,12 @@ public partial class GsrVerifyViewModel : BaseViewModel
     [RelayCommand]
     public async Task Yes()
     {
+        Group.ProxyAttendance = StandingIn;
+
+        if (StandinEmail != null)
+        {
+            Group.ProxyEmail = StandinEmail;
+        }
 
         await _attendanceRegistration.Register(Group);
 
