@@ -52,8 +52,8 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 
             var emailBody = await _emailTemplate.RenderTemplateAsync("WelcomeEmail", welcome);
 
-            if (entity.GsrEmailPersonal != null)
-                await _mailService.SendEmailAsync(entity.GsrEmailPersonal, "Important information about your group.", emailBody, isHtml:true);
+            //if (entity.GsrEmailPersonal != null)
+            //    await _mailService.SendEmailAsync(entity.GsrEmailPersonal, "Important information about your group.", emailBody, isHtml:true);
 
         }
 

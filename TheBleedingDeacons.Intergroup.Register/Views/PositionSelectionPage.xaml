@@ -9,7 +9,7 @@
 
     <Grid>
         <!-- Main content - hidden while loading -->
-        <Grid RowDefinitions="Auto,Auto,*" IsVisible="{Binding IsDataLoaded}">
+        <Grid RowDefinitions="Auto,Auto,*" IsVisible="{Binding IsDataLoaded}" Margin="10">
 
             <!-- Header with selected context -->
             <Border Grid.Row="0" 
@@ -34,7 +34,9 @@
             <CollectionView Grid.Row="2"
                            ItemsSource="{Binding Positions}"
                            SelectionMode="None">
-
+                <CollectionView.ItemsLayout>
+                    <LinearItemsLayout Orientation="Vertical" ItemSpacing="5" />
+                </CollectionView.ItemsLayout>
                 <CollectionView.ItemTemplate>
                     <DataTemplate x:DataType="models:Position">
                         <Border BackgroundColor="White"

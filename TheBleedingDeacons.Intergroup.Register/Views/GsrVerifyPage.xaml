@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<ContentPage x:Class="TheBleedingDeacons.Intergroup.Register.Views.GsrRegistrationPage"
+<ContentPage x:Class="TheBleedingDeacons.Intergroup.Register.Views.GsrVerifyPage"
              xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:viewmodels="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
+             xmlns:converters="clr-namespace:TheBleedingDeacons.Intergroup.Register.Converters"
+             xmlns:tc="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
              x:DataType="viewmodels:GsrVerifyViewModel"
              Title="{Binding Title}">
 
@@ -32,6 +34,8 @@
             <Setter Property="FontAttributes" Value="Bold"/>
             <Setter Property="Margin" Value="0,0,0,15"/>
         </Style>
+        <tc:InvertedBoolConverter x:Key="InvertedBoolConverter" />
+        <converters:ObscurePhoneNumberConverter x:Key="ObscurePhoneNumber" />
     </ContentPage.Resources>
 
     <Grid>
@@ -46,22 +50,58 @@
         <ScrollView IsVisible="{Binding IsLoading, Converter={StaticResource InvertedBoolConverter}}">
             <StackLayout Padding="20" Spacing="10">
 
-                    <StackLayout>
-                        <Label Text="Group Service Representative" 
+                <StackLayout>
+                    <Label Text="Group Service Representative" 
                                Style="{StaticResource HeaderLabelStyle}"/>
 
-                        <!-- GSR Name -->
-                        <Label Text="Name" Style="{StaticResource FieldLabelStyle}"/>
-                        <Label Text="{Binding Group.GsrName}" Style="{StaticResource ValueLabelStyle}"/>
+                    <!-- GSR Name -->
+                    <Label Text="Name" Style="{StaticResource FieldLabelStyle}"/>
+                    <Label Text="{Binding Group.GsrName}" Style="{StaticResource ValueLabelStyle}"/>
 
-                        <!-- GSR Email -->
-                        <Label Text="Personal Email" Style="{StaticResource FieldLabelStyle}"/>
-                        <Label Text="{Binding Group.GsrEmailPersonal}" Style="{StaticResource ValueLabelStyle}" />
+                    <!-- GSR Email -->
+                    <Label Text="Personal Email" Style="{StaticResource FieldLabelStyle}"/>
+                    <Label Text="{Binding Group.GsrEmailPersonal}" Style="{StaticResource ValueLabelStyle}" />
 
-                        <!-- GSR Phone -->
-                        <Label Text="Mobile Phone" Style="{StaticResource FieldLabelStyle}"/>
-                        <Label Text="{Binding Group.GsrPhone}" Style="{StaticResource ValueLabelStyle}" />
-                    </StackLayout>
+                    <!-- GSR Phone -->
+                    <Label Text="Mobile Phone" Style="{StaticResource FieldLabelStyle}"/>
+                    <Label Text="{Binding Group.GsrPhone, Converter={StaticResource ObscurePhoneNumber}}" Style="{StaticResource ValueLabelStyle}" />
+
+                    <!-- Standing In Section with Border -->
+                    <Border Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}"
+                                StrokeThickness="2"
+                                StrokeShape="RoundRectangle 10"
+                                Padding="15"
+                                Margin="0,10,0,15"
+                                BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray900}}">
+                        <StackLayout Spacing="10">
+                            <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="10">
+                                <Label Text="Are Standing In?" 
+                                       Style="{StaticResource FieldLabelStyle}"
+                                       VerticalOptions="Center"
+                                       Margin="0"
+                                       Grid.Column="0"/>
+                                <CheckBox x:Name="StandingIn" 
+                                          BindingContext="{Binding StandingIn}"
+                                          Grid.Column="1"
+                                          VerticalOptions="Center"/>
+                            </Grid>
+
+                            <!-- Email Entry - Visible when checkbox is checked -->
+                            <StackLayout IsVisible="{Binding Source={x:Reference StandingIn}, Path=IsChecked}"
+                                            Spacing="5">
+                                <Label Text="Your Email" 
+                                           Style="{StaticResource FieldLabelStyle}"
+                                           Margin="0"/>
+                                <Entry x:Name="StandingInEmail"
+                                           Placeholder="Enter your email address"
+                                           Keyboard="Email"
+                                           FontSize="18"
+                                           BackgroundColor="{AppThemeBinding Light=White, Dark={StaticResource Gray800}}"
+                                           TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"/>
+                            </StackLayout>
+                        </StackLayout>
+                    </Border>
+                </StackLayout>
 
                 <Label x:Name="QuestionLabel"
                     FontSize="32"
@@ -71,37 +111,37 @@
 
                 <!-- Action Buttons -->
                 <FlexLayout Direction="Row" 
-			        JustifyContent="SpaceEvenly" 
-			        AlignItems="Center"
-			        Margin="0,20,0,0">
+		        JustifyContent="SpaceEvenly" 
+		        AlignItems="Center"
+		        Margin="0,20,0,0">
 
                     <Button Text="Yes" 
-			            Command="{Binding YesCommand}"
+		            Command="{Binding YesCommand}"
                         IsEnabled="{Binding CanRegister}"
-			            Style="{StaticResource PrimaryButtonStyle}"
-			            TextColor="White"
-			            CornerRadius="25"
-			            HeightRequest="100"
-			            FlexLayout.Grow="1"
-			            Margin="0,0,7.5,0"/>
+		            Style="{StaticResource PrimaryButtonStyle}"
+		            TextColor="White"
+		            CornerRadius="25"
+		            HeightRequest="100"
+		            FlexLayout.Grow="1"
+		            Margin="0,0,7.5,0"/>
 
                     <Button Text="No" 
-			            Command="{Binding NoCommand}"
-			            Style="{StaticResource PrimaryButtonStyle}"
-			            TextColor="White"
-			            CornerRadius="25"
-			            HeightRequest="100"
-			            FlexLayout.Grow="1"
-			            Margin="7.5,0,7.5,0"/>
+		            Command="{Binding NoCommand}"
+		            Style="{StaticResource PrimaryButtonStyle}"
+		            TextColor="White"
+		            CornerRadius="25"
+		            HeightRequest="100"
+		            FlexLayout.Grow="1"
+		            Margin="7.5,0,7.5,0"/>
 
-                    <Button Text="Cancel" 
-			            Command="{Binding CancelCommand}"
-			            Style="{StaticResource PrimaryButtonStyle}"
-			            TextColor="White"
-			            CornerRadius="25"
-			            HeightRequest="100"
-			            FlexLayout.Grow="1"
-			            Margin="7.5,0,0,0"/>
+                    <!--<Button Text="Cancel" 
+		            Command="{Binding CancelCommand}"
+		            Style="{StaticResource PrimaryButtonStyle}"
+		            TextColor="White"
+		            CornerRadius="25"
+		            HeightRequest="100"
+		            FlexLayout.Grow="1"
+		            Margin="7.5,0,0,0"/>-->
 
                 </FlexLayout>
 

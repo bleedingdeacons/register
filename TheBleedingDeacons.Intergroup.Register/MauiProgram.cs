@@ -30,7 +30,7 @@ public static class MauiProgram
             {
                 fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
                 fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
-                fonts.AddFont("Font Awesome 7 Brands-Regular-400.otf", "FontAwesome");
+                //fonts.AddFont("Font Awesome 7 Brands-Regular-400.otf", "FontAwesome");
             });
 
         // Register logging service
@@ -47,6 +47,8 @@ public static class MauiProgram
         var appDbPath = Path.Combine(FileSystem.AppDataDirectory, APP_DATABASE_NAME);
         builder.Services.AddDbContext<RegisterContext>(options =>
             options.UseSqlite($"Data Source={appDbPath}"));
+
+        Log.Logger.Information("Register Db {databasePath}", appDbPath);
 
         // Mail Database
         var mailDbPath = Path.Combine(FileSystem.AppDataDirectory, MAIL_DATABASE_NAME);
@@ -101,7 +103,7 @@ public static class MauiProgram
         builder.Services.AddTransient<TypeSelectionPage>();
         builder.Services.AddTransient<GroupSelectionPage>();
         builder.Services.AddTransient<ImportExportPage>();
-        builder.Services.AddTransient<GsrRegistrationPage>();
+        builder.Services.AddTransient<GsrVerifyPage>();
         builder.Services.AddTransient<GroupEditPage>();
         builder.Services.AddTransient<PositionEditPage>();
         builder.Services.AddTransient<PositionSelectionPage>();

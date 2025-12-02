@@ -1,4 +1,5 @@
 ﻿using System.Collections.ObjectModel;
+using CommunityToolkit.Maui.Alerts;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Serilog;
@@ -54,6 +55,6 @@ public partial class DaySelectionViewModel : BaseViewModel
     private async Task ShowFeedback()
     {
         await Task.Delay(100);
-        //await Toast.Make("Loading Groups...", ToastDuration.Short).Show();            
+        await Toast.Make("Loading Groups...", CommunityToolkit.Maui.Core.ToastDuration.Short).Show();
     }
 }

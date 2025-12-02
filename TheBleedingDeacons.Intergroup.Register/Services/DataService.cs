@@ -41,6 +41,11 @@ public class DataService
 
             RegisterData data = ExcelSerializer.DeserializeFromExcel(excelStream);
 
+            await _context.Groups.ExecuteDeleteAsync();
+            await _context.Positions.ExecuteDeleteAsync();
+
+            await _context.SaveChangesAsync();
+
             foreach (var group in data.Groups)
             {
                 var existingGroup = await _context.Groups.FindAsync(group.ID);
@@ -75,7 +80,7 @@ public class DataService
         }
         catch (Exception ex)
         {
-
+            Log.Error(ex, "Import from Excel Failed!");
         }
     }
 
@@ -83,9 +88,7 @@ public class DataService
     {
         await EnsureDatabaseCreatedAsync();
 
-        // ExcelPackage.License.SetNonCommercialOrganization("Your Organization");
-        OfficeOpenXml.ExcelPackage.LicenseContext = OfficeOpenXml.LicenseContext.NonCommercial;
-
+        ExcelPackage.License.SetNonCommercialOrganization("AABristol");
         using var package = new OfficeOpenXml.ExcelPackage();
 
         // Sort By Day Start on Monday
@@ -126,6 +129,8 @@ public class DataService
             groupsWorksheet.Cells[1, 21].Value = "Contact 3 Phone";
             groupsWorksheet.Cells[1, 22].Value = "Updated";
             groupsWorksheet.Cells[1, 23].Value = "Attended";
+            groupsWorksheet.Cells[1, 24].Value = "Proxy Attended";
+            groupsWorksheet.Cells[1, 25].Value = "Proxy Email";
 
             // Add groups data
             for (int i = 0; i < groups.Count; i++)
@@ -156,6 +161,9 @@ public class DataService
                 groupsWorksheet.Cells[row, 21].Value = group.Contact3Phone;
                 groupsWorksheet.Cells[row, 22].Value = group.Updated?.ToString("yyyy-MM-dd HH:mm:ss");
                 groupsWorksheet.Cells[row, 23].Value = group.Attended;
+                groupsWorksheet.Cells[row, 24].Value = group.ProxyAttendance;
+                groupsWorksheet.Cells[row, 25].Value = group.ProxyEmail;
+
             }
 
             groupsWorksheet.Cells.AutoFitColumns();
