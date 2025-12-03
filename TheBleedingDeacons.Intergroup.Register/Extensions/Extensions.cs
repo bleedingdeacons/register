@@ -103,9 +103,16 @@ namespace TheBleedingDeacons.Intergroup.Register.Extensions
         }
 
 
-        public static string GetGsrFirstName(this Group group)
+        public static string GetFirstName(this Group group)
         {
-            return group.GsrName.Split(' ').First();
+            string name;
+
+            if (!string.IsNullOrWhiteSpace(group.ProxyName)) 
+                { name = group.ProxyName; }
+
+            else { name = group.GsrName; }
+
+            return name.Split(' ').First();
         }
 
     }

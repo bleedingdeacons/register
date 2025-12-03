@@ -136,20 +136,19 @@ public static class MauiProgram
         var mauiapp = builder.Build();
 
         // Force database creation and load data synchronously
-        //using (var scope = mauiapp.Services.CreateScope())
-        //{
-        //    var context = scope.ServiceProvider.GetRequiredService<RegisterContext>();
+        using (var scope = mauiapp.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<RegisterContext>();
 
-        //    // Ensure database is created
-        //    //context.Database.EnsureCreated();
+            // Ensure database is created
+            context.Database.EnsureCreated();
 
-        //    // Load all data synchronously
-        //    var groups = context.Groups.ToList();
-        //    var positions = context.Positions.ToList();
+            // Load all data synchronously
+            var groups = context.Groups.ToList();
+            var positions = context.Positions.ToList();
 
-
-        //    System.Diagnostics.Debug.WriteLine($"Loaded {groups.Count} groups and {positions.Count} positions.");
-        //}
+            System.Diagnostics.Debug.WriteLine($"Loaded {groups.Count} groups and {positions.Count} positions.");
+        }
 
         return mauiapp;
     }

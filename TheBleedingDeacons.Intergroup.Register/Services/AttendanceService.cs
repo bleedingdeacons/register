@@ -40,7 +40,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 
             var welcome = new WelcomeEmail
             {
-                FirstName = entity.GetGsrFirstName(),
+                FirstName = entity.GetFirstName(),
                 GroupName = entity.Name,
                 StartTime = entity.Time,
                 Location = entity.Location,

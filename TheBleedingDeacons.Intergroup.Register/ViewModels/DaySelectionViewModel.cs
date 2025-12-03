@@ -22,7 +22,7 @@ public partial class DaySelectionViewModel : BaseViewModel
 
     public DaySelectionViewModel()
     {
-        
+
         Title = "Select a Day";
 
         days = new ObservableCollection<DayItem>
@@ -40,21 +40,14 @@ public partial class DaySelectionViewModel : BaseViewModel
     [RelayCommand]
     async Task SelectDay(DayItem day)
     {
-        await ShowFeedback();
 
         var parameters = new Dictionary<string, object>{
 
                 {"day", day.Name}};
-
 
         await Shell.Current.GoToAsync(nameof(TypeSelectionPage), parameters);
 
 
     }
 
-    private async Task ShowFeedback()
-    {
-        await Task.Delay(100);
-        await Toast.Make("Loading Groups...", CommunityToolkit.Maui.Core.ToastDuration.Short).Show();
-    }
 }

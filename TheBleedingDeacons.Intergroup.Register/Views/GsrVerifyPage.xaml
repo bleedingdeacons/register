@@ -86,9 +86,20 @@
                                           VerticalOptions="Center"/>
                             </Grid>
 
-                            <!-- Email Entry - Visible when checkbox is checked -->
+                            <!-- Name and Email Entries - Visible when checkbox is checked -->
                             <StackLayout IsVisible="{Binding Source={x:Reference StandingIn}, Path=IsChecked}"
                                             Spacing="5">
+                                <Label Text="Your Name" 
+                                           Style="{StaticResource FieldLabelStyle}"
+                                           Margin="0"/>
+                                <Entry x:Name="StandingInName"
+                                           Text="{Binding StandinName}"
+                                           Placeholder="Enter your name"
+                                           Keyboard="Text"
+                                           FontSize="18"
+                                           BackgroundColor="{AppThemeBinding Light=White, Dark={StaticResource Gray800}}"
+                                           TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"/>
+
                                 <Label Text="Your Email" 
                                            Style="{StaticResource FieldLabelStyle}"
                                            Margin="0"/>

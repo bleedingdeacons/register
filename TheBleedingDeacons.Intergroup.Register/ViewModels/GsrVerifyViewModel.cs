@@ -43,6 +43,9 @@ public partial class GsrVerifyViewModel : BaseViewModel
     private string standinEmail;
 
     [ObservableProperty]
+    private string standinName;
+
+    [ObservableProperty]
     private bool canRegister = false;
 
     public GsrVerifyViewModel(DataService dataService, IAttendanceRegistration<Group> attendanceRegistration, IGroupRepository groupRepository, IPopupNotification popupService)
@@ -93,15 +96,14 @@ public partial class GsrVerifyViewModel : BaseViewModel
     public async Task Yes()
     {
         Group.ProxyAttendance = StandingIn;
+        Group.ProxyEmail = StandinEmail;
+        Group.ProxyName = StandinName;
 
-        if (StandinEmail != null)
-        {
-            Group.ProxyEmail = StandinEmail;
-        }
+        
 
         await _attendanceRegistration.Register(Group);
 
-        string personalName = Group.GetGsrFirstName();
+        string personalName = Group.GetFirstName();
 
         // Show success popup
         await _popupService.ShowCountdownPopupAsync(

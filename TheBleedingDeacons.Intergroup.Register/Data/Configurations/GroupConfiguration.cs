@@ -96,6 +96,10 @@ public class GroupConfiguration : IEntityTypeConfiguration<Group>
             .HasColumnName("Proxy Email")
             .HasMaxLength(255);
 
+        builder.Property(e => e.ProxyName)
+            .HasColumnName("Proxy Name")
+            .HasMaxLength(255);
+
         builder.Property(e => e.ProxyAttendance)
             .HasColumnName("Proxy Attendance")
             .HasColumnType("bit");
