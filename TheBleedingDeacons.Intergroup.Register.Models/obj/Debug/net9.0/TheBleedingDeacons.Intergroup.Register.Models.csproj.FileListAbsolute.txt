@@ -1,0 +1,12 @@
+C:\Data\dev\register\TheBleedingDeacons.Intergroup.Register.Models\obj\Debug\net9.0\TheBleedingDeacons.Intergroup.Register.Models.GeneratedMSBuildEditorConfig.editorconfig
+C:\Data\dev\register\TheBleedingDeacons.Intergroup.Register.Models\obj\Debug\net9.0\TheBleedingDeacons.Intergroup.Register.Models.AssemblyInfoInputs.cache
+C:\Data\dev\register\TheBleedingDeacons.Intergroup.Register.Models\obj\Debug\net9.0\TheBleedingDeacons.Intergroup.Register.Models.AssemblyInfo.cs
+C:\Data\dev\register\TheBleedingDeacons.Intergroup.Register.Models\obj\Debug\net9.0\TheBleedingDeacons.Intergroup.Register.Models.csproj.CoreCompileInputs.cache
+C:\Data\dev\register\TheBleedingDeacons.Intergroup.Register.Models\obj\Debug\net9.0\TheBleedingDeacons.Intergroup.Register.Models.sourcelink.json
+C:\Data\dev\register\TheBleedingDeacons.Intergroup.Register.Models\bin\Debug\net9.0\TheBleedingDeacons.Intergroup.Register.Models.deps.json
+C:\Data\dev\register\TheBleedingDeacons.Intergroup.Register.Models\bin\Debug\net9.0\TheBleedingDeacons.Intergroup.Register.Models.dll
+C:\Data\dev\register\TheBleedingDeacons.Intergroup.Register.Models\bin\Debug\net9.0\TheBleedingDeacons.Intergroup.Register.Models.pdb
+C:\Data\dev\register\TheBleedingDeacons.Intergroup.Register.Models\obj\Debug\net9.0\TheBleedingDeacons.Intergroup.Register.Models.dll
+C:\Data\dev\register\TheBleedingDeacons.Intergroup.Register.Models\obj\Debug\net9.0\refint\TheBleedingDeacons.Intergroup.Register.Models.dll
+C:\Data\dev\register\TheBleedingDeacons.Intergroup.Register.Models\obj\Debug\net9.0\TheBleedingDeacons.Intergroup.Register.Models.pdb
+C:\Data\dev\register\TheBleedingDeacons.Intergroup.Register.Models\obj\Debug\net9.0\ref\TheBleedingDeacons.Intergroup.Register.Models.dll

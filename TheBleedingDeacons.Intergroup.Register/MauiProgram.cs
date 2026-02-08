@@ -1,6 +1,7 @@
 ﻿using CommunityToolkit.Maui;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Serilog.Events;
 using Serilog;
 using System.Reflection;
 using TheBleedingDeacons.Intergroup.Register.Data;
@@ -189,7 +190,7 @@ public static class MauiProgram
             retainedFileCountLimit: 7,
             restrictedToMinimumLevel: LogEventLevel.Information);
 
-        ConfigureLoki(config, builder.Configuration, appName, environment);
+        //ConfigureLoki(config, builder.Configuration, appName, environment);
 #endif
 
         Log.Logger = config.CreateLogger();

@@ -173,6 +173,10 @@
 	</ItemGroup>
 
 	<ItemGroup>
+	  <ProjectReference Include="..\..\..\..\Users\David\Local Sites\unity-dev\app\public\wp-content\plugins\integrity\csharp-client\Integrity.Client.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
 	  <Compile Update="Views\ImportExportPage.xaml.cs">
 	    <DependentUpon>ImportExportPage.xaml</DependentUpon>
 	  </Compile>

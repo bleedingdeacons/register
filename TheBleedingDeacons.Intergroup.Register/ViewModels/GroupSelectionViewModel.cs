@@ -53,7 +53,8 @@ public partial class GroupSelectionViewModel : BaseViewModel
 
     partial void OnCriteriaChanged(GroupCriteria value)
     {
-        _ = Task.Run(async () =>
+        // Use MainThread for proper Android compatibility
+        MainThread.BeginInvokeOnMainThread(async () =>
         {
             await LoadDataAsync();
         });
@@ -69,7 +70,7 @@ public partial class GroupSelectionViewModel : BaseViewModel
             IsBusy = true;
             IsLoading = true;
             IsDataLoaded = false;
-            
+
 
             await Task.Yield();
 
@@ -98,7 +99,7 @@ public partial class GroupSelectionViewModel : BaseViewModel
 
             //HasGroups = Groups.Count > 0;
 
-            Header = $"{Criteria.Day} {Criteria.MeetingType} Meetings";            
+            Header = $"{Criteria.Day} {Criteria.MeetingType} Meetings";
         }
         finally
         {
