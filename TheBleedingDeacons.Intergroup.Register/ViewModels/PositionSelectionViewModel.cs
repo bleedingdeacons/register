@@ -13,7 +13,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 {
     public partial class PositionSelectionViewModel : BaseViewModel
     {
-        private static readonly ILogger Logger = AppLogger.ForContext<PositionEditViewModel>();
+        private static readonly ILogger Logger = AppLogger.ForContext<PositionSelectionViewModel>();
 
         private readonly IPositionRepository _positionRepository;
 

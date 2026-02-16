@@ -40,8 +40,17 @@ public class SerializationService
 
                 await _registrationService.ImportFromExcel(stream);
 
-                await Application.Current!.MainPage!.DisplayAlert("Success",
-                    "Position Excel file imported successfully!", "OK");
+                var page = GetActivePage();
+                if (page != null)
+                {
+                    await page.DisplayAlert("Success",
+                        "Position Excel file imported successfully!", "OK");
+                }
+                else
+                {
+                    Logger.Information("Position Excel file imported successfully! (no active Page to display alert)");
+                }
+
                 return true;
             }
 
@@ -49,8 +58,17 @@ public class SerializationService
         }
         catch (Exception ex)
         {
-            await Application.Current!.MainPage!.DisplayAlert("Error",
-                $"Data import failed: {ex.Message}", "OK");
+            var page = GetActivePage();
+            if (page != null)
+            {
+                await page.DisplayAlert("Error",
+                    $"Data import failed: {ex.Message}", "OK");
+            }
+            else
+            {
+                Logger.Error(ex, "Data import failed: {Message}", ex.Message);
+            }
+
             return false;
         }
     }
@@ -72,15 +90,32 @@ public class SerializationService
             var filePath = Path.Combine(FileSystem.AppDataDirectory, fileName);
             await File.WriteAllBytesAsync(filePath, excelData);
 
-            await Application.Current!.MainPage!.DisplayAlert("Success",
-                $"File saved to: {filePath}", "OK");
+            var page = GetActivePage();
+            if (page != null)
+            {
+                await page.DisplayAlert("Success",
+                    $"File saved to: {filePath}", "OK");
+            }
+            else
+            {
+                Logger.Information("File saved to: {FilePath} (no active Page to display alert)", filePath);
+            }
 #endif
             return true;
         }
         catch (Exception ex)
         {
-            await Application.Current!.MainPage!.DisplayAlert("Error",
-                $"Position export failed: {ex.Message}", "OK");
+            var page = GetActivePage();
+            if (page != null)
+            {
+                await page.DisplayAlert("Error",
+                    $"Position export failed: {ex.Message}", "OK");
+            }
+            else
+            {
+                Logger.Error(ex, "Position export failed: {Message}", ex.Message);
+            }
+
             return false;
         }
     }
@@ -94,16 +129,32 @@ public class SerializationService
             var filePath = Path.Combine(downloadsPath, fileName);
             await File.WriteAllBytesAsync(filePath, data);
             
-            await Application.Current!.MainPage!.DisplayAlert("Success", 
-                $"File saved to Downloads: {fileName}", "OK");
+            var page = GetActivePage();
+            if (page != null)
+            {
+                await page.DisplayAlert("Success", 
+                    $"File saved to Downloads: {fileName}", "OK");
+            }
+            else
+            {
+                Logger.Information("File saved to Downloads: {FileName} (no active Page to display alert)", fileName);
+            }
         }
         else
         {
             var filePath = Path.Combine(FileSystem.AppDataDirectory, fileName);
             await File.WriteAllBytesAsync(filePath, data);
             
-            await Application.Current!.MainPage!.DisplayAlert("Success", 
-                $"File saved to app directory: {fileName}", "OK");
+            var page = GetActivePage();
+            if (page != null)
+            {
+                await page.DisplayAlert("Success", 
+                    $"File saved to app directory: {fileName}", "OK");
+            }
+            else
+            {
+                Logger.Information("File saved to app directory: {FileName} (no active Page to display alert)", fileName);
+            }
         }
     }
 #endif
@@ -121,8 +172,16 @@ public class SerializationService
             File = new ShareFile(filePath)
         });
         
-        await Application.Current!.MainPage!.DisplayAlert("Success", 
-            $"File saved and shared: {fileName}", "OK");
+        var page = GetActivePage();
+        if (page != null)
+        {
+            await page.DisplayAlert("Success", 
+                $"File saved and shared: {fileName}", "OK");
+        }
+        else
+        {
+            Logger.Information("File saved and shared: {FileName} (no active Page to display alert)", fileName);
+        }
     }
 #endif
 
@@ -133,8 +192,30 @@ public class SerializationService
         var filePath = Path.Combine(documentsPath, fileName);
         await File.WriteAllBytesAsync(filePath, data);
         
-        await Application.Current!.MainPage!.DisplayAlert("Success", 
-            $"File saved to Documents: {fileName}", "OK");
+        var page = GetActivePage();
+        if (page != null)
+        {
+            await page.DisplayAlert("Success", 
+                $"File saved to Documents: {fileName}", "OK");
+        }
+        else
+        {
+            Logger.Information("File saved to Documents: {FileName} (no active Page to display alert)", fileName);
+        }
     }
 #endif
+
+    private Page? GetActivePage()
+    {
+        var app = Application.Current;
+        if (app == null) return null;
+
+        var windows = app.Windows;
+        if (windows != null && windows.Count > 0)
+        {
+            return windows[0].Page;
+        }
+
+        return null;
+    }
 }

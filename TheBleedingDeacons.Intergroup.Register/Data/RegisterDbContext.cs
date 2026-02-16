@@ -14,7 +14,9 @@ public class RegisterContext : DbContext
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
+#if DEBUG
         optionsBuilder.EnableSensitiveDataLogging();
+#endif
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

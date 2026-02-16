@@ -7,11 +7,11 @@ using TheBleedingDeacons.Intergroup.Register.Support;
 
 namespace TheBleedingDeacons.Intergroup.Register.Services
 {
-
     public class ConfigurationService : IConfigurationService
     {
-        private static readonly ILogger Logger = AppLogger.ForContext<ConfigurationService >();
+        private static readonly ILogger Logger = AppLogger.ForContext<ConfigurationService>();
 
+        private const string SMTP_PASSWORD_KEY = "smtp_password";
         private readonly IConfiguration _configuration;
         private readonly string _configFilePath;
         private SmtpConfiguration? _cachedSmtpConfig;
@@ -44,12 +44,25 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
                 return _cachedSmtpConfig;
 
             var section = _configuration.GetSection("SmtpSettings");
+
+            // Retrieve password from SecureStorage, fall back to config file
+            string password;
+            try
+            {
+                password = SecureStorage.GetAsync(SMTP_PASSWORD_KEY).GetAwaiter().GetResult() ?? section["Password"] ?? "";
+            }
+            catch
+            {
+                // SecureStorage may not be available on all platforms during testing
+                password = section["Password"] ?? "";
+            }
+
             _cachedSmtpConfig = new SmtpConfiguration
             {
                 Host = section["Host"] ?? "",
                 Port = int.TryParse(section["Port"], out int port) ? port : 587,
                 Username = section["Username"] ?? "",
-                Password = section["Password"] ?? "",
+                Password = password,
                 EnableSsl = bool.TryParse(section["EnableSsl"], out bool ssl) ? ssl : true,
                 FromDisplayName = section["FromDisplayName"] ?? "",
                 TimeoutSeconds = int.TryParse(section["TimeoutSeconds"], out int timeout) ? timeout : 30
@@ -65,9 +78,29 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 
         public async Task SaveSmtpConfigurationAsync(SmtpConfiguration config)
         {
+            // Store password securely
+            try
+            {
+                await SecureStorage.SetAsync(SMTP_PASSWORD_KEY, config.Password);
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning(ex, "SecureStorage unavailable, password will be stored in config file");
+            }
+
+            // Save non-sensitive settings to JSON (password excluded)
             var settings = new
             {
-                SmtpSettings = config
+                SmtpSettings = new
+                {
+                    config.Host,
+                    config.Port,
+                    config.Username,
+                    config.EnableSsl,
+                    config.FromDisplayName,
+                    config.TimeoutSeconds,
+                    config.MaxRetries
+                }
             };
 
             var json = System.Text.Json.JsonSerializer.Serialize(settings, new System.Text.Json.JsonSerializerOptions
@@ -81,13 +114,9 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 
         public async Task<SmtpConfiguration> LoadSmtpConfigurationAsync()
         {
-            if (File.Exists(_configFilePath))
-            {
-                var json = await File.ReadAllTextAsync(_configFilePath);
-                var settings = System.Text.Json.JsonSerializer.Deserialize<dynamic>(json);
-            }
-
-            return GetSmtpConfiguration();
+            // Clear cache to force a fresh load
+            _cachedSmtpConfig = null;
+            return await Task.FromResult(GetSmtpConfiguration());
         }
     }
 }

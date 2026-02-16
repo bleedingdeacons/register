@@ -21,9 +21,12 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
         {
             var popup = new CountdownPopup(title, message, navigationAction);
 
-            if (Application.Current?.MainPage is Page currentPage)
+            // Use the Windows collection to obtain the active Page instead of the deprecated MainPage property
+            var currentPage = Application.Current?.Windows?.FirstOrDefault()?.Page;
+
+            if (currentPage is Page page)
             {
-                await currentPage.ShowPopupAsync(popup);
+                await page.ShowPopupAsync(popup);
             }
         }
     }

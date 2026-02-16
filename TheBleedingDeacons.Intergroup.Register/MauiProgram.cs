@@ -8,7 +8,6 @@ using TheBleedingDeacons.Intergroup.Register.Data;
 using TheBleedingDeacons.Intergroup.Register.Models;
 using TheBleedingDeacons.Intergroup.Register.Services;
 using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
-using TheBleedingDeacons.Intergroup.Register.Services.Repositories;
 using TheBleedingDeacons.Intergroup.Register.Support;
 using TheBleedingDeacons.Intergroup.Register.ViewModels;
 using TheBleedingDeacons.Intergroup.Register.Views;
@@ -40,9 +39,9 @@ public static class MauiProgram
         // Add configuration service
         builder.Services.AddSingleton<IConfigurationService, ConfigurationService>();
 
-        builder.Services.AddSingleton<IAttendanceRegistration<Group>, AttendanceService>();
-
-        builder.Services.AddSingleton<IAttendanceRegistration<Position>, AttendanceService>();
+        builder.Services.AddScoped<AttendanceService>();
+        builder.Services.AddScoped<IAttendanceRegistration<Group>>(sp => sp.GetRequiredService<AttendanceService>());
+        builder.Services.AddScoped<IAttendanceRegistration<Position>>(sp => sp.GetRequiredService<AttendanceService>());
 
         // App Database
         var appDbPath = Path.Combine(FileSystem.AppDataDirectory, APP_DATABASE_NAME);
@@ -64,17 +63,17 @@ public static class MauiProgram
         builder.Services.AddScoped<IGroupRepository, GroupRepository>();
         builder.Services.AddScoped<IPositionRepository, PositionRepository>();
         builder.Services.AddScoped<IPopupNotification, PopupNotificationService>();
-        
+
         // Register Email Templates
         builder.Services.AddSingleton<IEmailTemplateService>(provider =>
         {
             return new EmailTemplateService(Assembly.GetExecutingAssembly(), "Templates");
         });
-        
+
         // Register the mail service with configuration
         builder.Services.AddSingleton<IMailService>(provider =>
         {
-            var dbContextFactory = provider.GetRequiredService<IDbContextFactory<MailDbContext>>();            
+            var dbContextFactory = provider.GetRequiredService<IDbContextFactory<MailDbContext>>();
             var configService = provider.GetRequiredService<IConfigurationService>();
 
             // Ensure database is created
@@ -84,7 +83,7 @@ public static class MauiProgram
 
             var smtpConfig = configService.GetSmtpConfiguration();
 
-            return new MailKitService(                
+            return new MailKitService(
                 dbContextFactory,
                 smtpConfig.Host,
                 smtpConfig.Port,
@@ -94,7 +93,7 @@ public static class MauiProgram
             );
         });
 
-        
+
 
         // Views
         builder.Services.AddTransient<MailSettingsPage>();
@@ -133,7 +132,7 @@ public static class MauiProgram
         builder.Logging.AddDebug();
 #endif
 
-        
+
         var mauiapp = builder.Build();
 
         // Force database creation and load data synchronously

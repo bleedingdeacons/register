@@ -1,44 +1,41 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using OfficeOpenXml;
 using Serilog;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Threading.Tasks;
 using TheBleedingDeacons.Intergroup.Register.Data;
 using TheBleedingDeacons.Intergroup.Register.Models;
+using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Support;
 using TheBleedingDeacons.Intergroup.Register.Utilities;
 
 namespace TheBleedingDeacons.Intergroup.Register.Services;
 
+/// <summary>
+/// Handles Excel import/export and search operations.
+/// For standard CRUD, use IGroupRepository and IPositionRepository directly.
+/// </summary>
 public class DataService
 {
     private static readonly ILogger Logger = AppLogger.ForContext<DataService>();
 
     private readonly RegisterContext _context;
+    private readonly IGroupRepository _groupRepository;
+    private readonly IPositionRepository _positionRepository;
 
-    public DataService(RegisterContext context)
+    public DataService(RegisterContext context, IGroupRepository groupRepository, IPositionRepository positionRepository)
     {
         _context = context;
-    }
-
-    private async Task EnsureDatabaseCreatedAsync()
-    {
-        await _context.Database.EnsureCreatedAsync();
+        _groupRepository = groupRepository;
+        _positionRepository = positionRepository;
     }
 
     // ====================================================================
-    // Combined Import/Export Methods
+    // Import/Export Methods
     // ====================================================================
 
     public async Task ImportFromExcel(Stream excelStream)
     {
         try
         {
-
-            await EnsureDatabaseCreatedAsync();
-
             RegisterData data = ExcelSerializer.DeserializeFromExcel(excelStream);
 
             await _context.Groups.ExecuteDeleteAsync();
@@ -49,10 +46,14 @@ public class DataService
 
             await _context.SaveChangesAsync();
 
+            // Invalidate all caches after bulk import
+            await _groupRepository.InvalidateAllGroupsCacheAsync();
+            await _positionRepository.InvalidateAllPositionsCacheAsync();
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "Import from Excel Failed!");
+            Logger.Error(ex, "Import from Excel Failed!");
+            throw;
         }
     }
 
@@ -60,13 +61,11 @@ public class DataService
     {
         try
         {
-            await EnsureDatabaseCreatedAsync();
-
             ExcelPackage.License.SetNonCommercialOrganization("AABristol");
-            using var package = new OfficeOpenXml.ExcelPackage();
+            using var package = new ExcelPackage();
 
             // Sort By Day Start on Monday
-            var groups = await _context.Groups.ToListAsync();
+            var groups = await _groupRepository.GetAllGroupsAsync();
 
             groups = groups.OrderBy(g =>
             {
@@ -76,7 +75,7 @@ public class DataService
                     return int.MaxValue;
             }).ThenBy(g => g.Name).ToList();
 
-            if (groups.Any())
+            if (groups.Count > 0)
             {
                 var groupsWorksheet = package.Workbook.Worksheets.Add("Groups");
 
@@ -108,8 +107,6 @@ public class DataService
                 groupsWorksheet.Cells[1, 25].Value = "Proxy Name";
                 groupsWorksheet.Cells[1, 26].Value = "Proxy Email";
 
-
-                // Add groups data
                 for (int i = 0; i < groups.Count; i++)
                 {
                     int row = i + 2;
@@ -141,19 +138,17 @@ public class DataService
                     groupsWorksheet.Cells[row, 24].Value = group.ProxyAttendance;
                     groupsWorksheet.Cells[row, 25].Value = group.ProxyName;
                     groupsWorksheet.Cells[row, 26].Value = group.ProxyEmail;
-
                 }
 
                 groupsWorksheet.Cells.AutoFitColumns();
             }
 
             // Export Positions
-            var positions = await _context.Positions.OrderBy(p => p.PositionName).ToListAsync();
-            if (positions.Any())
+            var positions = await _positionRepository.GetAllPositionsAsync();
+            if (positions.Count > 0)
             {
                 var positionsWorksheet = package.Workbook.Worksheets.Add("Positions");
 
-                // Add headers for Positions
                 positionsWorksheet.Cells[1, 1].Value = "ID";
                 positionsWorksheet.Cells[1, 2].Value = "Position Name";
                 positionsWorksheet.Cells[1, 3].Value = "Position Long Name";
@@ -165,7 +160,6 @@ public class DataService
                 positionsWorksheet.Cells[1, 9].Value = "Started Service";
                 positionsWorksheet.Cells[1, 10].Value = "Attended";
 
-                // Add positions data
                 for (int i = 0; i < positions.Count; i++)
                 {
                     int row = i + 2;
@@ -187,140 +181,38 @@ public class DataService
             }
 
             return await package.GetAsByteArrayAsync();
-
-        } catch (Exception ex)
+        }
+        catch (Exception ex)
         {
             Logger.Error(ex, "Export Failed!");
-
             return null;
-        } 
+        }
     }
 
     // ====================================================================
-    // Position Methods
+    // Search Methods (kept here as they span the DbContext directly)
     // ====================================================================
-
-    public async Task<List<Position>> GetAllPositions()
-    {
-        await EnsureDatabaseCreatedAsync();
-
-        return await _context.Positions.OrderBy(p => p.PositionName).ToListAsync();
-    }
-
-    public async Task<Position?> GetPositionById(int id)
-    {
-        await EnsureDatabaseCreatedAsync();
-
-        return await _context.Positions.FindAsync(id);
-    }
-
-    public async Task<Position> SavePosition(Position position)
-    {
-        await EnsureDatabaseCreatedAsync();
-
-        var existingPosition = await _context.Positions.FindAsync(position.ID);
-        if (existingPosition != null)
-        {
-            _context.Entry(existingPosition).CurrentValues.SetValues(position);
-        }
-        else
-        {
-            _context.Positions.Add(position);
-        }
-
-        await _context.SaveChangesAsync();
-        return position;
-    }
-
-    public async Task DeletePosition(int id)
-    {
-        await EnsureDatabaseCreatedAsync();
-
-        var position = await _context.Positions.FindAsync(id);
-        if (position != null)
-        {
-            _context.Positions.Remove(position);
-            await _context.SaveChangesAsync();
-        }
-    }
-
-    public async Task<List<Position>> SearchPositions(string searchTerm)
-    {
-        await EnsureDatabaseCreatedAsync();
-
-        return await _context.Positions
-            .Where(p => p.PositionName!.Contains(searchTerm) ||
-                       p.PositionLongName!.Contains(searchTerm) ||
-                       p.MemberAnonymousName!.Contains(searchTerm))
-            .OrderBy(p => p.PositionName)
-            .ToListAsync();
-    }
-
-    // ====================================================================
-    // Group Methods
-    // ====================================================================
-
-    public async Task<Group?> GetGroupById(int id)
-    {
-        await EnsureDatabaseCreatedAsync();
-
-        return await _context.Groups.FindAsync(id);
-    }
-
-    public async Task<Group> SaveGroup(Group group)
-    {
-        await EnsureDatabaseCreatedAsync();
-
-        var existingGroup = await _context.Groups.FindAsync(group.ID);
-        if (existingGroup != null)
-        {
-            group.Updated = DateTime.Now;
-            _context.Entry(existingGroup).CurrentValues.SetValues(group);
-        }
-        else
-        {
-            //group.Updated = DateTime.Now;
-            _context.Groups.Add(group);
-        }
-
-        await _context.SaveChangesAsync();
-        return group;
-    }
-
-    public async Task DeleteGroup(int id)
-    {
-        await EnsureDatabaseCreatedAsync();
-
-        var group = await _context.Groups.FindAsync(id);
-        if (group != null)
-        {
-            _context.Groups.Remove(group);
-            await _context.SaveChangesAsync();
-        }
-    }
 
     public async Task<List<Group>> SearchGroups(string searchTerm)
     {
-        await EnsureDatabaseCreatedAsync();
-
         return await _context.Groups
-            .Where(g => g.Name!.Contains(searchTerm) ||
-                       g.Day!.Contains(searchTerm) ||
-                       g.Contact1Name!.Contains(searchTerm) ||
-                       g.Contact2Name!.Contains(searchTerm) ||
-                       g.Contact3Name!.Contains(searchTerm))
+            .Where(g => (g.Name ?? "").Contains(searchTerm) ||
+                       (g.Day ?? "").Contains(searchTerm) ||
+                       (g.Contact1Name ?? "").Contains(searchTerm) ||
+                       (g.Contact2Name ?? "").Contains(searchTerm) ||
+                       (g.Contact3Name ?? "").Contains(searchTerm))
             .OrderBy(g => g.Day)
             .ThenBy(g => g.Name)
             .ToListAsync();
     }
 
-    //public async Task RegisterAttendance(int groupId)
-    //{
-    //    var group = await GetGroupById(groupId);
-
-    //    group.Attended = true;
-
-    //    await SaveGroup(group);
-
-    //}
+    public async Task<List<Position>> SearchPositions(string searchTerm)
+    {
+        return await _context.Positions
+            .Where(p => (p.PositionName ?? "").Contains(searchTerm) ||
+                       (p.PositionLongName ?? "").Contains(searchTerm) ||
+                       (p.MemberAnonymousName ?? "").Contains(searchTerm))
+            .OrderBy(p => p.PositionName)
+            .ToListAsync();
+    }
 }

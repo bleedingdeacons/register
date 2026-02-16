@@ -5,9 +5,9 @@ VisualStudioVersion = 18.2.11408.102
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheBleedingDeacons.Intergroup.Register", "TheBleedingDeacons.Intergroup.Register\TheBleedingDeacons.Intergroup.Register.csproj", "{970B6FFE-4555-9690-2952-345BD009A0CD}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Integrity.Client", "..\..\..\Users\David\Local Sites\unity-dev\app\public\wp-content\plugins\integrity\csharp-client\Integrity.Client.csproj", "{666FBFFC-8E8B-7570-9FFA-8B42F99B1767}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheBleedingDeacons.Unity.Client", "..\..\..\Users\David\Local Sites\unity-dev\app\public\wp-content\plugins\integrity\sharp\TheBleedingDeacons.Unity.Client\TheBleedingDeacons.Unity.Client.csproj", "{33E44DE6-CFC0-4E68-8172-2BA393C12D98}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheBleedingDeacons.Intergroup.Models", "TheBleedingDeacons.Intergroup.Models\TheBleedingDeacons.Intergroup.Models.csproj", "{C5592AB7-88F1-4028-AC48-93E3EF47302F}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheBleedingDeacons.Unity.Models", "..\..\..\Users\David\Local Sites\unity-dev\app\public\wp-content\plugins\integrity\sharp\TheBleedingDeacons.Unity.Models\TheBleedingDeacons.Unity.Models.csproj", "{5EB18989-9921-9119-8002-5946DD0D09DC}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -20,14 +20,14 @@ Global
 		{970B6FFE-4555-9690-2952-345BD009A0CD}.Debug|Any CPU.Deploy.0 = Debug|Any CPU
 		{970B6FFE-4555-9690-2952-345BD009A0CD}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{970B6FFE-4555-9690-2952-345BD009A0CD}.Release|Any CPU.Build.0 = Release|Any CPU
-		{666FBFFC-8E8B-7570-9FFA-8B42F99B1767}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{666FBFFC-8E8B-7570-9FFA-8B42F99B1767}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{666FBFFC-8E8B-7570-9FFA-8B42F99B1767}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{666FBFFC-8E8B-7570-9FFA-8B42F99B1767}.Release|Any CPU.Build.0 = Release|Any CPU
-		{C5592AB7-88F1-4028-AC48-93E3EF47302F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{C5592AB7-88F1-4028-AC48-93E3EF47302F}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{C5592AB7-88F1-4028-AC48-93E3EF47302F}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{C5592AB7-88F1-4028-AC48-93E3EF47302F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{33E44DE6-CFC0-4E68-8172-2BA393C12D98}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{33E44DE6-CFC0-4E68-8172-2BA393C12D98}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{33E44DE6-CFC0-4E68-8172-2BA393C12D98}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{33E44DE6-CFC0-4E68-8172-2BA393C12D98}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5EB18989-9921-9119-8002-5946DD0D09DC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5EB18989-9921-9119-8002-5946DD0D09DC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5EB18989-9921-9119-8002-5946DD0D09DC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5EB18989-9921-9119-8002-5946DD0D09DC}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

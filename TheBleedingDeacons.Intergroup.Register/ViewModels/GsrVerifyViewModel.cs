@@ -1,4 +1,5 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+﻿using System.Linq;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Serilog;
 using TheBleedingDeacons.Intergroup.Register.Extensions;
@@ -165,7 +166,12 @@ public partial class GsrVerifyViewModel : BaseViewModel
         catch (Exception ex)
         {
             Logger.Error(ex, "Failed to register attendance");
-            await Application.Current?.MainPage?.DisplayAlert("Error", $"Failed to register: {ex.Message}", "OK");
+
+            var mainPage = Application.Current?.Windows?.FirstOrDefault()?.Page;
+            if (mainPage != null)
+            {
+                await mainPage.DisplayAlert("Error", $"Failed to register: {ex.Message}", "OK");
+            }
         }
     }
 
@@ -219,10 +225,14 @@ public partial class GsrVerifyViewModel : BaseViewModel
             else
             {
                 Logger.Warning("Group not found for ID: {GroupId}", groupId);
-                await Application.Current?.MainPage?.DisplayAlert(
-                    "Not Found",
-                    $"Group with ID {groupId} was not found.",
-                    "OK");
+                var mainPage = Application.Current?.Windows?.FirstOrDefault()?.Page;
+                if (mainPage != null)
+                {
+                    await mainPage.DisplayAlert(
+                        "Not Found",
+                        $"Group with ID {groupId} was not found.",
+                        "OK");
+                }
             }
         }
         catch (Exception ex)
@@ -231,10 +241,14 @@ public partial class GsrVerifyViewModel : BaseViewModel
 
             try
             {
-                await Application.Current?.MainPage?.DisplayAlert(
-                    "Error",
-                    $"Failed to load group: {ex.Message}",
-                    "OK");
+                var mainPage = Application.Current?.Windows?.FirstOrDefault()?.Page;
+                if (mainPage != null)
+                {
+                    await mainPage.DisplayAlert(
+                        "Error",
+                        $"Failed to load group: {ex.Message}",
+                        "OK");
+                }
             }
             catch (Exception alertEx)
             {

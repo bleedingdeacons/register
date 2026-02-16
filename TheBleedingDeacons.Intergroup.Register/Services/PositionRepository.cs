@@ -1,236 +1,157 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Memory;
 using Serilog;
 using TheBleedingDeacons.Intergroup.Register.Data;
 using TheBleedingDeacons.Intergroup.Register.Models;
 using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Support;
 
-namespace TheBleedingDeacons.Intergroup.Register.Services.Repositories
+namespace TheBleedingDeacons.Intergroup.Register.Services
 {
     public class PositionRepository : IPositionRepository
     {
         private static readonly ILogger Logger = AppLogger.ForContext<PositionRepository>();
 
         private readonly RegisterContext _context;
-        private readonly IMemoryCache _cache;        
+        private readonly CacheService _cache;
 
-        // Cache keys
-        private const string ALL_POSITIONS_CACHE_KEY = "all_positions";
-        private const string POSITION_BY_ID_CACHE_KEY = "position_by_id_{0}";
-        private const string POSITIONS_BY_DAY_CACHE_KEY = "positions_by_day_{0}";
-
-        // Cache expiration times
-        private readonly TimeSpan _cacheExpiration = TimeSpan.FromMinutes(30);
-
-        public PositionRepository(RegisterContext context, IMemoryCache cache)
+        private static class CacheKeys
         {
-            _context = context;
-            _cache = cache;
+            public const string AllPositions = "all_positions";
+            public static string PositionById(int id) => $"position_{id}";
+            public static string PositionsByDay(string day) => $"positions_day_{day.ToLowerInvariant()}";
+        }
+
+        private TimeSpan GetCacheDuration(int baseMinutes = 15)
+        {
+            try
+            {
+                var connectivity = Connectivity.Current.NetworkAccess;
+                return connectivity == NetworkAccess.Internet
+                    ? TimeSpan.FromMinutes(baseMinutes / 3)
+                    : TimeSpan.FromMinutes(baseMinutes * 2);
+            }
+            catch
+            {
+                return TimeSpan.FromMinutes(baseMinutes);
+            }
+        }
+
+        public PositionRepository(RegisterContext context, CacheService cache)
+        {
+            _context = context ?? throw new ArgumentNullException(nameof(context));
+            _cache = cache ?? throw new ArgumentNullException(nameof(cache));
         }
 
         public async Task<List<Position>> GetAllPositionsAsync()
         {
-            try
-            {
-                if (_cache.TryGetValue(ALL_POSITIONS_CACHE_KEY, out List<Position>? cachedPositions))
-                {
-                    Logger.Debug("Retrieved all positions from cache");
-                    return cachedPositions!;
-                }
-
-                var positions = await _context.Positions
+            return await _cache.GetOrSetAsync(
+                CacheKeys.AllPositions,
+                async () => await _context.Positions
+                    .AsNoTracking()
                     .OrderBy(p => p.PositionName)
-                    .ToListAsync();
-
-                _cache.Set(ALL_POSITIONS_CACHE_KEY, positions, _cacheExpiration);
-                Logger.Debug("Retrieved {Count} positions from database and cached", positions.Count);
-
-                return positions;
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Error retrieving all positions");
-                throw;
-            }
+                    .ToListAsync()
+                    .ConfigureAwait(false),
+                GetCacheDuration(15)
+            );
         }
 
         public async Task<Position?> GetPositionByIdAsync(int id)
         {
-            try
-            {
-                var cacheKey = string.Format(POSITION_BY_ID_CACHE_KEY, id);
+            if (id <= 0)
+                return null;
 
-                if (_cache.TryGetValue(cacheKey, out Position? cachedPosition))
-                {
-                    Logger.Debug("Retrieved position {Id} from cache", id);
-                    return cachedPosition;
-                }
-
-                var position = await _context.Positions
-                    .FirstOrDefaultAsync(p => p.ID == id);
-
-                if (position != null)
-                {
-                    _cache.Set(cacheKey, position, _cacheExpiration);
-                    Logger.Debug("Retrieved position {Id} from database and cached", id);
-                }
-
-                return position;
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Error retrieving position with ID {Id}", id);
-                throw;
-            }
+            return await _cache.GetOrSetAsync(
+                CacheKeys.PositionById(id),
+                async () => await _context.Positions
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(p => p.ID == id)
+                    .ConfigureAwait(false),
+                GetCacheDuration(10)
+            );
         }
 
         public async Task<List<Position>> GetPositionsByDayAsync(string day)
         {
-            try
-            {
-                var cacheKey = string.Format(POSITIONS_BY_DAY_CACHE_KEY, day?.ToLowerInvariant());
+            if (string.IsNullOrWhiteSpace(day))
+                return new List<Position>();
 
-                if (_cache.TryGetValue(cacheKey, out List<Position>? cachedPositions))
-                {
-                    Logger.Debug("Retrieved positions for day {Day} from cache", day);
-                    return cachedPositions!;
-                }
+            var normalizedDay = day.Trim().ToLowerInvariant();
 
-                // Note: Since the Position model doesn't have a Day property directly,
-                // this might need to be adjusted based on your business logic.
-                // This is a placeholder implementation - you may need to join with Groups
-                // or implement day-based filtering differently.
-                var positions = await _context.Positions
-                    .Where(p => p.PositionDuration != null && p.PositionDuration.Contains(day ?? ""))
+            return await _cache.GetOrSetAsync(
+                CacheKeys.PositionsByDay(normalizedDay),
+                async () => await _context.Positions
+                    .AsNoTracking()
+                    .Where(p => p.PositionDuration != null && p.PositionDuration.Contains(day))
                     .OrderBy(p => p.PositionName)
-                    .ToListAsync();
-
-                _cache.Set(cacheKey, positions, _cacheExpiration);
-                Logger.Debug("Retrieved {Count} positions for day {Day} from database and cached", positions.Count, day);
-
-                return positions;
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Error retrieving positions for day {Day}", day);
-                throw;
-            }
+                    .ToListAsync()
+                    .ConfigureAwait(false),
+                GetCacheDuration(15)
+            );
         }
 
         public async Task<Position?> GetPositionDirectlyAsync(int id)
         {
-            try
-            {
-                // This method bypasses cache and goes directly to the database
-                var position = await _context.Positions
-                    .FirstOrDefaultAsync(p => p.ID == id);
+            if (id <= 0)
+                return null;
 
-                Logger.Debug("Retrieved position {Id} directly from database", id);
-                return position;
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Error retrieving position {Id} directly from database", id);
-                throw;
-            }
+            return await _context.Positions.FindAsync(id).ConfigureAwait(false);
         }
 
         public async Task<Position> SavePositionAsync(Position position)
         {
-            try
+            if (position == null)
+                throw new ArgumentNullException(nameof(position));
+
+            Position savedPosition;
+
+            if (position.ID == 0)
             {
-                if (position.ID == 0)
-                {
-                    // New position
-                    position.Updated = DateTime.UtcNow;
-                    _context.Positions.Add(position);
-                    Logger.Debug("Adding new position");
-                }
-                else
-                {
-                    // Update existing position
-                    position.Updated = DateTime.UtcNow;
-                    _context.Positions.Update(position);
-                    Logger.Debug("Updating position {Id}", position.ID);
-                }
-
-                await _context.SaveChangesAsync();
-
-                // Invalidate relevant caches
-                await InvalidatePositionCacheAsync(position.ID);
-                await InvalidateAllPositionsCacheAsync();
-
-                // If position duration contains day information, invalidate day-based caches
-                if (!string.IsNullOrEmpty(position.PositionDuration))
-                {
-                    // This is a simplified approach - you might need more sophisticated day extraction
-                    var days = new[] { "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday" };
-                    foreach (var day in days)
-                    {
-                        if (position.PositionDuration.Contains(day, StringComparison.OrdinalIgnoreCase))
-                        {
-                            await InvalidatePositionsByDayCacheAsync(day);
-                        }
-                    }
-                }
-
-                Logger.Information("Successfully saved position {Id}", position.ID);
-                return position;
+                position.Updated = DateTime.UtcNow;
+                _context.Positions.Add(position);
+                await _context.SaveChangesAsync().ConfigureAwait(false);
+                savedPosition = position;
             }
-            catch (Exception ex)
+            else
             {
-                Logger.Error(ex, "Error saving position {Id}", position.ID);
-                throw;
+                var existingPosition = await _context.Positions.FindAsync(position.ID).ConfigureAwait(false);
+                if (existingPosition == null)
+                    throw new InvalidOperationException($"Position with ID {position.ID} not found for update");
+
+                _context.Entry(existingPosition).CurrentValues.SetValues(position);
+                existingPosition.Updated = DateTime.UtcNow;
+
+                await _context.SaveChangesAsync().ConfigureAwait(false);
+                savedPosition = existingPosition;
             }
+
+            await InvalidatePositionCacheAsync(savedPosition.ID);
+            await InvalidateAllPositionsCacheAsync();
+
+            Logger.Information("Successfully saved position {Id}", savedPosition.ID);
+            return savedPosition;
         }
 
-        public Task InvalidatePositionCacheAsync(int id)
+        public async Task InvalidatePositionCacheAsync(int id)
         {
-            try
-            {
-                var cacheKey = string.Format(POSITION_BY_ID_CACHE_KEY, id);
-                _cache.Remove(cacheKey);
-                Logger.Debug("Invalidated cache for position {Id}", id);
-                return Task.CompletedTask;
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Error invalidating cache for position {Id}", id);
-                throw;
-            }
+            if (id <= 0)
+                return;
+
+            await _cache.RemoveAsync(CacheKeys.PositionById(id));
+            await _cache.RemoveAsync(CacheKeys.AllPositions);
         }
 
-        public Task InvalidateAllPositionsCacheAsync()
+        public async Task InvalidateAllPositionsCacheAsync()
         {
-            try
-            {
-                _cache.Remove(ALL_POSITIONS_CACHE_KEY);
-                Logger.Debug("Invalidated all positions cache");
-                return Task.CompletedTask;
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Error invalidating all positions cache");
-                throw;
-            }
+            await _cache.RemoveAsync(CacheKeys.AllPositions);
         }
 
-        public Task InvalidatePositionsByDayCacheAsync(string day)
+        public async Task InvalidatePositionsByDayCacheAsync(string day)
         {
-            try
-            {
-                var cacheKey = string.Format(POSITIONS_BY_DAY_CACHE_KEY, day?.ToLowerInvariant());
-                _cache.Remove(cacheKey);
-                Logger.Debug("Invalidated positions cache for day {Day}", day);
-                return Task.CompletedTask;
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Error invalidating positions cache for day {Day}", day);
-                throw;
-            }
+            if (string.IsNullOrWhiteSpace(day))
+                return;
+
+            var normalizedDay = day.Trim().ToLowerInvariant();
+            await _cache.RemoveAsync(CacheKeys.PositionsByDay(normalizedDay));
         }
     }
 }
-

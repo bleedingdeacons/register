@@ -113,7 +113,7 @@ public partial class GroupSelectionViewModel : BaseViewModel
     {
         if (group == null) return;
 
-        await ShowFeedback();
+        //await ShowFeedback();
 
         var parameters = new Dictionary<string, object> {
                 {"groupId", group.ID.ToString()} };
@@ -122,10 +122,10 @@ public partial class GroupSelectionViewModel : BaseViewModel
         await Shell.Current.GoToAsync(nameof(GsrVerifyPage), parameters);
     }
 
-    private async Task ShowFeedback()
-    {
-        await Task.Delay(100);
-        await Toast.Make("Loading Group...", ToastDuration.Short).Show();
-    }
+    //private async Task ShowFeedback()
+    //{
+    //    await Task.Delay(100);
+    //    await Toast.Make("Loading Group...", ToastDuration.Short).Show();
+    //}
 
 }
