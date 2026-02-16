@@ -29,6 +29,7 @@ public class Group
     public string? Contact3Phone { get; set; }
     public string? Types { get; set; }
     public string? ProxyEmail { get; set; }
+    public string? ProxyName { get; set; }
     public bool? ProxyAttendance { get; set; }
     public DateTime? Updated { get; set; }
     public bool? Attended { get; set; }

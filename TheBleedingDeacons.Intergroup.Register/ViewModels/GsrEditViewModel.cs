@@ -4,7 +4,7 @@ using CommunityToolkit.Mvvm.Messaging;
 using Serilog;
 using System.ComponentModel.DataAnnotations;
 using TheBleedingDeacons.Intergroup.Register.Models;
-using TheBleedingDeacons.Intergroup.Register.Services;
+using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Support;
 
 namespace TheBleedingDeacons.Intergroup.Register.ViewModels;
@@ -13,8 +13,8 @@ public partial class GsrEditViewModel : ObservableObject, IQueryAttributable
 {
     private static readonly ILogger Logger = AppLogger.ForContext<GroupSelectionViewModel>();
 
-    private readonly DataService _dataService;
-    
+    private readonly IGroupRepository _groupRepository;
+
     [ObservableProperty]
     private Group? group;
 
@@ -61,9 +61,9 @@ public partial class GsrEditViewModel : ObservableObject, IQueryAttributable
     private string saveButtonText = "Save";
 
 
-    public GsrEditViewModel(DataService dataService)
+    public GsrEditViewModel(IGroupRepository groupRepository)
     {
-        _dataService = dataService;
+        _groupRepository = groupRepository;
 
         // Initialize with default values
         ValidateForm();
@@ -85,15 +85,15 @@ public partial class GsrEditViewModel : ObservableObject, IQueryAttributable
         ValidateGsrName();
         CheckForUnsavedChanges();
         ValidateForm();
-     
+
     }
 
     partial void OnGsrPhoneChanged(string? value)
     {
-        ValidateGsrPhone();        
+        ValidateGsrPhone();
         CheckForUnsavedChanges();
         ValidateForm();
-     
+
     }
 
     partial void OnGsrEmailPersonalChanged(string? value)
@@ -101,7 +101,7 @@ public partial class GsrEditViewModel : ObservableObject, IQueryAttributable
         ValidateGsrEmail();
         CheckForUnsavedChanges();
         ValidateForm();
-     
+
     }
 
     partial void OnIsLoadingChanged(bool value)
@@ -111,7 +111,7 @@ public partial class GsrEditViewModel : ObservableObject, IQueryAttributable
         // Notify that command can execute state might have changed
         SaveCommand.NotifyCanExecuteChanged();
         CancelCommand.NotifyCanExecuteChanged();
-        
+
     }
 
     partial void OnHasUnsavedChangesChanged(bool value)
@@ -124,12 +124,12 @@ public partial class GsrEditViewModel : ObservableObject, IQueryAttributable
         {
             Title = "Edit GSR Information";
         }
-        
+
     }
 
     partial void OnIsFormValidChanged(bool value)
     {
-        SaveCommand.NotifyCanExecuteChanged();        
+        SaveCommand.NotifyCanExecuteChanged();
     }
 
     private void LoadGroupData()
@@ -144,7 +144,7 @@ public partial class GsrEditViewModel : ObservableObject, IQueryAttributable
         GsrEmailPersonal = Group.GsrEmailPersonal;
 
         // Reset change tracking
-        HasUnsavedChanges = false;        
+        HasUnsavedChanges = false;
     }
 
     private void UpdateTitle()
@@ -309,7 +309,7 @@ public partial class GsrEditViewModel : ObservableObject, IQueryAttributable
             ValidateGsrName();
             ValidateGsrPhone();
             ValidateGsrEmail();
-            
+
             await Shell.Current.DisplayAlert("Validation Error", "Please fix the form errors before saving.", "OK");
             return;
         }
@@ -328,7 +328,7 @@ public partial class GsrEditViewModel : ObservableObject, IQueryAttributable
                 // Here you would typically save to your database or service
                 await SaveToDatabase(Group);
 
-                HasUnsavedChanges = false;                               
+                HasUnsavedChanges = false;
 
                 // Navigate back
                 await Shell.Current.GoToAsync($"..?edited=true");
@@ -338,7 +338,7 @@ public partial class GsrEditViewModel : ObservableObject, IQueryAttributable
         }
         catch (Exception ex)
         {
-            
+
             await Shell.Current.DisplayAlert("Error", $"Failed to save GSR information: {ex.Message}", "OK");
         }
         finally
@@ -381,7 +381,7 @@ public partial class GsrEditViewModel : ObservableObject, IQueryAttributable
     {
         System.Diagnostics.Debug.WriteLine("=== Test command executed ===");
         Shell.Current.DisplayAlert("Test", "Command system is working!", "OK");
-    }    
+    }
 
     // Handle navigation parameters
     public void ApplyQueryAttributes(IDictionary<string, object> query)
@@ -396,9 +396,9 @@ public partial class GsrEditViewModel : ObservableObject, IQueryAttributable
     // This method should be implemented based on your data access layer
     private async Task SaveToDatabase(Group group)
     {
-        await _dataService.SaveGroup(group);        
+        await _groupRepository.SaveGroupAsync(group);
     }
 
-    
+
 
 }

@@ -325,7 +325,7 @@ public partial class GroupEditViewModel : BaseViewModel
             {
                 await _attendanceRegistration.Register(Group);
 
-                string personalName = Group.GetGsrFirstName();
+                string personalName = Group.GetFirstName();
 
                 // Show success popup
                 await _popupService.ShowCountdownPopupAsync(

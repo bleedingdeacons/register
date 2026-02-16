@@ -7,10 +7,10 @@ using TheBleedingDeacons.Intergroup.Register.Support;
 
 namespace TheBleedingDeacons.Intergroup.Register.Services
 {
-    
+
     public class GroupRepository : IGroupRepository
     {
-        private static readonly ILogger Logger = AppLogger.ForContext<EmailTemplateService>();
+        private static readonly ILogger Logger = AppLogger.ForContext<GroupRepository>();
 
         private readonly RegisterContext _context;
         private readonly CacheService _cache;

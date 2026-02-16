@@ -55,7 +55,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
                     {
                         throw new TemplateNotFoundException(templateName);
                     }
-                    
+
 
                     _templateCache[templateName] = template;
                 }
@@ -84,7 +84,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
                 // Handle loops: {{#each CollectionProperty}}...{{/each}}
                 var result = template;
                 result = ProcessLoops(result, model);
-                
+
                 var properties = typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance);
 
                 // Handle simple property replacements: {{PropertyName}}
@@ -101,7 +101,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
                 // Handle simple conditionals: {{#if PropertyName}}...{{/if}}
                 result = ProcessConditionals(result, model);
 
-                
+
 
                 return result;
             }
@@ -260,7 +260,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
                 // Extract the item template between {{#each}} and {{/each}}
                 var itemTemplate = result.Substring(contentStart, endEachIndex - contentStart);
 
-                Console.WriteLine($"🔍 Loop for '{propertyName}', template: '{itemTemplate}'");
+                Logger.Debug("Processing loop for property {PropertyName}", propertyName);
 
                 try
                 {
@@ -274,19 +274,18 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
                         foreach (var item in enumerable)
                         {
                             count++;
-                            Console.WriteLine($"🔄 Processing item {count}: {item?.GetType().Name}");
 
-                            // Process each item template - THIS IS THE COMPLETE METHOD
+
                             var itemHtml = ProcessSingleItemTemplate(itemTemplate, item);
                             processedContent += itemHtml;
 
-                            Console.WriteLine($"🔄 Item {count} result: '{itemHtml.Trim()}'");
+
                         }
-                        Console.WriteLine($"✅ Processed {count} items");
+                        Logger.Debug("Processed {Count} items for {PropertyName}", count, propertyName);
                     }
                     else
                     {
-                        Console.WriteLine($"❌ '{propertyName}' is not enumerable: {collection?.GetType().Name ?? "NULL"}");
+                        Logger.Debug("Property {PropertyName} is not enumerable", propertyName);
                     }
 
                     // Replace the entire {{#each}}...{{/each}} block
@@ -295,7 +294,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"❌ Error processing loop: {ex.Message}");
+                    Logger.Warning(ex, "Error processing loop for {PropertyName}", propertyName);
                     break;
                 }
             }
@@ -312,7 +311,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
             var itemType = item.GetType();
             var properties = itemType.GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
 
-            Console.WriteLine($"  🔍 Item type: {itemType.Name}, Properties: {properties.Length}");
+
 
             foreach (var prop in properties)
             {
@@ -324,50 +323,16 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
                     if (result.Contains(placeholder))
                     {
                         result = result.Replace(placeholder, value);
-                        Console.WriteLine($"    ✅ {prop.Name}: '{value}'");
+
                     }
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"    ❌ Error with {prop.Name}: {ex.Message}");
+                    Logger.Debug(ex, "Error processing property {PropertyName}", prop.Name);
                 }
             }
 
             return result;
         }
-
-        //private string ProcessLoops<T>(string template, T model)
-        //{                        
-        //    var pattern = @"\{\{#each\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)\}\}([\s\S]*?)\{\{/each\}\}";
-        //    var regex = new Regex(pattern, RegexOptions.Multiline);
-
-        //    return regex.Replace(template, match =>
-        //    {
-        //        var propertyName = match.Groups[1].Value;
-        //        var itemTemplate = match.Groups[2].Value;
-
-        //        try
-        //        {
-        //            var collection = GetNestedPropertyValue(model, propertyName);
-
-        //            if (collection is System.Collections.IEnumerable enumerable and not string)
-        //            {
-        //                var result = string.Empty;
-        //                foreach (var item in enumerable)
-        //                {
-        //                    var itemHtml = RenderTemplate(itemTemplate, item);
-        //                    result += itemHtml;
-        //                }
-        //                return result;
-        //            }
-
-        //            return string.Empty;
-        //        }
-        //        catch
-        //        {
-        //            return string.Empty;
-        //        }
-        //    });
-        //}
     }
 }
