@@ -1,12 +1,213 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using Serilog;
+using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
+using TheBleedingDeacons.Intergroup.Register.Support;
+using TheBleedingDeacons.Intergroup.Register.Utilities;
+using TheBleedingDeacons.Unity.Client;
+using UnityModels = TheBleedingDeacons.Unity.Models;
+using LocalModels = TheBleedingDeacons.Intergroup.Register.Models;
 
-namespace TheBleedingDeacons.Intergroup.Register.Services
+namespace TheBleedingDeacons.Intergroup.Register.Services;
+
+/// <summary>
+/// Fetches data from the Unity WordPress API via <see cref="UnityRestSharp"/>
+/// and maps it into a <see cref="RegisterData"/> for the register app.
+/// </summary>
+public class UnityApiService : IUnityApiService
 {
-    internal class UnityApiService
+    private static readonly ILogger Logger = AppLogger.ForContext<UnityApiService>();
+
+    private readonly UnityRestSharp _client;
+
+    public UnityApiService(UnityRestSharp client)
     {
+        _client = client;
+    }
+
+    /// <inheritdoc />
+    public async Task<RegisterData> GetRegisterDataAsync(CancellationToken cancellationToken = default)
+    {
+        Logger.Information("Fetching register data from Unity API");
+
+        // Fetch groups with expanded meetings so we get day/time/location per meeting
+        var groupsResponse = await _client.GetGroupsAsync(
+            perPage: 500,
+            expandMeetings: true,
+            cancellationToken: cancellationToken);
+
+        if (!groupsResponse.Success || groupsResponse.Data is null)
+        {
+            Logger.Error("Failed to fetch groups from Unity API: {Error}",
+                groupsResponse.Error?.Message ?? "Unknown error");
+            throw new InvalidOperationException(
+                $"Failed to fetch groups: {groupsResponse.Error?.Message ?? "Unknown error"}");
+        }
+
+        // Fetch positions
+        var positionsResponse = await _client.GetPositionsAsync(
+            perPage: 500,
+            cancellationToken: cancellationToken);
+
+        if (!positionsResponse.Success || positionsResponse.Data is null)
+        {
+            Logger.Error("Failed to fetch positions from Unity API: {Error}",
+                positionsResponse.Error?.Message ?? "Unknown error");
+            throw new InvalidOperationException(
+                $"Failed to fetch positions: {positionsResponse.Error?.Message ?? "Unknown error"}");
+        }
+
+        // Fetch members so we can resolve GSR info and position holders
+        var membersResponse = await _client.GetMembersAsync(
+            perPage: 500,
+            cancellationToken: cancellationToken);
+
+        if (!membersResponse.Success || membersResponse.Data is null)
+        {
+            Logger.Error("Failed to fetch members from Unity API: {Error}",
+                membersResponse.Error?.Message ?? "Unknown error");
+            throw new InvalidOperationException(
+                $"Failed to fetch members: {membersResponse.Error?.Message ?? "Unknown error"}");
+        }
+
+        var groups = MapGroups(groupsResponse.Data, membersResponse.Data);
+        var positions = MapPositions(positionsResponse.Data, membersResponse.Data);
+
+        Logger.Information("Fetched {GroupCount} groups and {PositionCount} positions from Unity API",
+            groups.Count, positions.Count);
+
+        return new RegisterData(groups, positions);
+    }
+
+    // ====================================================================
+    // Mapping: Unity Groups + Meetings → Local Groups
+    // ====================================================================
+
+    private static List<LocalModels.Group> MapGroups(
+        List<UnityModels.Group> unityGroups,
+        List<UnityModels.Member> members)
+    {
+        var groups = new List<LocalModels.Group>();
+
+        // Build a lookup of GSR members by home group ID
+        var gsrsByGroupId = members
+            .Where(m => m.IsGsr && m.HomeGroupId.HasValue)
+            .GroupBy(m => m.HomeGroupId!.Value)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        foreach (var unityGroup in unityGroups)
+        {
+            gsrsByGroupId.TryGetValue(unityGroup.Id, out var gsr);
+
+            if (unityGroup.HasExpandedMeetings && unityGroup.Meetings.Count > 0)
+            {
+                // One local Group row per meeting
+                foreach (var meeting in unityGroup.Meetings)
+                {
+                    groups.Add(MapMeetingToGroup(unityGroup, meeting, gsr));
+                }
+            }
+            else
+            {
+                // No meetings expanded – create a single entry from the group itself
+                groups.Add(MapGroupOnly(unityGroup, gsr));
+            }
+        }
+
+        return groups;
+    }
+
+    private static LocalModels.Group MapMeetingToGroup(
+        UnityModels.Group unityGroup,
+        UnityModels.Meeting meeting,
+        UnityModels.Member? gsr)
+    {
+        // Prefer meeting-level contacts, fall back to group-level contacts
+        var contacts = meeting.Contacts.Count > 0
+            ? meeting.Contacts
+            : unityGroup.Contacts;
+
+        return new LocalModels.Group
+        {
+            ID = meeting.Id,
+            Day = meeting.DayOfWeek,
+            Time = meeting.Time,
+            EndTime = meeting.EndTime,
+            Name = !string.IsNullOrEmpty(meeting.Name) ? meeting.Name : unityGroup.Title,
+            GsrName = gsr?.AnonymousName,
+            GsrEmailPersonal = gsr?.PersonalEmail,
+            GsrPhone = gsr?.MobileNumber,
+            GroupGenericEmail = unityGroup.Email,
+            UsingGeneric = !string.IsNullOrEmpty(unityGroup.Email) ? true : null,
+            Location = meeting.Location?.Name,
+            Address = meeting.Location?.FormattedAddress,
+            Contact1Name = contacts.ElementAtOrDefault(0)?.Name,
+            Contact1Email = contacts.ElementAtOrDefault(0)?.Email,
+            Contact1Phone = contacts.ElementAtOrDefault(0)?.Phone,
+            Contact2Name = contacts.ElementAtOrDefault(1)?.Name,
+            Contact2Email = contacts.ElementAtOrDefault(1)?.Email,
+            Contact2Phone = contacts.ElementAtOrDefault(1)?.Phone,
+            Contact3Name = contacts.ElementAtOrDefault(2)?.Name,
+            Contact3Email = contacts.ElementAtOrDefault(2)?.Email,
+            Contact3Phone = contacts.ElementAtOrDefault(2)?.Phone,
+            Types = meeting.Types.Count > 0 ? string.Join(", ", meeting.Types) : null
+        };
+    }
+
+    private static LocalModels.Group MapGroupOnly(
+        UnityModels.Group unityGroup,
+        UnityModels.Member? gsr)
+    {
+        var contacts = unityGroup.Contacts;
+
+        return new LocalModels.Group
+        {
+            ID = unityGroup.Id,
+            Name = unityGroup.Title,
+            GsrName = gsr?.AnonymousName,
+            GsrEmailPersonal = gsr?.PersonalEmail,
+            GsrPhone = gsr?.MobileNumber,
+            GroupGenericEmail = unityGroup.Email,
+            UsingGeneric = !string.IsNullOrEmpty(unityGroup.Email) ? true : null,
+            Contact1Name = contacts.ElementAtOrDefault(0)?.Name,
+            Contact1Email = contacts.ElementAtOrDefault(0)?.Email,
+            Contact1Phone = contacts.ElementAtOrDefault(0)?.Phone,
+            Contact2Name = contacts.ElementAtOrDefault(1)?.Name,
+            Contact2Email = contacts.ElementAtOrDefault(1)?.Email,
+            Contact2Phone = contacts.ElementAtOrDefault(1)?.Phone,
+            Contact3Name = contacts.ElementAtOrDefault(2)?.Name,
+            Contact3Email = contacts.ElementAtOrDefault(2)?.Email,
+            Contact3Phone = contacts.ElementAtOrDefault(2)?.Phone,
+        };
+    }
+
+    // ====================================================================
+    // Mapping: Unity Positions + Members → Local Positions
+    // ====================================================================
+
+    private static List<LocalModels.Position> MapPositions(
+        List<UnityModels.Position> unityPositions,
+        List<UnityModels.Member> members)
+    {
+        // Build a lookup of members by their intergroup position ID
+        var membersByPositionId = members
+            .Where(m => m.IntergroupPositionId.HasValue)
+            .GroupBy(m => m.IntergroupPositionId!.Value)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        return unityPositions.Select(p =>
+        {
+            membersByPositionId.TryGetValue(p.Id, out var holder);
+
+            return new LocalModels.Position
+            {
+                ID = p.Id,
+                PositionName = p.ShortDescription,
+                PositionLongName = p.LongName,
+                PositionGenericEmail = p.Email,
+                MemberAnonymousName = holder?.AnonymousName,
+                MemberPersonalEmail = holder?.PersonalEmail,
+                MemberMobile = holder?.MobileNumber,
+                PositionDuration = p.TermYears > 0 ? $"{p.TermYears} year{(p.TermYears != 1 ? "s" : "")}" : null,
+            };
+        }).ToList();
     }
 }
