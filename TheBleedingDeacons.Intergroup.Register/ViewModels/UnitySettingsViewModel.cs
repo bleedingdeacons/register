@@ -60,7 +60,8 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 
                 // Quick connectivity test using the Unity client
                 using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
-                httpClient.DefaultRequestHeaders.Add("X-Integrity-Key", ApiKey.Trim());
+                httpClient.DefaultRequestHeaders.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", ApiKey.Trim());
 
                 var testUrl = BaseUrl.TrimEnd('/') + "/wp-json/integrity/v1/positions?per_page=1";
                 var response = await httpClient.GetAsync(testUrl);
