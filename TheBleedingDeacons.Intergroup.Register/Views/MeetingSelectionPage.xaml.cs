@@ -3,10 +3,10 @@ using TheBleedingDeacons.Intergroup.Register.ViewModels;
 
 namespace TheBleedingDeacons.Intergroup.Register.Views;
 
-public partial class GroupSelectionPage : ContentPage
+public partial class MeetingSelectionPage : ContentPage
 {
     
-    public GroupSelectionPage(GroupSelectionViewModel viewModel)
+    public MeetingSelectionPage(MeetingSelectionViewModel viewModel)
     {
         InitializeComponent();
         BindingContext = viewModel;

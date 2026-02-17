@@ -1,4 +1,4 @@
-﻿using System.Linq;
+using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Serilog;
@@ -11,26 +11,26 @@ using TheBleedingDeacons.Intergroup.Register.Views;
 
 namespace TheBleedingDeacons.Intergroup.Register.ViewModels;
 
-[QueryProperty(nameof(GroupId), "groupId")]
+[QueryProperty(nameof(MeetingId), "groupId")]
 [QueryProperty(nameof(Edited), "edited")]
 public partial class GsrVerifyViewModel : BaseViewModel
 {
     private static readonly ILogger Logger = AppLogger.ForContext<GsrVerifyViewModel>();
 
     private readonly DataService _dataService;
-    private readonly IAttendanceRegistration<Group> _attendanceRegistration;
-    private readonly IGroupRepository _groupRepository;
+    private readonly IAttendanceRegistration<Meeting> _attendanceRegistration;
+    private readonly IMeetingRepository _meetingRepository;
     private readonly IPopupNotification _popupService;
 
     [ObservableProperty]
     private string attendedStatusText = string.Empty;
 
     [ObservableProperty]
-    private int groupId;
+    private int meetingId;
 
-    // Initialize Group to avoid null reference exceptions in bindings
+    // Initialize Meeting to avoid null reference exceptions in bindings
     [ObservableProperty]
-    private Group group = new();
+    private Meeting meeting = new();
 
     [ObservableProperty]
     private bool edited;
@@ -50,11 +50,11 @@ public partial class GsrVerifyViewModel : BaseViewModel
     [ObservableProperty]
     private bool isLoading;
 
-    public GsrVerifyViewModel(DataService dataService, IAttendanceRegistration<Group> attendanceRegistration, IGroupRepository groupRepository, IPopupNotification popupService)
+    public GsrVerifyViewModel(DataService dataService, IAttendanceRegistration<Meeting> attendanceRegistration, IMeetingRepository meetingRepository, IPopupNotification popupService)
     {
         _attendanceRegistration = attendanceRegistration;
         _dataService = dataService;
-        _groupRepository = groupRepository;
+        _meetingRepository = meetingRepository;
         _popupService = popupService;
     }
 
@@ -74,48 +74,46 @@ public partial class GsrVerifyViewModel : BaseViewModel
         {
             MainThread.BeginInvokeOnMainThread(() =>
             {
-                OnPropertyChanged(nameof(Group));
+                OnPropertyChanged(nameof(Meeting));
                 // Null-safe check for HasAll
-                CanRegister = Group?.HasAll() ?? false;
+                CanRegister = Meeting?.HasAll() ?? false;
             });
         }
 
         // Handle groupId passed as string from navigation
-        if (query.TryGetValue("groupId", out var groupIdObj))
+        if (query.TryGetValue("groupId", out var meetingIdObj))
         {
-            int parsedGroupId = 0;
+            int parsedMeetingId = 0;
 
-            if (groupIdObj is string groupIdStr)
+            if (meetingIdObj is string meetingIdStr)
             {
-                Logger.Information("Parsing groupId from string: {GroupIdStr}", groupIdStr);
-                int.TryParse(groupIdStr, out parsedGroupId);
+                Logger.Information("Parsing meetingId from string: {MeetingIdStr}", meetingIdStr);
+                int.TryParse(meetingIdStr, out parsedMeetingId);
             }
-            else if (groupIdObj is int intValue)
+            else if (meetingIdObj is int intValue)
             {
-                Logger.Information("GroupId is already int: {IntValue}", intValue);
-                parsedGroupId = intValue;
+                Logger.Information("MeetingId is already int: {IntValue}", intValue);
+                parsedMeetingId = intValue;
             }
 
-            Logger.Information("Parsed groupId: {ParsedGroupId}", parsedGroupId);
+            Logger.Information("Parsed meetingId: {ParsedMeetingId}", parsedMeetingId);
 
-            if (parsedGroupId > 0)
+            if (parsedMeetingId > 0)
             {
-                GroupId = parsedGroupId;
+                MeetingId = parsedMeetingId;
             }
         }
     }
 
-    partial void OnGroupIdChanged(int value)
+    partial void OnMeetingIdChanged(int value)
     {
-        Logger.Information("OnGroupIdChanged triggered with value: {Value}", value);
+        Logger.Information("OnMeetingIdChanged triggered with value: {Value}", value);
 
         if (value > 0)
         {
-            // Use MainThread.BeginInvokeOnMainThread for the async call
-            // This ensures proper context on Android
             MainThread.BeginInvokeOnMainThread(async () =>
             {
-                await LoadGroupAsync(value);
+                await LoadMeetingAsync(value);
             });
         }
     }
@@ -123,15 +121,15 @@ public partial class GsrVerifyViewModel : BaseViewModel
     [RelayCommand]
     public async Task No()
     {
-        if (Group == null)
+        if (Meeting == null)
         {
-            Logger.Warning("Cannot navigate to edit - Group is null");
+            Logger.Warning("Cannot navigate to edit - Meeting is null");
             return;
         }
 
         var parameters = new Dictionary<string, object>
         {
-            ["group"] = Group
+            ["meeting"] = Meeting
         };
 
         await Shell.Current.GoToAsync(nameof(GsrEditPage), parameters);
@@ -140,21 +138,21 @@ public partial class GsrVerifyViewModel : BaseViewModel
     [RelayCommand]
     public async Task Yes()
     {
-        if (Group == null)
+        if (Meeting == null)
         {
-            Logger.Warning("Cannot register - Group is null");
+            Logger.Warning("Cannot register - Meeting is null");
             return;
         }
 
         try
         {
-            Group.ProxyAttendance = StandingIn;
-            Group.ProxyEmail = StandinEmail;
-            Group.ProxyName = StandinName;
+            Meeting.ProxyAttendance = StandingIn;
+            Meeting.ProxyEmail = StandinEmail;
+            Meeting.ProxyName = StandinName;
 
-            await _attendanceRegistration.Register(Group);
+            await _attendanceRegistration.Register(Meeting);
 
-            string personalName = Group.GetFirstName();
+            string personalName = Meeting.GetFirstName();
 
             // Show success popup
             await _popupService.ShowCountdownPopupAsync(
@@ -181,9 +179,9 @@ public partial class GsrVerifyViewModel : BaseViewModel
         await Shell.Current.GoToAsync("///MainPage");
     }
 
-    private async Task LoadGroupAsync(int groupId)
+    private async Task LoadMeetingAsync(int meetingId)
     {
-        Logger.Information("LoadGroupAsync called with groupId: {GroupId}", groupId);
+        Logger.Information("LoadMeetingAsync called with meetingId: {MeetingId}", meetingId);
 
         if (IsLoading) return;
 
@@ -191,53 +189,53 @@ public partial class GsrVerifyViewModel : BaseViewModel
         {
             IsLoading = true;
 
-            var loadedGroup = await _groupRepository.GetGroupDirectlyAsync(groupId);
+            var loadedMeeting = await _meetingRepository.GetMeetingDirectlyAsync(meetingId);
 
-            Logger.Information("Group loaded: {GroupName}, GSR: {GsrName}",
-                loadedGroup?.Name ?? "null",
-                loadedGroup?.GsrName ?? "null");
+            Logger.Information("Meeting loaded: {MeetingName}, GSR: {GsrName}",
+                loadedMeeting?.Name ?? "null",
+                loadedMeeting?.GsrName ?? "null");
 
-            if (loadedGroup != null)
+            if (loadedMeeting != null)
             {
                 // All UI updates happen here on the main thread
-                Group = loadedGroup;
+                Meeting = loadedMeeting;
 
                 // Set title with null-safe checks
-                if (!string.IsNullOrEmpty(loadedGroup.Name) &&
-                    !string.IsNullOrEmpty(loadedGroup.Day) &&
-                    !loadedGroup.Name.Contains(loadedGroup.Day))
+                if (!string.IsNullOrEmpty(loadedMeeting.Name) &&
+                    !string.IsNullOrEmpty(loadedMeeting.Day) &&
+                    !loadedMeeting.Name.Contains(loadedMeeting.Day))
                 {
-                    Title = $"{loadedGroup.Name} on {loadedGroup.Day}";
+                    Title = $"{loadedMeeting.Name} on {loadedMeeting.Day}";
                 }
                 else
                 {
-                    Title = loadedGroup.Name ?? "Unknown Group";
+                    Title = loadedMeeting.Name ?? "Unknown Meeting";
                 }
 
-                CanRegister = loadedGroup.HasAll();
+                CanRegister = loadedMeeting.HasAll();
 
                 // Force property change notification for bindings
-                OnPropertyChanged(nameof(Group));
+                OnPropertyChanged(nameof(Meeting));
 
-                Logger.Information("UI updated - Group: {GroupName}, CanRegister: {CanRegister}",
-                    Group?.Name, CanRegister);
+                Logger.Information("UI updated - Meeting: {MeetingName}, CanRegister: {CanRegister}",
+                    Meeting?.Name, CanRegister);
             }
             else
             {
-                Logger.Warning("Group not found for ID: {GroupId}", groupId);
+                Logger.Warning("Meeting not found for ID: {MeetingId}", meetingId);
                 var mainPage = Application.Current?.Windows?.FirstOrDefault()?.Page;
                 if (mainPage != null)
                 {
                     await mainPage.DisplayAlert(
                         "Not Found",
-                        $"Group with ID {groupId} was not found.",
+                        $"Meeting with ID {meetingId} was not found.",
                         "OK");
                 }
             }
         }
         catch (Exception ex)
         {
-            Logger.Error(ex, "Failed to load group {GroupId}", groupId);
+            Logger.Error(ex, "Failed to load meeting {MeetingId}", meetingId);
 
             try
             {
@@ -246,7 +244,7 @@ public partial class GsrVerifyViewModel : BaseViewModel
                 {
                     await mainPage.DisplayAlert(
                         "Error",
-                        $"Failed to load group: {ex.Message}",
+                        $"Failed to load meeting: {ex.Message}",
                         "OK");
                 }
             }

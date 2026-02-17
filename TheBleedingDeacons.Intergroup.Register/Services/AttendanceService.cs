@@ -1,4 +1,4 @@
-﻿using Serilog;
+using Serilog;
 using TheBleedingDeacons.Intergroup.Register.Extensions;
 using TheBleedingDeacons.Intergroup.Register.Models;
 using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
@@ -6,23 +6,23 @@ using TheBleedingDeacons.Intergroup.Register.Support;
 
 namespace TheBleedingDeacons.Intergroup.Register.Services
 {
-    public class AttendanceService : IAttendanceRegistration<Position>, IAttendanceRegistration<Group>, IDisposable
+    public class AttendanceService : IAttendanceRegistration<Position>, IAttendanceRegistration<Meeting>, IDisposable
     {
         private static readonly ILogger Logger = AppLogger.ForContext<AttendanceService>();
 
         private readonly IMailService _mailService;
         private readonly IEmailTemplateService _emailTemplate;
-        private readonly IGroupRepository _groupRepository;
+        private readonly IMeetingRepository _meetingRepository;
         private readonly IPositionRepository _positionRepository;
 
         private readonly EventHandler<EmailSentEventArgs> _emailSentHandler;
         private readonly EventHandler<EmailFailedEventArgs> _emailFailedHandler;
         private bool _disposed;
 
-        public AttendanceService(IGroupRepository groupRepository, IPositionRepository positionRepository, IEmailTemplateService emailTemplate, IMailService mailService)
+        public AttendanceService(IMeetingRepository meetingRepository, IPositionRepository positionRepository, IEmailTemplateService emailTemplate, IMailService mailService)
         {
             _positionRepository = positionRepository;
-            _groupRepository = groupRepository;
+            _meetingRepository = meetingRepository;
             _mailService = mailService;
             _emailTemplate = emailTemplate;
 
@@ -39,26 +39,26 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
             await _positionRepository.SavePositionAsync(entity);
         }
 
-        public async Task Register(Group entity)
+        public async Task Register(Meeting entity)
         {
             entity.Attended = true;
-            await _groupRepository.SaveGroupAsync(entity);
+            await _meetingRepository.SaveMeetingAsync(entity);
 
             // TODO: Enable welcome email sending once SMTP is configured
             // var welcome = new WelcomeEmail
             // {
             //     FirstName = entity.GetFirstName(),
-            //     GroupName = entity.Name,
+            //     MeetingName = entity.Name,
             //     StartTime = entity.Time,
             //     Location = entity.Location,
             //     Address = entity.Address,
-            //     GroupContacts = entity.GetContacts()
+            //     MeetingContacts = entity.GetContacts()
             // };
             // var emailBody = await _emailTemplate.RenderTemplateAsync("WelcomeEmail", welcome);
             // if (!string.IsNullOrEmpty(entity.GsrEmailPersonal))
-            //     await _mailService.SendEmailAsync(entity.GsrEmailPersonal, "Important information about your group.", emailBody, isHtml: true);
+            //     await _mailService.SendEmailAsync(entity.GsrEmailPersonal, "Important information about your meeting.", emailBody, isHtml: true);
 
-            Logger.Information("Group {GroupName} attendance registered", entity.Name);
+            Logger.Information("Meeting {MeetingName} attendance registered", entity.Name);
         }
 
         public async Task Unregister(Position entity)
@@ -68,14 +68,14 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
             Logger.Information("Position {PositionName} attendance unregistered", entity.PositionName);
         }
 
-        public async Task Unregister(Group entity)
+        public async Task Unregister(Meeting entity)
         {
             entity.Attended = false;
             entity.ProxyAttendance = false;
             entity.ProxyEmail = null;
             entity.ProxyName = null;
-            await _groupRepository.SaveGroupAsync(entity);
-            Logger.Information("Group {GroupName} attendance unregistered", entity.Name);
+            await _meetingRepository.SaveMeetingAsync(entity);
+            Logger.Information("Meeting {MeetingName} attendance unregistered", entity.Name);
         }
 
         public void Dispose()

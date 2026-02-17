@@ -4,21 +4,22 @@ using System.Collections.Generic;
 using System.IO;
 using TheBleedingDeacons.Intergroup.Register.Models;
 
+
 namespace TheBleedingDeacons.Intergroup.Register.Utilities;
 
 public class RegisterData
 {
-    public List<Group> Groups { get; set; } = new List<Group>();
+    public List<Meeting> Meetings { get; set; } = new List<Meeting>();
     public List<Position> Positions { get; set; } = new List<Position>();
 
-    public int TotalGroups => Groups.Count;
+    public int TotalMeetings => Meetings.Count;
     public int TotalPositions => Positions.Count;
 
     public RegisterData() { }
 
-    public RegisterData(List<Group> groups, List<Position> positions)
+    public RegisterData(List<Meeting> meetings, List<Position> positions)
     {
-        Groups = groups ?? new List<Group>();
+        Meetings = meetings ?? new List<Meeting>();
         Positions = positions ?? new List<Position>();
     }
 }
@@ -36,10 +37,10 @@ public static class ExcelSerializer
         
         using var package = new ExcelPackage(excelStream);
 
-        var groups = DeserializeWorksheet<Group>(package, "Groups");
+        var meetings = DeserializeWorksheet<Meeting>(package, "Meetings");
         var positions = DeserializeWorksheet<Position>(package, "Positions");
 
-        return new RegisterData(groups, positions);
+        return new RegisterData(meetings, positions);
     }
 
     // Internal method to deserialize a specific worksheet from an already loaded package
@@ -79,9 +80,9 @@ public static class ExcelSerializer
         try
         {
 
-            if (typeof(T) == typeof(Group))
+            if (typeof(T) == typeof(Meeting))
             {
-                return (T)(object)new Group
+                return (T)(object)new Meeting
                 {
                     ID = GetCellValue<int>(worksheet, row, 1),
                     Day = GetCellValue<string>(worksheet, row, 2),
@@ -91,7 +92,7 @@ public static class ExcelSerializer
                     GsrName = GetCellValue<string>(worksheet, row, 6),
                     GsrEmailPersonal = GetCellValue<string>(worksheet, row, 7),
                     GsrPhone = GetCellValue<string>(worksheet, row, 8),
-                    GroupGenericEmail = GetCellValue<string>(worksheet, row, 9),
+                    MeetingGenericEmail = GetCellValue<string>(worksheet, row, 9),
                     UsingGeneric = GetCellValue<bool?>(worksheet, row, 10),
                     Location = GetCellValue<string>(worksheet, row, 11),
                     Address = GetCellValue<string>(worksheet, row, 12),
@@ -137,14 +138,14 @@ public static class ExcelSerializer
 
 
     // Combined serialization method - creates one Excel file with multiple tabs
-    public static byte[] SerializeToExcel(List<Group> groups, List<Position> positions)
+    public static byte[] SerializeToExcel(List<Meeting> meetings, List<Position> positions)
     {
         using var package = new ExcelPackage();
 
-        // Create Groups tab
-        var groupsWorksheet = package.Workbook.Worksheets.Add("Groups");
-        SerializeGroupsToWorksheet(groupsWorksheet, groups);
-        groupsWorksheet.Cells.AutoFitColumns();
+        // Create Meetings tab
+        var meetingsWorksheet = package.Workbook.Worksheets.Add("Meetings");
+        SerializeMeetingsToWorksheet(meetingsWorksheet, meetings);
+        meetingsWorksheet.Cells.AutoFitColumns();
 
         // Create Positions tab
         var positionsWorksheet = package.Workbook.Worksheets.Add("Positions");
@@ -160,9 +161,9 @@ public static class ExcelSerializer
         using var package = new ExcelPackage();
         var worksheet = package.Workbook.Worksheets.Add(worksheetName);
 
-        if (typeof(T) == typeof(Group))
+        if (typeof(T) == typeof(Meeting))
         {
-            SerializeGroupsToWorksheet(worksheet, items.Cast<Group>().ToList());
+            SerializeMeetingsToWorksheet(worksheet, items.Cast<Meeting>().ToList());
         }
         else if (typeof(T) == typeof(Position))
         {
@@ -179,9 +180,9 @@ public static class ExcelSerializer
     }
 
     // Specific serialization methods for single tabs
-    public static byte[] SerializeGroupsToExcel(List<Group> groups)
+    public static byte[] SerializeMeetingsToExcel(List<Meeting> meetings)
     {
-        return SerializeToExcel(groups, "Groups");
+        return SerializeToExcel(meetings, "Meetings");
     }
 
     public static byte[] SerializePositionsToExcel(List<Position> positions)
@@ -189,7 +190,7 @@ public static class ExcelSerializer
         return SerializeToExcel(positions, "Positions");
     }
 
-    private static void SerializeGroupsToWorksheet(ExcelWorksheet worksheet, List<Group> groups)
+    private static void SerializeMeetingsToWorksheet(ExcelWorksheet worksheet, List<Meeting> meetings)
     {
         // Add headers
         worksheet.Cells[1, 1].Value = "ID";
@@ -198,7 +199,7 @@ public static class ExcelSerializer
         worksheet.Cells[1, 4].Value = "GSR Name";
         worksheet.Cells[1, 5].Value = "GSR Email Personal";
         worksheet.Cells[1, 6].Value = "GSR Phone";
-        worksheet.Cells[1, 7].Value = "Group Generic Email";
+        worksheet.Cells[1, 7].Value = "Meeting Generic Email";
         worksheet.Cells[1, 8].Value = "Using Generic";
         worksheet.Cells[1, 9].Value = "Location";
         worksheet.Cells[1, 10].Value = "Address"; 
@@ -216,33 +217,33 @@ public static class ExcelSerializer
         worksheet.Cells[1, 22].Value = "Attended";
 
         // Add data rows
-        for (int i = 0; i < groups.Count; i++)
+        for (int i = 0; i < meetings.Count; i++)
         {
             int row = i + 2; // Start from row 2 (after headers)
-            var group = groups[i];
+            var meeting = meetings[i];
 
-            worksheet.Cells[row, 1].Value = group.ID;
-            worksheet.Cells[row, 2].Value = group.Day;
-            worksheet.Cells[row, 3].Value = group.Name;
-            worksheet.Cells[row, 4].Value = group.GsrName;
-            worksheet.Cells[row, 5].Value = group.GsrEmailPersonal;
-            worksheet.Cells[row, 6].Value = group.GsrPhone;
-            worksheet.Cells[row, 7].Value = group.GroupGenericEmail;
-            worksheet.Cells[row, 8].Value = group.UsingGeneric;
-            worksheet.Cells[row, 9].Value = group.Location;
-            worksheet.Cells[row, 10].Value = group.Address;
-            worksheet.Cells[row, 11].Value = group.Contact1Name;
-            worksheet.Cells[row, 12].Value = group.Contact1Email;
-            worksheet.Cells[row, 13].Value = group.Contact1Phone;
-            worksheet.Cells[row, 14].Value = group.Contact2Name;
-            worksheet.Cells[row, 15].Value = group.Contact2Email;
-            worksheet.Cells[row, 16].Value = group.Contact2Phone;
-            worksheet.Cells[row, 17].Value = group.Contact3Name;
-            worksheet.Cells[row, 18].Value = group.Contact3Email;
-            worksheet.Cells[row, 19].Value = group.Contact3Phone;
-            worksheet.Cells[row, 20].Value = group.Types;
-            worksheet.Cells[row, 21].Value = group.Updated?.ToString("yyyy-MM-dd");
-            worksheet.Cells[row, 22].Value = group.Attended;
+            worksheet.Cells[row, 1].Value = meeting.ID;
+            worksheet.Cells[row, 2].Value = meeting.Day;
+            worksheet.Cells[row, 3].Value = meeting.Name;
+            worksheet.Cells[row, 4].Value = meeting.GsrName;
+            worksheet.Cells[row, 5].Value = meeting.GsrEmailPersonal;
+            worksheet.Cells[row, 6].Value = meeting.GsrPhone;
+            worksheet.Cells[row, 7].Value = meeting.MeetingGenericEmail;
+            worksheet.Cells[row, 8].Value = meeting.UsingGeneric;
+            worksheet.Cells[row, 9].Value = meeting.Location;
+            worksheet.Cells[row, 10].Value = meeting.Address;
+            worksheet.Cells[row, 11].Value = meeting.Contact1Name;
+            worksheet.Cells[row, 12].Value = meeting.Contact1Email;
+            worksheet.Cells[row, 13].Value = meeting.Contact1Phone;
+            worksheet.Cells[row, 14].Value = meeting.Contact2Name;
+            worksheet.Cells[row, 15].Value = meeting.Contact2Email;
+            worksheet.Cells[row, 16].Value = meeting.Contact2Phone;
+            worksheet.Cells[row, 17].Value = meeting.Contact3Name;
+            worksheet.Cells[row, 18].Value = meeting.Contact3Email;
+            worksheet.Cells[row, 19].Value = meeting.Contact3Phone;
+            worksheet.Cells[row, 20].Value = meeting.Types;
+            worksheet.Cells[row, 21].Value = meeting.Updated?.ToString("yyyy-MM-dd");
+            worksheet.Cells[row, 22].Value = meeting.Attended;
         }
     }
 

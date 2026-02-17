@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using Serilog;
@@ -11,12 +11,12 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels;
 
 public partial class GsrEditViewModel : ObservableObject, IQueryAttributable
 {
-    private static readonly ILogger Logger = AppLogger.ForContext<GroupSelectionViewModel>();
+    private static readonly ILogger Logger = AppLogger.ForContext<MeetingSelectionViewModel>();
 
-    private readonly IGroupRepository _groupRepository;
+    private readonly IMeetingRepository _meetingRepository;
 
     [ObservableProperty]
-    private Group? group;
+    private Meeting? meeting;
 
     [ObservableProperty]
     private string? gsrName;
@@ -61,20 +61,20 @@ public partial class GsrEditViewModel : ObservableObject, IQueryAttributable
     private string saveButtonText = "Save";
 
 
-    public GsrEditViewModel(IGroupRepository groupRepository)
+    public GsrEditViewModel(IMeetingRepository meetingRepository)
     {
-        _groupRepository = groupRepository;
+        _meetingRepository = meetingRepository;
 
         // Initialize with default values
         ValidateForm();
     }
 
-    // This method is automatically called when the Group property changes
-    partial void OnGroupChanged(Group? value)
+    // This method is automatically called when the Meeting property changes
+    partial void OnMeetingChanged(Meeting? value)
     {
         if (value != null)
         {
-            LoadGroupData();
+            LoadMeetingData();
             UpdateTitle();
         }
     }
@@ -132,16 +132,16 @@ public partial class GsrEditViewModel : ObservableObject, IQueryAttributable
         SaveCommand.NotifyCanExecuteChanged();
     }
 
-    private void LoadGroupData()
+    private void LoadMeetingData()
     {
-        if (Group == null) return;
+        if (Meeting == null) return;
 
         // Temporarily disable change tracking while loading
         var wasTracking = HasUnsavedChanges;
 
-        GsrName = Group.GsrName;
-        GsrPhone = Group.GsrPhone;
-        GsrEmailPersonal = Group.GsrEmailPersonal;
+        GsrName = Meeting.GsrName;
+        GsrPhone = Meeting.GsrPhone;
+        GsrEmailPersonal = Meeting.GsrEmailPersonal;
 
         // Reset change tracking
         HasUnsavedChanges = false;
@@ -149,13 +149,13 @@ public partial class GsrEditViewModel : ObservableObject, IQueryAttributable
 
     private void UpdateTitle()
     {
-        if (Group != null && !string.IsNullOrEmpty(Group.Name))
+        if (Meeting != null && !string.IsNullOrEmpty(Meeting.Name))
         {
-            Title = $"{Group.Name}";
+            Title = $"{Meeting.Name}";
         }
         else
         {
-            Title = "Group Service Representive";
+            Title = "Group Service Representative";
         }
     }
 
@@ -219,52 +219,23 @@ public partial class GsrEditViewModel : ObservableObject, IQueryAttributable
 
     private void CheckForUnsavedChanges()
     {
-        if (Group == null)
+        if (Meeting == null)
         {
             HasUnsavedChanges = false;
             return;
         }
 
-        HasUnsavedChanges = Group.GsrName != GsrName?.Trim() ||
-                           Group.GsrPhone != GsrPhone?.Trim() ||
-                           Group.GsrEmailPersonal != GsrEmailPersonal?.Trim();
+        HasUnsavedChanges = Meeting.GsrName != GsrName?.Trim() ||
+                           Meeting.GsrPhone != GsrPhone?.Trim() ||
+                           Meeting.GsrEmailPersonal != GsrEmailPersonal?.Trim();
     }
 
-    private void SetGsrNameError(string error)
-    {
-        GsrNameError = error;
-        HasGsrNameError = true;
-    }
-
-    private void ClearGsrNameError()
-    {
-        GsrNameError = null;
-        HasGsrNameError = false;
-    }
-
-    private void SetGsrPhoneError(string error)
-    {
-        GsrPhoneError = error;
-        HasGsrPhoneError = true;
-    }
-
-    private void ClearGsrPhoneError()
-    {
-        GsrPhoneError = null;
-        HasGsrPhoneError = false;
-    }
-
-    private void SetGsrEmailError(string error)
-    {
-        GsrEmailError = error;
-        HasGsrEmailError = true;
-    }
-
-    private void ClearGsrEmailError()
-    {
-        GsrEmailError = null;
-        HasGsrEmailError = false;
-    }
+    private void SetGsrNameError(string error) { GsrNameError = error; HasGsrNameError = true; }
+    private void ClearGsrNameError() { GsrNameError = null; HasGsrNameError = false; }
+    private void SetGsrPhoneError(string error) { GsrPhoneError = error; HasGsrPhoneError = true; }
+    private void ClearGsrPhoneError() { GsrPhoneError = null; HasGsrPhoneError = false; }
+    private void SetGsrEmailError(string error) { GsrEmailError = error; HasGsrEmailError = true; }
+    private void ClearGsrEmailError() { GsrEmailError = null; HasGsrEmailError = false; }
 
     private void ClearAllErrors()
     {
@@ -280,36 +251,24 @@ public partial class GsrEditViewModel : ObservableObject, IQueryAttributable
             var emailAttribute = new EmailAddressAttribute();
             return emailAttribute.IsValid(email);
         }
-        catch
-        {
-            return false;
-        }
+        catch { return false; }
     }
 
     private bool IsValidPhoneFormat(string phone)
     {
-        // Basic phone validation - customize as needed
         if (string.IsNullOrWhiteSpace(phone)) return false;
-
-        // Remove common phone number characters
         var digitsOnly = new string(phone.Where(char.IsDigit).ToArray());
-
-        // Check if it has reasonable length (adjust as needed)
         return digitsOnly.Length >= 7 && digitsOnly.Length <= 15;
     }
 
     [RelayCommand]
     private async Task Save()
     {
-
         if (!IsFormValid)
         {
-
-            // Force validation to show errors
             ValidateGsrName();
             ValidateGsrPhone();
             ValidateGsrEmail();
-
             await Shell.Current.DisplayAlert("Validation Error", "Please fix the form errors before saving.", "OK");
             return;
         }
@@ -318,27 +277,20 @@ public partial class GsrEditViewModel : ObservableObject, IQueryAttributable
         {
             IsLoading = true;
 
-            // Update the group model
-            if (Group != null)
+            if (Meeting != null)
             {
-                Group.GsrName = GsrName?.Trim();
-                Group.GsrPhone = string.IsNullOrWhiteSpace(GsrPhone) ? string.Empty : GsrPhone.Trim();
-                Group.GsrEmailPersonal = string.IsNullOrWhiteSpace(GsrEmailPersonal) ? string.Empty : GsrEmailPersonal.Trim();
+                Meeting.GsrName = GsrName?.Trim();
+                Meeting.GsrPhone = string.IsNullOrWhiteSpace(GsrPhone) ? string.Empty : GsrPhone.Trim();
+                Meeting.GsrEmailPersonal = string.IsNullOrWhiteSpace(GsrEmailPersonal) ? string.Empty : GsrEmailPersonal.Trim();
 
-                // Here you would typically save to your database or service
-                await SaveToDatabase(Group);
+                await SaveToDatabase(Meeting);
 
                 HasUnsavedChanges = false;
-
-                // Navigate back
                 await Shell.Current.GoToAsync($"..?edited=true");
-
             }
-
         }
         catch (Exception ex)
         {
-
             await Shell.Current.DisplayAlert("Error", $"Failed to save GSR information: {ex.Message}", "OK");
         }
         finally
@@ -350,14 +302,8 @@ public partial class GsrEditViewModel : ObservableObject, IQueryAttributable
     [RelayCommand]
     private async Task Cancel()
     {
+        if (IsLoading) return;
 
-        if (IsLoading)
-        {
-            System.Diagnostics.Debug.WriteLine("Cannot cancel while loading");
-            return;
-        }
-
-        // Check for unsaved changes
         if (HasUnsavedChanges)
         {
             bool shouldCancel = await Shell.Current.DisplayAlert(
@@ -365,17 +311,12 @@ public partial class GsrEditViewModel : ObservableObject, IQueryAttributable
                 "You have unsaved changes. Are you sure you want to cancel?",
                 "Yes", "No");
 
-            if (!shouldCancel)
-            {
-                System.Diagnostics.Debug.WriteLine("User chose not to cancel");
-                return;
-            }
+            if (!shouldCancel) return;
         }
 
         await Shell.Current.GoToAsync("..");
     }
 
-    // Test method to verify commands are working
     [RelayCommand]
     private void TestCommand()
     {
@@ -386,19 +327,14 @@ public partial class GsrEditViewModel : ObservableObject, IQueryAttributable
     // Handle navigation parameters
     public void ApplyQueryAttributes(IDictionary<string, object> query)
     {
-
-        if (query.ContainsKey("group") && query["group"] is Group group)
+        if (query.ContainsKey("meeting") && query["meeting"] is Meeting meeting)
         {
-            Group = group;
+            Meeting = meeting;
         }
     }
 
-    // This method should be implemented based on your data access layer
-    private async Task SaveToDatabase(Group group)
+    private async Task SaveToDatabase(Meeting meeting)
     {
-        await _groupRepository.SaveGroupAsync(group);
+        await _meetingRepository.SaveMeetingAsync(meeting);
     }
-
-
-
 }

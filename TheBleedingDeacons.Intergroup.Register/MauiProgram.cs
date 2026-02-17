@@ -40,7 +40,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<IConfigurationService, ConfigurationService>();
 
         builder.Services.AddScoped<AttendanceService>();
-        builder.Services.AddScoped<IAttendanceRegistration<Group>>(sp => sp.GetRequiredService<AttendanceService>());
+        builder.Services.AddScoped<IAttendanceRegistration<Meeting>>(sp => sp.GetRequiredService<AttendanceService>());
         builder.Services.AddScoped<IAttendanceRegistration<Position>>(sp => sp.GetRequiredService<AttendanceService>());
 
         // App Database
@@ -60,7 +60,7 @@ public static class MauiProgram
         builder.Services.AddScoped<SerializationService>();
         builder.Services.AddMemoryCache();
         builder.Services.AddSingleton<CacheService>();
-        builder.Services.AddScoped<IGroupRepository, GroupRepository>();
+        builder.Services.AddScoped<IMeetingRepository, MeetingRepository>();
         builder.Services.AddScoped<IPositionRepository, PositionRepository>();
         builder.Services.AddScoped<IPopupNotification, PopupNotificationService>();
 
@@ -101,10 +101,10 @@ public static class MauiProgram
         builder.Services.AddTransient<GsrEditPage>();
         builder.Services.AddTransient<DaySelectionPage>();
         builder.Services.AddTransient<TypeSelectionPage>();
-        builder.Services.AddTransient<GroupSelectionPage>();
+        builder.Services.AddTransient<MeetingSelectionPage>();
         builder.Services.AddTransient<ImportExportPage>();
         builder.Services.AddTransient<GsrVerifyPage>();
-        builder.Services.AddTransient<GroupEditPage>();
+        builder.Services.AddTransient<MeetingEditPage>();
         builder.Services.AddTransient<PositionEditPage>();
         builder.Services.AddTransient<PositionSelectionPage>();
         builder.Services.AddTransient<DatabaseBackupPage>();
@@ -114,13 +114,13 @@ public static class MauiProgram
         // ViewModels        
         builder.Services.AddTransient<MailSettingsViewModel>();
         builder.Services.AddTransient<MainPageViewModel>();
-        builder.Services.AddTransient<GroupSelectionViewModel>();
+        builder.Services.AddTransient<MeetingSelectionViewModel>();
         builder.Services.AddTransient<GsrEditViewModel>();
         builder.Services.AddTransient<TypeSelectionViewModel>();
         builder.Services.AddTransient<DaySelectionViewModel>();
         builder.Services.AddTransient<ImportExportViewModel>();
         builder.Services.AddTransient<GsrVerifyViewModel>();
-        builder.Services.AddTransient<GroupEditViewModel>();
+        builder.Services.AddTransient<MeetingEditViewModel>();
         builder.Services.AddTransient<PositionSelectionViewModel>();
         builder.Services.AddTransient<PositionEditViewModel>();
         builder.Services.AddTransient<DatabaseBackupViewModel>();
@@ -144,10 +144,10 @@ public static class MauiProgram
             context.Database.EnsureCreated();
 
             // Load all data synchronously
-            var groups = context.Groups.ToList();
+            var meetings = context.Meetings.ToList();
             var positions = context.Positions.ToList();
 
-            System.Diagnostics.Debug.WriteLine($"Loaded {groups.Count} groups and {positions.Count} positions.");
+            System.Diagnostics.Debug.WriteLine($"Loaded {meetings.Count} meetings and {positions.Count} positions.");
         }
 
         return mauiapp;
@@ -161,7 +161,7 @@ public static class MauiProgram
         Directory.CreateDirectory(logPath);
 
         // Get app configuration
-        var appName = builder.Configuration["App:Name"] ?? "FareShare";
+        var appName = builder.Configuration["App:Name"] ?? "Register";
         var environment = builder.Configuration["App:Environment"] ?? "Development";
 
         var config = new LoggerConfiguration()

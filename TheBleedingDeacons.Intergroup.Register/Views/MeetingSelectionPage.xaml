@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<ContentPage x:Class="TheBleedingDeacons.Intergroup.Register.Views.GroupSelectionPage"
+<ContentPage x:Class="TheBleedingDeacons.Intergroup.Register.Views.MeetingSelectionPage"
              xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:vm="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
              xmlns:models="clr-namespace:TheBleedingDeacons.Intergroup.Register.Models"
-             x:DataType="vm:GroupSelectionViewModel"
+             x:DataType="vm:MeetingSelectionViewModel"
              Title="{Binding Title}">
 
     <Grid>
@@ -30,15 +30,15 @@
                 </StackLayout>
             </Border>
 
-            <!-- Groups list -->
+            <!-- Meetings list -->
             <CollectionView Grid.Row="2"
-                           ItemsSource="{Binding Groups}"                          
+                           ItemsSource="{Binding Meetings}"                          
                            SelectionMode="None">
                 <CollectionView.ItemsLayout>
                     <LinearItemsLayout Orientation="Vertical" ItemSpacing="5" />
                 </CollectionView.ItemsLayout>
                 <CollectionView.ItemTemplate>
-                    <DataTemplate x:DataType="models:Group">
+                    <DataTemplate x:DataType="models:Meeting">
                         <Border BackgroundColor="White"
                                StrokeShape="RoundRectangle 8"
                                Stroke="{StaticResource Gray200}"
@@ -46,7 +46,7 @@
                                Margin="15,5">
 
                             <Border.GestureRecognizers>
-                                <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type vm:GroupSelectionViewModel}}, Path=SelectGroupCommand}"
+                                <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type vm:MeetingSelectionViewModel}}, Path=SelectMeetingCommand}"
                                                      CommandParameter="{Binding .}" />
                             </Border.GestureRecognizers>
 
@@ -54,7 +54,7 @@
                                   RowDefinitions="Auto,Auto,Auto,Auto" 
                                   ColumnDefinitions="*,Auto">
 
-                                <!-- Group Name -->
+                                <!-- Meeting Name -->
                                 <Label Grid.Row="0" Grid.Column="0"
                                        Text="{Binding Name}"
                                        FontSize="24"
@@ -106,40 +106,6 @@
                         Padding="40"
                         VerticalOptions="Center"
                         IsVisible="{Binding IsDataLoaded, Converter={StaticResource InvertedBoolConverter}}">
-
-                <!--<Label Text="📋"
-                       FontSize="64"
-                       HorizontalOptions="Center"
-                       TextColor="{StaticResource Gray300}" />
-
-                <Label Text="No Groups Found"
-                       FontSize="20"
-                       FontAttributes="Bold"
-                       HorizontalOptions="Center"
-                       TextColor="{StaticResource Gray500}"
-                       Margin="0,20,0,0" />-->
-
-                <!--<Label FontSize="16"
-                       HorizontalOptions="Center"
-                       TextColor="{StaticResource Gray400}"
-                       HorizontalTextAlignment="Center"
-                       Margin="0,10,0,20">
-                    <Label.Text>
-                        <MultiBinding StringFormat="No groups found for {0}.{1}Add a new group or import from Excel.">
-                            <Binding Path="SelectedDay" />
-                            <Binding Source="&#x0A;" />
-                        </MultiBinding>
-                    </Label.Text>
-                </Label>-->
-
-                <!--<Button Text="Add First Group"
-                        Command="{Binding AddGroupCommand}"
-                        BackgroundColor="{StaticResource Primary}"
-                        TextColor="White"
-                        FontSize="16"
-                        HorizontalOptions="Center"
-                        Padding="30,15" />-->
-
             </StackLayout>
 
         </Grid>
@@ -151,7 +117,7 @@
             <ActivityIndicator IsRunning="{Binding IsLoading}"
                               Color="{StaticResource Primary}"
                               Scale="1.5" />
-            <Label Text="Finding groups..."
+            <Label Text="Finding meetings..."
                    HorizontalOptions="Center"
                    Margin="0,20,0,0"
                    FontSize="16"

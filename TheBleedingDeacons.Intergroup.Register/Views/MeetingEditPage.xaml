@@ -2,8 +2,8 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:viewmodels="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
-             x:Class="TheBleedingDeacons.Intergroup.Register.Views.GroupEditPage"
-             x:DataType="viewmodels:GroupEditViewModel"
+             x:Class="TheBleedingDeacons.Intergroup.Register.Views.MeetingEditPage"
+             x:DataType="viewmodels:MeetingEditViewModel"
              Title="{Binding Title}">
 
     <ScrollView>
@@ -182,7 +182,7 @@
                        Style="{StaticResource FieldLabelStyle}" />
 
                             <Label Grid.Row="1"
-                       Text="{Binding DisplayGroupGenericEmail}"
+                       Text="{Binding DisplayMeetingGenericEmail}"
                        HorizontalOptions="Start"
                        Style="{StaticResource ValueLabelStyle}" />
                         </Grid>
@@ -200,8 +200,8 @@
                        Style="{StaticResource FieldLabelStyle}">
                                 <Label.IsVisible>
                                     <MultiBinding Converter="{StaticResource StringNotEmptyConverter}">
-                                        <Binding Path="DisplayGroupGenericEmail" />
-                                        <Binding Path="EditGroupGenericEmail" />
+                                        <Binding Path="DisplayMeetingGenericEmail" />
+                                        <Binding Path="EditMeetingGenericEmail" />
                                         <Binding Path="IsEditing" />
                                     </MultiBinding>
                                 </Label.IsVisible>
@@ -214,7 +214,7 @@
                        Style="{StaticResource ValueLabelStyle}">
                                 <Label.IsVisible>
                                     <MultiBinding Converter="{StaticResource StringNotEmptyAndNotEditingConverter}">
-                                        <Binding Path="DisplayGroupGenericEmail" />
+                                        <Binding Path="DisplayMeetingGenericEmail" />
                                         <Binding Path="IsEditing" />
                                     </MultiBinding>
                                 </Label.IsVisible>
@@ -226,7 +226,7 @@
                           HorizontalOptions="Start">
                                 <CheckBox.IsVisible>
                                     <MultiBinding Converter="{StaticResource StringNotEmptyAndEditingConverter}">
-                                        <Binding Path="DisplayGroupGenericEmail" />
+                                        <Binding Path="DisplayMeetingGenericEmail" />
                                         <Binding Path="IsEditing" />
                                     </MultiBinding>
                                 </CheckBox.IsVisible>

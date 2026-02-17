@@ -89,13 +89,10 @@
 		<MauiXaml Update="Views\EmailStatusPage.xaml">
 			<Generator>MSBuild:Compile</Generator>
 		</MauiXaml>
-		<MauiXaml Update="Views\GroupEditPage.xaml">
+		<MauiXaml Update="Views\MeetingEditPage.xaml">
 			<Generator>MSBuild:Compile</Generator>
 		</MauiXaml>
-		<MauiXaml Update="Views\GroupSelectionPage.xaml">
-			<Generator>MSBuild:Compile</Generator>
-		</MauiXaml>
-		<MauiXaml Update="Views\GroupView.xaml">
+		<MauiXaml Update="Views\MeetingSelectionPage.xaml">
 			<Generator>MSBuild:Compile</Generator>
 		</MauiXaml>
 		<MauiXaml Update="Views\GsrEditPage.xaml">
@@ -133,8 +130,8 @@
 		<Compile Update="Views\DatabaseBackupPage.xaml.cs">
 			<DependentUpon>DatabaseBackupPage.xaml</DependentUpon>
 		</Compile>
-		<Compile Update="Views\GroupSelectionPage.xaml.cs">
-			<DependentUpon>GroupSelectionPage.xaml</DependentUpon>
+		<Compile Update="Views\MeetingSelectionPage.xaml.cs">
+			<DependentUpon>MeetingSelectionPage.xaml</DependentUpon>
 		</Compile>
 		<Compile Update="Views\GsrVerifyPage.xaml.cs">
 			<DependentUpon>GsrVerifyPage.xaml</DependentUpon>
@@ -142,7 +139,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<None Update="Views\GroupEditPage.xaml">
+		<None Update="Views\MeetingEditPage.xaml">
 			<Generator>MSBuild:Compile</Generator>
 		</None>
 	</ItemGroup>

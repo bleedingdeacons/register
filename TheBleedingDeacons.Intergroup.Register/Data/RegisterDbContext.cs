@@ -1,10 +1,11 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using TheBleedingDeacons.Intergroup.Register.Models;
 
 namespace TheBleedingDeacons.Intergroup.Register.Data;
 
 public class RegisterContext : DbContext
 {
+    public DbSet<Meeting> Meetings { get; set; }
     public DbSet<Group> Groups { get; set; }
     public DbSet<Position> Positions { get; set; }
 

@@ -56,15 +56,15 @@
 
                     <!-- GSR Name -->
                     <Label Text="Name" Style="{StaticResource FieldLabelStyle}"/>
-                    <Label Text="{Binding Group.GsrName}" Style="{StaticResource ValueLabelStyle}"/>
+                    <Label Text="{Binding Meeting.GsrName}" Style="{StaticResource ValueLabelStyle}"/>
 
                     <!-- GSR Email -->
                     <Label Text="Personal Email" Style="{StaticResource FieldLabelStyle}"/>
-                    <Label Text="{Binding Group.GsrEmailPersonal}" Style="{StaticResource ValueLabelStyle}" />
+                    <Label Text="{Binding Meeting.GsrEmailPersonal}" Style="{StaticResource ValueLabelStyle}" />
 
                     <!-- GSR Phone -->
                     <Label Text="Mobile Phone" Style="{StaticResource FieldLabelStyle}"/>
-                    <Label Text="{Binding Group.GsrPhone, Converter={StaticResource ObscurePhoneNumber}}" Style="{StaticResource ValueLabelStyle}" />
+                    <Label Text="{Binding Meeting.GsrPhone, Converter={StaticResource ObscurePhoneNumber}}" Style="{StaticResource ValueLabelStyle}" />
 
                     <!-- Standing In Section with Border -->
                     <Border Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}"

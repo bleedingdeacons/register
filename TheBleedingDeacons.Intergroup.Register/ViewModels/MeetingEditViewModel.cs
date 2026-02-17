@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.Maui.Alerts;
+using CommunityToolkit.Maui.Alerts;
 using CommunityToolkit.Maui.Core;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -10,14 +10,14 @@ using TheBleedingDeacons.Intergroup.Register.Support;
 
 namespace TheBleedingDeacons.Intergroup.Register.ViewModels;
 
-public partial class GroupEditViewModel : BaseViewModel
+public partial class MeetingEditViewModel : BaseViewModel
 {
-    private static readonly ILogger Logger = AppLogger.ForContext<GroupEditViewModel>();
+    private static readonly ILogger Logger = AppLogger.ForContext<MeetingEditViewModel>();
 
-    private readonly IGroupRepository _groupRepository;
+    private readonly IMeetingRepository _meetingRepository;
 
     [ObservableProperty]
-    private Group? _group;
+    private Meeting? _meeting;
 
     [ObservableProperty]
     private bool _isEditing;
@@ -32,7 +32,7 @@ public partial class GroupEditViewModel : BaseViewModel
     private string? _editGsrPhone;
 
     [ObservableProperty]
-    private string? _editGroupGenericEmail;
+    private string? _editMeetingGenericEmail;
 
     [ObservableProperty]
     private bool _editUsingGeneric;
@@ -51,7 +51,7 @@ public partial class GroupEditViewModel : BaseViewModel
     private string? _displayGsrPhone;
 
     [ObservableProperty]
-    private string? _displayGroupGenericEmail;
+    private string? _displayMeetingGenericEmail;
 
     [ObservableProperty]
     private bool _displayUsingGeneric;
@@ -66,60 +66,60 @@ public partial class GroupEditViewModel : BaseViewModel
     private bool _canSave;
 
     private readonly IPopupNotification _popupService;
-    private readonly IAttendanceRegistration<Group> _attendanceRegistration;
+    private readonly IAttendanceRegistration<Meeting> _attendanceRegistration;
 
-    public GroupEditViewModel(IGroupRepository groupRepository, IPopupNotification popupService, IAttendanceRegistration<Group> attendanceRegistration)
+    public MeetingEditViewModel(IMeetingRepository meetingRepository, IPopupNotification popupService, IAttendanceRegistration<Meeting> attendanceRegistration)
     {
-        _groupRepository = groupRepository ?? throw new ArgumentNullException(nameof(groupRepository));
+        _meetingRepository = meetingRepository ?? throw new ArgumentNullException(nameof(meetingRepository));
         _attendanceRegistration = attendanceRegistration ?? throw new ArgumentNullException(nameof(attendanceRegistration));
         _popupService = popupService;
     }
 
     public override void ApplyQueryAttributes(IDictionary<string, object> query)
     {
-        if (query.TryGetValue("group", out var groupObj) && groupObj is Group group)
+        if (query.TryGetValue("meeting", out var meetingObj) && meetingObj is Meeting meeting)
         {
-            Initialize(group);
+            Initialize(meeting);
         }
-        else if (query.TryGetValue("groupId", out var groupIdObj) &&
-                 groupIdObj is string groupIdStr &&
-                 int.TryParse(groupIdStr, out var groupId))
+        else if (query.TryGetValue("meetingId", out var meetingIdObj) &&
+                 meetingIdObj is string meetingIdStr &&
+                 int.TryParse(meetingIdStr, out var meetingId))
         {
-            // Load group by ID if only ID was passed
-            _ = LoadGroupByIdAsync(groupId);
+            // Load meeting by ID if only ID was passed
+            _ = LoadMeetingByIdAsync(meetingId);
         }
     }
 
-    private async Task LoadGroupByIdAsync(int groupId)
+    private async Task LoadMeetingByIdAsync(int meetingId)
     {
         try
         {
-            var group = await _groupRepository.GetGroupByIdAsync(groupId);
-            if (group != null)
+            var meeting = await _meetingRepository.GetMeetingByIdAsync(meetingId);
+            if (meeting != null)
             {
-                Initialize(group);
+                Initialize(meeting);
             }
             else
             {
-                await Shell.Current.DisplayAlert("Error", "Group not found.", "OK");
+                await Shell.Current.DisplayAlert("Error", "Meeting not found.", "OK");
                 await Shell.Current.GoToAsync("//MainPage");
             }
         }
         catch (Exception ex)
         {
-            await Shell.Current.DisplayAlert("Error", $"Failed to load group: {ex.Message}", "OK");
+            await Shell.Current.DisplayAlert("Error", $"Failed to load meeting: {ex.Message}", "OK");
             await Shell.Current.GoToAsync("//MainPage");
         }
     }
 
-    public void Initialize(Group group)
+    public void Initialize(Meeting meeting)
     {
-        Group = group;        
+        Meeting = meeting;        
         UpdateDisplayProperties();
         UpdateCanConfirm();
     }
 
-    partial void OnGroupChanged(Group? value)
+    partial void OnMeetingChanged(Meeting? value)
     {
         UpdateDisplayProperties();
         UpdateCanConfirm();
@@ -127,13 +127,13 @@ public partial class GroupEditViewModel : BaseViewModel
 
     private void UpdateDisplayProperties()
     {
-        if (Group == null) return;        
-        DisplayGsrName = Group.GsrName;
-        DisplayGsrEmailPersonal = Group.GsrEmailPersonal;
-        DisplayGsrPhone = Group.GsrPhone;
-        DisplayGroupGenericEmail = Group.GroupGenericEmail;
-        DisplayUsingGeneric = Group.UsingGeneric ?? false;
-        Title = Group.Name;
+        if (Meeting == null) return;        
+        DisplayGsrName = Meeting.GsrName;
+        DisplayGsrEmailPersonal = Meeting.GsrEmailPersonal;
+        DisplayGsrPhone = Meeting.GsrPhone;
+        DisplayMeetingGenericEmail = Meeting.MeetingGenericEmail;
+        DisplayUsingGeneric = Meeting.UsingGeneric ?? false;
+        Title = Meeting.Name;
     }
 
     partial void OnIsEditingChanged(bool value)
@@ -160,7 +160,7 @@ public partial class GroupEditViewModel : BaseViewModel
         UpdateCanSave();
     }
 
-    partial void OnEditGroupGenericEmailChanged(string? value)
+    partial void OnEditMeetingGenericEmailChanged(string? value)
     {
         UpdateCanSave();
     }
@@ -174,12 +174,12 @@ public partial class GroupEditViewModel : BaseViewModel
 
     private void StartEditing()
     {
-        if (Group == null) return;
+        if (Meeting == null) return;
 
         EditGsrName = DisplayGsrName;
         EditGsrEmailPersonal = DisplayGsrEmailPersonal;
         EditGsrPhone = DisplayGsrPhone;
-        EditGroupGenericEmail = DisplayGroupGenericEmail;
+        EditMeetingGenericEmail = DisplayMeetingGenericEmail;
         EditUsingGeneric = DisplayUsingGeneric;
 
         UpdateCanSave();
@@ -238,7 +238,7 @@ public partial class GroupEditViewModel : BaseViewModel
     [RelayCommand]
     private async Task SaveAsync()
     {
-        if (Group == null) return;
+        if (Meeting == null) return;
 
         await ShowSaveFeedback();
 
@@ -264,28 +264,25 @@ public partial class GroupEditViewModel : BaseViewModel
 
         try
         {
-            // Copy edited values back to the group
-            Group.GsrName = EditGsrName;
-            Group.GsrEmailPersonal = EditGsrEmailPersonal;
-            Group.GsrPhone = EditGsrPhone;
-            Group.GroupGenericEmail = EditGroupGenericEmail;
-            Group.UsingGeneric = EditUsingGeneric;
+            // Copy edited values back to the meeting
+            Meeting.GsrName = EditGsrName;
+            Meeting.GsrEmailPersonal = EditGsrEmailPersonal;
+            Meeting.GsrPhone = EditGsrPhone;
+            Meeting.MeetingGenericEmail = EditMeetingGenericEmail;
+            Meeting.UsingGeneric = EditUsingGeneric;
 
             // Save to repository
-            var savedGroup = await _groupRepository.SaveGroupAsync(Group);
+            var savedMeeting = await _meetingRepository.SaveMeetingAsync(Meeting);
 
-            // Update the Group property to trigger UI refresh
-            Group = savedGroup;
+            // Update the Meeting property to trigger UI refresh
+            Meeting = savedMeeting;
 
             // Exit editing mode
             IsEditing = false;
-
-            // Show success message
-            //await Shell.Current.DisplayAlert("Success", "Group information has been saved.", "OK");
         }
         catch (Exception ex)
         {
-            await Shell.Current.DisplayAlert("Error", $"Failed to save group: {ex.Message}", "OK");
+            await Shell.Current.DisplayAlert("Error", $"Failed to save meeting: {ex.Message}", "OK");
         }
     }
 
@@ -321,11 +318,11 @@ public partial class GroupEditViewModel : BaseViewModel
         try
         {
             // Mark as attended and save
-            if (Group != null)
+            if (Meeting != null)
             {
-                await _attendanceRegistration.Register(Group);
+                await _attendanceRegistration.Register(Meeting);
 
-                string personalName = Group.GetFirstName();
+                string personalName = Meeting.GetFirstName();
 
                 // Show success popup
                 await _popupService.ShowCountdownPopupAsync(
@@ -338,7 +335,7 @@ public partial class GroupEditViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            await Shell.Current.DisplayAlert("Error", $"Failed to confirm group: {ex.Message}", "OK");
+            await Shell.Current.DisplayAlert("Error", $"Failed to confirm meeting: {ex.Message}", "OK");
         }
     }
 
@@ -347,14 +344,14 @@ public partial class GroupEditViewModel : BaseViewModel
         return EditGsrName != DisplayGsrName ||
                EditGsrEmailPersonal != DisplayGsrEmailPersonal ||
                EditGsrPhone != DisplayGsrPhone ||
-               EditGroupGenericEmail != DisplayGroupGenericEmail ||
+               EditMeetingGenericEmail != DisplayMeetingGenericEmail ||
                EditUsingGeneric != DisplayUsingGeneric;
     }
 
     private async Task ShowSaveFeedback()
     {
         await Task.Delay(100);
-        await Toast.Make("Updating Group...", ToastDuration.Short).Show();
+        await Toast.Make("Updating Meeting...", ToastDuration.Short).Show();
     }
 
 }

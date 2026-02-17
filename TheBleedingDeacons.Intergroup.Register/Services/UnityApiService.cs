@@ -1,4 +1,4 @@
-﻿using Serilog;
+using Serilog;
 using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Support;
 using TheBleedingDeacons.Intergroup.Register.Utilities;
@@ -68,24 +68,24 @@ public class UnityApiService : IUnityApiService
                 $"Failed to fetch members: {membersResponse.Error?.Message ?? "Unknown error"}");
         }
 
-        var groups = MapGroups(groupsResponse.Data, membersResponse.Data);
+        var meetings = MapMeetings(groupsResponse.Data, membersResponse.Data);
         var positions = MapPositions(positionsResponse.Data, membersResponse.Data);
 
-        Logger.Information("Fetched {GroupCount} groups and {PositionCount} positions from Unity API",
-            groups.Count, positions.Count);
+        Logger.Information("Fetched {MeetingCount} meetings and {PositionCount} positions from Unity API",
+            meetings.Count, positions.Count);
 
-        return new RegisterData(groups, positions);
+        return new RegisterData(meetings, positions);
     }
 
     // ====================================================================
-    // Mapping: Unity Groups + Meetings → Local Groups
+    // Mapping: Unity Groups + Meetings → Local Meetings
     // ====================================================================
 
-    private static List<LocalModels.Group> MapGroups(
+    private static List<LocalModels.Meeting> MapMeetings(
         List<UnityModels.Group> unityGroups,
         List<UnityModels.Member> members)
     {
-        var groups = new List<LocalModels.Group>();
+        var meetings = new List<LocalModels.Meeting>();
 
         // Build a lookup of GSR members by home group ID
         var gsrsByGroupId = members
@@ -99,23 +99,23 @@ public class UnityApiService : IUnityApiService
 
             if (unityGroup.HasExpandedMeetings && unityGroup.Meetings.Count > 0)
             {
-                // One local Group row per meeting
+                // One local Meeting row per Unity meeting
                 foreach (var meeting in unityGroup.Meetings)
                 {
-                    groups.Add(MapMeetingToGroup(unityGroup, meeting, gsr));
+                    meetings.Add(MapUnityMeetingToLocal(unityGroup, meeting, gsr));
                 }
             }
             else
             {
-                // No meetings expanded – create a single entry from the group itself
-                groups.Add(MapGroupOnly(unityGroup, gsr));
+                // No meetings expanded - create a single entry from the group itself
+                meetings.Add(MapGroupOnlyToLocal(unityGroup, gsr));
             }
         }
 
-        return groups;
+        return meetings;
     }
 
-    private static LocalModels.Group MapMeetingToGroup(
+    private static LocalModels.Meeting MapUnityMeetingToLocal(
         UnityModels.Group unityGroup,
         UnityModels.Meeting meeting,
         UnityModels.Member? gsr)
@@ -125,7 +125,7 @@ public class UnityApiService : IUnityApiService
             ? meeting.Contacts
             : unityGroup.Contacts;
 
-        return new LocalModels.Group
+        return new LocalModels.Meeting
         {
             ID = meeting.Id,
             Day = meeting.DayOfWeek,
@@ -135,7 +135,7 @@ public class UnityApiService : IUnityApiService
             GsrName = gsr?.AnonymousName,
             GsrEmailPersonal = gsr?.PersonalEmail,
             GsrPhone = gsr?.MobileNumber,
-            GroupGenericEmail = unityGroup.Email,
+            MeetingGenericEmail = unityGroup.Email,
             UsingGeneric = !string.IsNullOrEmpty(unityGroup.Email) ? true : null,
             Location = meeting.Location?.Name,
             Address = meeting.Location?.FormattedAddress,
@@ -152,20 +152,20 @@ public class UnityApiService : IUnityApiService
         };
     }
 
-    private static LocalModels.Group MapGroupOnly(
+    private static LocalModels.Meeting MapGroupOnlyToLocal(
         UnityModels.Group unityGroup,
         UnityModels.Member? gsr)
     {
         var contacts = unityGroup.Contacts;
 
-        return new LocalModels.Group
+        return new LocalModels.Meeting
         {
             ID = unityGroup.Id,
             Name = unityGroup.Title,
             GsrName = gsr?.AnonymousName,
             GsrEmailPersonal = gsr?.PersonalEmail,
             GsrPhone = gsr?.MobileNumber,
-            GroupGenericEmail = unityGroup.Email,
+            MeetingGenericEmail = unityGroup.Email,
             UsingGeneric = !string.IsNullOrEmpty(unityGroup.Email) ? true : null,
             Contact1Name = contacts.ElementAtOrDefault(0)?.Name,
             Contact1Email = contacts.ElementAtOrDefault(0)?.Email,

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
@@ -8,8 +8,8 @@ using TheBleedingDeacons.Intergroup.Register.Utilities;
 
 namespace TheBleedingDeacons.Intergroup.Register.Models
 {
-    [TypeConverter(typeof(GroupCriteriaConverter))]
-    public class GroupCriteria
+    [TypeConverter(typeof(MeetingCriteriaConverter))]
+    public class MeetingCriteria
     {
         public required string Day { get; set; }
         public required string MeetingType { get; set; }

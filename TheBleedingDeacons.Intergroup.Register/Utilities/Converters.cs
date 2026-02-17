@@ -202,7 +202,7 @@ public class UsingGenericVisibilityConverter : IMultiValueConverter
             return false;
 
         // values[0] = IsEditing (bool)
-        // values[1] = DisplayGroupGenericEmail (string)
+        // values[1] = DisplayMeetingGenericEmail (string)
 
         if (values[0] is bool isEditing && values[1] is string displayEmail)
         {
@@ -230,7 +230,7 @@ public class UsingGenericEditVisibilityConverter : IMultiValueConverter
             return false;
 
         // values[0] = IsEditing (bool)
-        // values[1] = EditGroupGenericEmail (string)
+        // values[1] = EditMeetingGenericEmail (string)
 
         if (values[0] is bool isEditing && values[1] is string editEmail)
         {
@@ -259,8 +259,8 @@ public class UsingGenericUnifiedVisibilityConverter : IMultiValueConverter
             return false;
 
         // values[0] = IsEditing (bool)
-        // values[1] = DisplayGroupGenericEmail (string)
-        // values[2] = EditGroupGenericEmail (string)
+        // values[1] = DisplayMeetingGenericEmail (string)
+        // values[2] = EditMeetingGenericEmail (string)
 
         if (values[0] is bool isEditing)
         {

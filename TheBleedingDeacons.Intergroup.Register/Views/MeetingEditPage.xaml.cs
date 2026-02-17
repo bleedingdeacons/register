@@ -3,9 +3,9 @@ using TheBleedingDeacons.Intergroup.Register.Models;
 
 namespace TheBleedingDeacons.Intergroup.Register.Views;
 
-public partial class GroupEditPage : ContentPage
+public partial class MeetingEditPage : ContentPage
 {
-    public GroupEditPage(GroupEditViewModel viewModel)
+    public MeetingEditPage(MeetingEditViewModel viewModel)
     {
         InitializeComponent();
         BindingContext = viewModel;

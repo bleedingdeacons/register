@@ -12,11 +12,11 @@ public partial class AppShell : Shell
         Routing.RegisterRoute(nameof(GsrEditPage), typeof(GsrEditPage));
         Routing.RegisterRoute(nameof(DaySelectionPage), typeof(DaySelectionPage));
         Routing.RegisterRoute(nameof(TypeSelectionPage), typeof(TypeSelectionPage));
-        Routing.RegisterRoute(nameof(GroupSelectionPage), typeof(GroupSelectionPage));
+        Routing.RegisterRoute(nameof(MeetingSelectionPage), typeof(MeetingSelectionPage));
         Routing.RegisterRoute(nameof(PositionSelectionPage), typeof(PositionSelectionPage));
         Routing.RegisterRoute(nameof(ImportExportPage), typeof(ImportExportPage));
         Routing.RegisterRoute(nameof(GsrVerifyPage), typeof(GsrVerifyPage));
-        Routing.RegisterRoute(nameof(GroupEditPage), typeof(GroupEditPage));
+        Routing.RegisterRoute(nameof(MeetingEditPage), typeof(MeetingEditPage));
         Routing.RegisterRoute(nameof(PositionEditPage), typeof(PositionEditPage));
         Routing.RegisterRoute(nameof(MailSettingsPage), typeof(MailSettingsPage));
         Routing.RegisterRoute(nameof(DatabaseBackupPage), typeof(DatabaseBackupPage));

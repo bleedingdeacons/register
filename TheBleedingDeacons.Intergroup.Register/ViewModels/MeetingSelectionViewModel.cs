@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.Maui.Alerts;
+using CommunityToolkit.Maui.Alerts;
 using CommunityToolkit.Maui.Core;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -12,16 +12,16 @@ using TheBleedingDeacons.Intergroup.Register.Views;
 
 namespace TheBleedingDeacons.Intergroup.Register.ViewModels;
 
-public partial class GroupSelectionViewModel : BaseViewModel
+public partial class MeetingSelectionViewModel : BaseViewModel
 {
-    private static readonly ILogger Logger = AppLogger.ForContext<GroupSelectionViewModel>();
+    private static readonly ILogger Logger = AppLogger.ForContext<MeetingSelectionViewModel>();
 
-    private readonly IGroupRepository _groupRepository;
+    private readonly IMeetingRepository _meetingRepository;
 
-    public ObservableCollection<Group> Groups { get; } = new();
+    public ObservableCollection<Meeting> Meetings { get; } = new();
 
     [ObservableProperty]
-    GroupCriteria criteria;
+    MeetingCriteria criteria;
 
     [ObservableProperty]
     string header = string.Empty;
@@ -33,10 +33,10 @@ public partial class GroupSelectionViewModel : BaseViewModel
     bool isDataLoaded = false;
 
 
-    public GroupSelectionViewModel(IGroupRepository groupRepository)
+    public MeetingSelectionViewModel(IMeetingRepository meetingRepository)
     {
 
-        _groupRepository = groupRepository;
+        _meetingRepository = meetingRepository;
 
         Title = "Select Meeting";
     }
@@ -46,12 +46,12 @@ public partial class GroupSelectionViewModel : BaseViewModel
 
         if (query == null) return;
 
-        Criteria = (GroupCriteria)query["criteria"];
+        Criteria = (MeetingCriteria)query["criteria"];
 
 
     }
 
-    partial void OnCriteriaChanged(GroupCriteria value)
+    partial void OnCriteriaChanged(MeetingCriteria value)
     {
         // Use MainThread for proper Android compatibility
         MainThread.BeginInvokeOnMainThread(async () =>
@@ -74,30 +74,28 @@ public partial class GroupSelectionViewModel : BaseViewModel
 
             await Task.Yield();
 
-            Groups.Clear();
+            Meetings.Clear();
 
-            var allGroups = await _groupRepository.GetAllGroupsAsync();
+            var allMeetings = await _meetingRepository.GetAllMeetingsAsync();
 
-            var filteredGroups = allGroups
-                .Where(g =>
+            var filteredMeetings = allMeetings
+                .Where(m =>
                 {
-                    return string.Equals(g.Day, Criteria.Day, StringComparison.OrdinalIgnoreCase) && g.IsOnline() == (Criteria.MeetingType == "Online");
+                    return string.Equals(m.Day, Criteria.Day, StringComparison.OrdinalIgnoreCase) && m.IsOnline() == (Criteria.MeetingType == "Online");
                 }).ToList();
 
             MainThread.BeginInvokeOnMainThread(() =>
             {
 
-                foreach (var group in filteredGroups)
+                foreach (var meeting in filteredMeetings)
                 {
-                    Groups.Add(group);
+                    Meetings.Add(meeting);
                 }
 
                 IsDataLoaded = true;
                 IsLoading = false;
             });
 
-
-            //HasGroups = Groups.Count > 0;
 
             Header = $"{Criteria.Day} {Criteria.MeetingType} Meetings";
         }
@@ -109,23 +107,14 @@ public partial class GroupSelectionViewModel : BaseViewModel
     }
 
     [RelayCommand]
-    async Task SelectGroup(Group group)
+    async Task SelectMeeting(Meeting meeting)
     {
-        if (group == null) return;
-
-        //await ShowFeedback();
+        if (meeting == null) return;
 
         var parameters = new Dictionary<string, object> {
-                {"groupId", group.ID.ToString()} };
+                {"groupId", meeting.ID.ToString()} };
 
-        //await Shell.Current.GoToAsync(nameof(GroupEditPage), parameters);
         await Shell.Current.GoToAsync(nameof(GsrVerifyPage), parameters);
     }
-
-    //private async Task ShowFeedback()
-    //{
-    //    await Task.Delay(100);
-    //    await Toast.Make("Loading Group...", ToastDuration.Short).Show();
-    //}
 
 }
