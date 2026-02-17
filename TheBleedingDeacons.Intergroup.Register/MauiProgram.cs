@@ -11,7 +11,6 @@ using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Support;
 using TheBleedingDeacons.Intergroup.Register.ViewModels;
 using TheBleedingDeacons.Intergroup.Register.Views;
-using TheBleedingDeacons.Unity.Client;
 using PopupNotificationService = TheBleedingDeacons.Intergroup.Register.Services.PopupNotificationService;
 
 namespace TheBleedingDeacons.Intergroup.Register;
@@ -96,17 +95,7 @@ public static class MauiProgram
 
 
 
-        // Register Unity API client and service
-        builder.Services.AddSingleton<UnityRestSharp>(provider =>
-        {
-            var configService = provider.GetRequiredService<IConfigurationService>();
-            var unityConfig = configService.GetUnityConfiguration();
-
-            return new UnityRestSharp(
-                unityConfig.BaseUrl.Length > 0 ? unityConfig.BaseUrl : "https://not-configured.local",
-                unityConfig.ApiKey.Length > 0 ? unityConfig.ApiKey : "not-configured"
-            );
-        });
+        // Register Unity API service (creates client on demand from config)
         builder.Services.AddScoped<IUnityApiService, UnityApiService>();
 
         // Views

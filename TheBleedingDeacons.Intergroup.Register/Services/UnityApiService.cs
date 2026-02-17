@@ -16,20 +16,28 @@ public class UnityApiService : IUnityApiService
 {
     private static readonly ILogger Logger = AppLogger.ForContext<UnityApiService>();
 
-    private readonly UnityRestSharp _client;
+    private readonly IConfigurationService _configService;
 
-    public UnityApiService(UnityRestSharp client)
+    public UnityApiService(IConfigurationService configService)
     {
-        _client = client;
+        _configService = configService;
     }
 
     /// <inheritdoc />
     public async Task<RegisterData> GetRegisterDataAsync(CancellationToken cancellationToken = default)
     {
-        Logger.Information("Fetching register data from Unity API");
+        var config = await _configService.LoadUnityConfigurationAsync();
+        if (!config.IsValid())
+        {
+            throw new InvalidOperationException("Unity API is not configured. Please set the Base URL and API Key in Settings.");
+        }
+
+        using var client = new UnityRestSharp(config.BaseUrl, config.ApiKey);
+
+        Logger.Information("Fetching register data from Unity API at {BaseUrl}", config.BaseUrl);
 
         // Fetch groups with expanded meetings so we get day/time/location per meeting
-        var groupsResponse = await _client.GetGroupsAsync(
+        var groupsResponse = await client.GetGroupsAsync(
             perPage: 500,
             expandMeetings: true,
             cancellationToken: cancellationToken);
@@ -43,7 +51,7 @@ public class UnityApiService : IUnityApiService
         }
 
         // Fetch positions
-        var positionsResponse = await _client.GetPositionsAsync(
+        var positionsResponse = await client.GetPositionsAsync(
             perPage: 500,
             cancellationToken: cancellationToken);
 
@@ -56,7 +64,7 @@ public class UnityApiService : IUnityApiService
         }
 
         // Fetch members so we can resolve GSR info and position holders
-        var membersResponse = await _client.GetMembersAsync(
+        var membersResponse = await client.GetMembersAsync(
             perPage: 500,
             cancellationToken: cancellationToken);
 

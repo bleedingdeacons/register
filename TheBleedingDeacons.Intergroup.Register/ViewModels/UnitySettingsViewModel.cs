@@ -16,7 +16,8 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
         public UnitySettingsViewModel(IConfigurationService configService)
         {
             _configService = configService;
-            LoadConfiguration();
+            // Fire async load - config will populate when ready
+            _ = LoadConfigurationAsync();
         }
 
         [ObservableProperty]
@@ -134,9 +135,9 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
             }
         }
 
-        private void LoadConfiguration()
+        private async Task LoadConfigurationAsync()
         {
-            var config = _configService.GetUnityConfiguration();
+            var config = await _configService.LoadUnityConfigurationAsync();
 
             SetProperty(ref baseUrl, config.BaseUrl, nameof(BaseUrl));
             SetProperty(ref apiKey, config.ApiKey, nameof(ApiKey));

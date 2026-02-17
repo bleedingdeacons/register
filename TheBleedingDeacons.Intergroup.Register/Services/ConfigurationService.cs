@@ -128,10 +128,10 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
             if (_cachedUnityConfig != null)
                 return _cachedUnityConfig;
 
+            // Return what we can synchronously (base URL from file, no API key)
+            // Callers needing the API key should use LoadUnityConfigurationAsync
             string baseUrl = "";
-            string apiKey = "";
 
-            // Try loading from unity settings file
             if (File.Exists(_unityConfigFilePath))
             {
                 try
@@ -152,21 +152,10 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
                 }
             }
 
-            // Retrieve API key from SecureStorage
-            try
-            {
-                apiKey = SecureStorage.GetAsync(UNITY_API_KEY).GetAwaiter().GetResult() ?? "";
-            }
-            catch
-            {
-                // SecureStorage may not be available on all platforms during testing
-                Logger.Warning("SecureStorage unavailable for Unity API key");
-            }
-
             _cachedUnityConfig = new UnityConfiguration
             {
                 BaseUrl = baseUrl,
-                ApiKey = apiKey
+                ApiKey = ""
             };
 
             return _cachedUnityConfig;
@@ -204,8 +193,45 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 
         public async Task<UnityConfiguration> LoadUnityConfigurationAsync()
         {
-            _cachedUnityConfig = null;
-            return await Task.FromResult(GetUnityConfiguration());
+            string baseUrl = "";
+            string apiKey = "";
+
+            if (File.Exists(_unityConfigFilePath))
+            {
+                try
+                {
+                    var json = await File.ReadAllTextAsync(_unityConfigFilePath);
+                    var doc = System.Text.Json.JsonDocument.Parse(json);
+                    var root = doc.RootElement;
+
+                    if (root.TryGetProperty("UnitySettings", out var section))
+                    {
+                        if (section.TryGetProperty("BaseUrl", out var urlProp))
+                            baseUrl = urlProp.GetString() ?? "";
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warning(ex, "Failed to load Unity settings from file");
+                }
+            }
+
+            try
+            {
+                apiKey = await SecureStorage.GetAsync(UNITY_API_KEY) ?? "";
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning(ex, "SecureStorage unavailable for Unity API key");
+            }
+
+            _cachedUnityConfig = new UnityConfiguration
+            {
+                BaseUrl = baseUrl,
+                ApiKey = apiKey
+            };
+
+            return _cachedUnityConfig;
         }
     }
 }

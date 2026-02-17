@@ -29,6 +29,41 @@ public class DataService
     }
 
     // ====================================================================
+    // Import Methods
+    // ====================================================================
+
+    public async Task<(int Meetings, int Positions)> ImportFromUnityAsync(IUnityApiService unityApiService, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            Logger.Information("Starting import from Unity API");
+
+            var data = await unityApiService.GetRegisterDataAsync(cancellationToken);
+
+            await _context.Meetings.ExecuteDeleteAsync(cancellationToken);
+            await _context.Positions.ExecuteDeleteAsync(cancellationToken);
+
+            await _context.Meetings.AddRangeAsync(data.Meetings, cancellationToken);
+            await _context.Positions.AddRangeAsync(data.Positions, cancellationToken);
+
+            await _context.SaveChangesAsync(cancellationToken);
+
+            await _meetingRepository.InvalidateAllMeetingsCacheAsync();
+            await _positionRepository.InvalidateAllPositionsCacheAsync();
+
+            Logger.Information("Unity import complete: {Meetings} meetings, {Positions} positions",
+                data.Meetings.Count, data.Positions.Count);
+
+            return (data.Meetings.Count, data.Positions.Count);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Import from Unity API failed");
+            throw;
+        }
+    }
+
+    // ====================================================================
     // Import/Export Methods
     // ====================================================================
 
