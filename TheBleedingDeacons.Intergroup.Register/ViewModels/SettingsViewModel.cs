@@ -22,6 +22,14 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
         }
 
         [RelayCommand]
+        private async Task NavigateToUnitySetting()
+        {
+            await ShowFeedback();
+            await Shell.Current.GoToAsync(nameof(UnitySettingsPage));
+            await Task.CompletedTask;
+        }
+
+        [RelayCommand]
         private async Task NavigateToImportExport()
         {
             await ShowFeedback();

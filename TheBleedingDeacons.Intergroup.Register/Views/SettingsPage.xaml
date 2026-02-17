@@ -35,6 +35,15 @@
                     HeightRequest="60"
                     Command="{Binding NavigateToMailSettingCommand}"/>
 
+            <Button x:Name="UnitySettingButton"
+                    Text="Unity API Settings"
+                    FontSize="18"
+                    BackgroundColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
+                    TextColor="White"
+                    CornerRadius="8"
+                    HeightRequest="60"
+                    Command="{Binding NavigateToUnitySettingCommand}"/>
+
             <Button x:Name="BackupButton"
                     Text="Database Backup"
                     FontSize="18"

@@ -13,5 +13,9 @@ namespace TheBleedingDeacons.Intergroup.Register.Services.Interfaces
         void UpdateSmtpConfiguration(SmtpConfiguration config);
         Task SaveSmtpConfigurationAsync(SmtpConfiguration config);
         Task<SmtpConfiguration> LoadSmtpConfigurationAsync();
+
+        UnityConfiguration GetUnityConfiguration();
+        Task SaveUnityConfigurationAsync(UnityConfiguration config);
+        Task<UnityConfiguration> LoadUnityConfigurationAsync();
     }
 }

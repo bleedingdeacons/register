@@ -11,6 +11,7 @@ using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Support;
 using TheBleedingDeacons.Intergroup.Register.ViewModels;
 using TheBleedingDeacons.Intergroup.Register.Views;
+using TheBleedingDeacons.Unity.Client;
 using PopupNotificationService = TheBleedingDeacons.Intergroup.Register.Services.PopupNotificationService;
 
 namespace TheBleedingDeacons.Intergroup.Register;
@@ -95,6 +96,19 @@ public static class MauiProgram
 
 
 
+        // Register Unity API client and service
+        builder.Services.AddSingleton<UnityRestSharp>(provider =>
+        {
+            var configService = provider.GetRequiredService<IConfigurationService>();
+            var unityConfig = configService.GetUnityConfiguration();
+
+            return new UnityRestSharp(
+                unityConfig.BaseUrl.Length > 0 ? unityConfig.BaseUrl : "https://not-configured.local",
+                unityConfig.ApiKey.Length > 0 ? unityConfig.ApiKey : "not-configured"
+            );
+        });
+        builder.Services.AddScoped<IUnityApiService, UnityApiService>();
+
         // Views
         builder.Services.AddTransient<MailSettingsPage>();
         builder.Services.AddTransient<MainPage>();
@@ -111,6 +125,8 @@ public static class MauiProgram
         builder.Services.AddTransient<EmailStatusPage>();
         builder.Services.AddTransient<SettingsPage>();
 
+        builder.Services.AddTransient<UnitySettingsPage>();
+
         // ViewModels        
         builder.Services.AddTransient<MailSettingsViewModel>();
         builder.Services.AddTransient<MainPageViewModel>();
@@ -126,6 +142,7 @@ public static class MauiProgram
         builder.Services.AddTransient<DatabaseBackupViewModel>();
         builder.Services.AddTransient<EmailStatusViewModel>();
         builder.Services.AddTransient<SettingsViewModel>();
+        builder.Services.AddTransient<UnitySettingsViewModel>();
 
 #if DEBUG
         builder.Services.AddLogging();
@@ -161,7 +178,7 @@ public static class MauiProgram
         Directory.CreateDirectory(logPath);
 
         // Get app configuration
-        var appName = builder.Configuration["App:Name"] ?? "Register";
+        var appName = builder.Configuration["App:Name"] ?? "FareShare";
         var environment = builder.Configuration["App:Environment"] ?? "Development";
 
         var config = new LoggerConfiguration()

@@ -2,9 +2,16 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:vm="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
+             xmlns:tc="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
              x:Class="TheBleedingDeacons.Intergroup.Register.Views.MailSettingsPage"
              x:DataType="vm:MailSettingsViewModel"
              Title="Mail Settings">
+
+    <ContentPage.Resources>
+        <tc:BoolToObjectConverter x:Key="BoolToColorConverter" TrueObject="Red" FalseObject="Green" />
+        <tc:BoolToObjectConverter x:Key="BoolToTestButtonTextConverter" TrueObject="Testing Connection..." FalseObject="Test Connection" />
+        <tc:BoolToObjectConverter x:Key="BoolToSaveButtonTextConverter" TrueObject="Saving..." FalseObject="Save Settings" />
+    </ContentPage.Resources>
 
     <ScrollView>
         <VerticalStackLayout Padding="20" Spacing="15">

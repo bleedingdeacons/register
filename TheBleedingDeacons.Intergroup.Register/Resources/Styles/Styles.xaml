@@ -210,7 +210,7 @@
     <local:IsNotNullConverter x:Key="IsNotNullConverter" />
     <local:CountdownToProgressConverter x:Key="CountdownToProgressConverter" />
     <local:BoolToYesSaveConverter x:Key="BoolToYesSaveConverter" />
-    <local:BoolToCancelBackConverter x:Key="BoolToCancelBackConverter" />
+    <!--<local:BoolToCancelBackConverter x:Key="BoolToCancelBackConverter" />-->
     <local:QuestionVisibilityConverter x:Key="QuestionVisibilityConverter" />
     <local:ValidationVisibilityConverter x:Key="ValidationVisibilityConverter" />
     <local:StringNotEmptyConverter x:Key="StringNotEmptyConverter" />
