@@ -114,7 +114,7 @@ public partial class MeetingSelectionViewModel : BaseViewModel
         var parameters = new Dictionary<string, object> {
                 {"groupId", meeting.ID.ToString()} };
 
-        await Shell.Current.GoToAsync(nameof(GsrVerifyPage), parameters);
+        await Shell.Current.GoToAsync(nameof(GroupEditPage), parameters);
     }
 
 }
