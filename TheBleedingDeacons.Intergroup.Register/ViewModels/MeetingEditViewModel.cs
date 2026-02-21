@@ -236,7 +236,7 @@ public partial class MeetingEditViewModel : BaseViewModel
     }
 
     [RelayCommand]
-    private async Task SaveAsync()
+    private async Task Save()
     {
         if (Meeting == null) return;
 
@@ -292,7 +292,7 @@ public partial class MeetingEditViewModel : BaseViewModel
     }
 
     [RelayCommand]
-    private async Task CancelAsync()
+    private async Task Cancel()
     {
         if (IsEditing)
         {
@@ -316,7 +316,7 @@ public partial class MeetingEditViewModel : BaseViewModel
     }
 
     [RelayCommand]
-    private async Task ConfirmAsync()
+    private async Task Confirm()
     {
         if (!CanConfirm) return;
 

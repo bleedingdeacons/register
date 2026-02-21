@@ -207,7 +207,7 @@ public partial class PositionEditViewModel : BaseViewModel
     }
 
     [RelayCommand]
-    private async Task SaveAsync()
+    private async Task Save()
     {
         if (Position == null) return;
 
@@ -259,7 +259,7 @@ public partial class PositionEditViewModel : BaseViewModel
     }
 
     [RelayCommand]
-    private async Task CancelAsync()
+    private async Task Cancel()
     {
         if (IsEditing)
         {
@@ -283,7 +283,7 @@ public partial class PositionEditViewModel : BaseViewModel
     }
 
     [RelayCommand]
-    private async Task ConfirmAsync()
+    private async Task Confirm()
     {
         if (!CanConfirm) return;
 

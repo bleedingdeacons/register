@@ -50,6 +50,8 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
                 CacheKeys.AllMeetings,
                 async () => await _context.Meetings
                     .AsNoTracking()
+                    .Include(m => m.Group)
+                        .ThenInclude(g => g.Gsr)
                     .ToListAsync()
                     .ConfigureAwait(false),
                 GetCacheDuration(15)
@@ -82,9 +84,38 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
                     throw new InvalidOperationException($"Meeting with ID {meeting.ID} not found for update");
                 }
 
-                // Update properties
+                // Update meeting scalar properties
                 _context.Entry(existingMeeting).CurrentValues.SetValues(meeting);
                 existingMeeting.Updated = DateTime.Now;
+
+                // Update the GSR Member if present.
+                // CurrentValues.SetValues only copies Meeting scalars, so the related
+                // Member must be updated explicitly.
+                if (meeting.Group?.Gsr != null)
+                {
+                    var incomingGsr = meeting.Group.Gsr;
+                    var existingMember = await _context.Members
+                        .FirstOrDefaultAsync(m => m.GroupId == meeting.GroupId)
+                        .ConfigureAwait(false);
+
+                    if (existingMember != null)
+                    {
+                        existingMember.Name = incomingGsr.Name;
+                        existingMember.EmailPersonal = incomingGsr.EmailPersonal;
+                        existingMember.Phone = incomingGsr.Phone;
+                    }
+                    else if (meeting.GroupId.HasValue)
+                    {
+                        // No GSR record yet for this group - create one
+                        _context.Members.Add(new Member
+                        {
+                            GroupId = meeting.GroupId.Value,
+                            Name = incomingGsr.Name,
+                            EmailPersonal = incomingGsr.EmailPersonal,
+                            Phone = incomingGsr.Phone,
+                        });
+                    }
+                }
 
                 await _context.SaveChangesAsync().ConfigureAwait(false);
                 savedMeeting = existingMeeting;
@@ -113,6 +144,8 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
                 CacheKeys.MeetingById(id),
                 async () => await _context.Meetings
                     .AsNoTracking()
+                    .Include(m => m.Group)
+                        .ThenInclude(g => g.Gsr)
                     .FirstOrDefaultAsync(m => m.ID == id)
                     .ConfigureAwait(false),
                 GetCacheDuration(10)
@@ -126,7 +159,11 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
                 return null;
             }
 
-            return await _context.Meetings.FindAsync(id).ConfigureAwait(false);
+            return await _context.Meetings
+                .Include(m => m.Group)
+                    .ThenInclude(g => g.Gsr)
+                .FirstOrDefaultAsync(m => m.ID == id)
+                .ConfigureAwait(false);
         }
 
         public async Task<List<Meeting>> GetMeetingsByDayAsync(string day)
@@ -142,6 +179,8 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
                 CacheKeys.MeetingsByDay(normalizedDay),
                 async () => await _context.Meetings
                     .AsNoTracking()
+                    .Include(m => m.Group)
+                        .ThenInclude(g => g.Gsr)
                     .Where(m => m.Day.ToLower() == normalizedDay)
                     .ToListAsync()
                     .ConfigureAwait(false),
