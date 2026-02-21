@@ -9,7 +9,7 @@ using TheBleedingDeacons.Intergroup.Register.Support;
 
 namespace TheBleedingDeacons.Intergroup.Register.ViewModels;
 
-public partial class GsrEditViewModel : ObservableObject, IQueryAttributable
+public partial class EditGroupViewModel : ObservableObject, IQueryAttributable
 {
     private static readonly ILogger Logger = AppLogger.ForContext<MeetingSelectionViewModel>();
 
@@ -61,7 +61,7 @@ public partial class GsrEditViewModel : ObservableObject, IQueryAttributable
     private string saveButtonText = "Save";
 
 
-    public GsrEditViewModel(IMeetingRepository meetingRepository)
+    public EditGroupViewModel(IMeetingRepository meetingRepository)
     {
         _meetingRepository = meetingRepository;
 

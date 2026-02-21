@@ -25,6 +25,33 @@ public partial class ClearableEntry : ContentView
     public static readonly BindableProperty ClearButtonColorProperty =
         BindableProperty.Create(nameof(ClearButtonColor), typeof(Color), typeof(ClearableEntry), Colors.Gray);
 
+    public static readonly BindableProperty FontSizeProperty =
+        BindableProperty.Create(nameof(FontSize), typeof(double), typeof(ClearableEntry), 14.0);
+
+    public static readonly BindableProperty TextColorProperty =
+        BindableProperty.Create(nameof(TextColor), typeof(Color), typeof(ClearableEntry), Colors.Black);
+
+    public static readonly BindableProperty PlaceholderColorProperty =
+        BindableProperty.Create(nameof(PlaceholderColor), typeof(Color), typeof(ClearableEntry), Colors.Gray);
+
+    public static readonly BindableProperty KeyboardProperty =
+        BindableProperty.Create(nameof(Keyboard), typeof(Keyboard), typeof(ClearableEntry), Keyboard.Default);
+
+    public static readonly BindableProperty IsPasswordProperty =
+        BindableProperty.Create(nameof(IsPassword), typeof(bool), typeof(ClearableEntry), false);
+
+    public static readonly BindableProperty MaxLengthProperty =
+        BindableProperty.Create(nameof(MaxLength), typeof(int), typeof(ClearableEntry), int.MaxValue);
+
+    public static readonly BindableProperty IsReadOnlyProperty =
+        BindableProperty.Create(nameof(IsReadOnly), typeof(bool), typeof(ClearableEntry), false);
+
+    public static readonly BindableProperty HorizontalTextAlignmentProperty =
+        BindableProperty.Create(nameof(HorizontalTextAlignment), typeof(TextAlignment), typeof(ClearableEntry), TextAlignment.Start);
+
+    public static readonly BindableProperty VerticalTextAlignmentProperty =
+        BindableProperty.Create(nameof(VerticalTextAlignment), typeof(TextAlignment), typeof(ClearableEntry), TextAlignment.Center);
+
     public ClearableEntry()
     {
         InitializeComponent();
@@ -70,6 +97,60 @@ public partial class ClearableEntry : ContentView
     {
         get => (Color)GetValue(ClearButtonColorProperty);
         set => SetValue(ClearButtonColorProperty, value);
+    }
+
+    public double FontSize
+    {
+        get => (double)GetValue(FontSizeProperty);
+        set => SetValue(FontSizeProperty, value);
+    }
+
+    public Color TextColor
+    {
+        get => (Color)GetValue(TextColorProperty);
+        set => SetValue(TextColorProperty, value);
+    }
+
+    public Color PlaceholderColor
+    {
+        get => (Color)GetValue(PlaceholderColorProperty);
+        set => SetValue(PlaceholderColorProperty, value);
+    }
+
+    public Keyboard Keyboard
+    {
+        get => (Keyboard)GetValue(KeyboardProperty);
+        set => SetValue(KeyboardProperty, value);
+    }
+
+    public bool IsPassword
+    {
+        get => (bool)GetValue(IsPasswordProperty);
+        set => SetValue(IsPasswordProperty, value);
+    }
+
+    public int MaxLength
+    {
+        get => (int)GetValue(MaxLengthProperty);
+        set => SetValue(MaxLengthProperty, value);
+    }
+
+    public bool IsReadOnly
+    {
+        get => (bool)GetValue(IsReadOnlyProperty);
+        set => SetValue(IsReadOnlyProperty, value);
+    }
+
+    public TextAlignment HorizontalTextAlignment
+    {
+        get => (TextAlignment)GetValue(HorizontalTextAlignmentProperty);
+        set => SetValue(HorizontalTextAlignmentProperty, value);
+    }
+
+    public TextAlignment VerticalTextAlignment
+    {
+        get => (TextAlignment)GetValue(VerticalTextAlignmentProperty);
+        set => SetValue(VerticalTextAlignmentProperty, value);
     }
 
     // Events

@@ -5,9 +5,9 @@ namespace TheBleedingDeacons.Intergroup.Register.Views;
 
 public partial class GsrEditPage : ContentPage, IQueryAttributable
 {
-    private GsrEditViewModel _viewModel;
+    private EditGroupViewModel _viewModel;
 
-    public GsrEditPage(GsrEditViewModel viewModel)
+    public GsrEditPage(EditGroupViewModel viewModel)
     {
         InitializeComponent();
         _viewModel = viewModel;
@@ -51,6 +51,9 @@ public partial class GsrEditPage : ContentPage, IQueryAttributable
     {
         base.OnAppearing();
 
+        // Configure keyboard for name entry with CapitalizeWord
+        GsrNameEntry.Keyboard = Keyboard.Create(KeyboardFlags.CapitalizeWord);
+
         System.Diagnostics.Debug.WriteLine("=== Page OnAppearing ===");
         System.Diagnostics.Debug.WriteLine($"ViewModel is null: {_viewModel == null}");
 
@@ -75,7 +78,7 @@ public partial class GsrEditPage : ContentPage, IQueryAttributable
     // Override to handle hardware back button on Android
     protected override bool OnBackButtonPressed()
     {
-        if (BindingContext is GsrEditViewModel viewModel)
+        if (BindingContext is EditGroupViewModel viewModel)
         {
             // Execute the cancel command which includes unsaved changes check
             viewModel.CancelCommand.Execute(null);

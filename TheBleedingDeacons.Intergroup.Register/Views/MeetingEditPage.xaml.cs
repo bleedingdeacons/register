@@ -11,4 +11,11 @@ public partial class MeetingEditPage : ContentPage
         BindingContext = viewModel;
     }
 
+    protected override void OnAppearing()
+    {
+        base.OnAppearing();
+        
+        // Configure keyboard for name entry with CapitalizeWord
+        EditGsrNameEntry.Keyboard = Keyboard.Create(KeyboardFlags.CapitalizeWord);
+    }
 }

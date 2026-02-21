@@ -88,8 +88,8 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 
         private async Task ShowFeedback()
         {
-            await Task.Delay(100);
-            await Toast.Make("Loading Position...", ToastDuration.Short).Show();
+            //await Task.Delay(100);
+            //await Toast.Make("Loading Position...", ToastDuration.Short).Show();
         }
     }
 }

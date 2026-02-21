@@ -319,7 +319,7 @@ public partial class PositionEditViewModel : BaseViewModel
 
     private async Task ShowSaveFeedback()
     {
-        await Task.Delay(100);
-        await Toast.Make("Updating Position...", ToastDuration.Short).Show();
+        //await Task.Delay(100);
+        //await Toast.Make("Updating Position...", ToastDuration.Short).Show();
     }
 }

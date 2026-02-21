@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:controls="clr-namespace:TheBleedingDeacons.Intergroup.Register.Controls"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:vm="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
              xmlns:tc="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
@@ -67,14 +68,14 @@
 
                     <VerticalStackLayout>
                         <Label Text="SMTP Host *"/>
-                        <Entry Text="{Binding Host}" 
+                        <controls:ClearableEntry Text="{Binding Host}" 
                                Placeholder="smtp.gmail.com"/>
                     </VerticalStackLayout>
 
                     <Grid ColumnDefinitions="2*,*" ColumnSpacing="10">
                         <VerticalStackLayout Grid.Column="0">
                             <Label Text="Port *"/>
-                            <Entry Text="{Binding Port}" 
+                            <controls:ClearableEntry Text="{Binding Port}" 
                                    Placeholder="587"
                                    Keyboard="Numeric"/>
                         </VerticalStackLayout>
@@ -100,21 +101,21 @@
 
                     <VerticalStackLayout>
                         <Label Text="Email Address *"/>
-                        <Entry Text="{Binding Username}" 
+                        <controls:ClearableEntry Text="{Binding Username}" 
                                Placeholder="your-email@gmail.com"
                                Keyboard="Email"/>
                     </VerticalStackLayout>
 
                     <VerticalStackLayout>
                         <Label Text="Password / App Password *"/>
-                        <Entry Text="{Binding Password}" 
+                        <controls:ClearableEntry Text="{Binding Password}" 
                                Placeholder="Enter password or app password"
                                IsPassword="True"/>
                     </VerticalStackLayout>
 
                     <VerticalStackLayout>
                         <Label Text="From Display Name"/>
-                        <Entry Text="{Binding FromDisplayName}" 
+                        <controls:ClearableEntry Text="{Binding FromDisplayName}" 
                                Placeholder="Your App Name"/>
                     </VerticalStackLayout>
 

@@ -15,4 +15,12 @@ public partial class PositionEditPage : ContentPage
 		BindingContext = _viewModel = viewModel;
 
 	}
+
+    protected override void OnAppearing()
+    {
+        base.OnAppearing();
+        
+        // Configure keyboard for name entry with CapitalizeWord
+        EditMemberNameEntry.Keyboard = Keyboard.Create(KeyboardFlags.CapitalizeWord);
+    }
 }

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:controls="clr-namespace:TheBleedingDeacons.Intergroup.Register.Controls"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:vm="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
              xmlns:tc="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
@@ -41,14 +42,14 @@
 
                     <VerticalStackLayout>
                         <Label Text="WordPress Site URL *"/>
-                        <Entry Text="{Binding BaseUrl}"
+                        <controls:ClearableEntry Text="{Binding BaseUrl}"
                                Placeholder="https://your-site.com"
                                Keyboard="Url"/>
                     </VerticalStackLayout>
 
                     <VerticalStackLayout>
                         <Label Text="API Key *"/>
-                        <Entry Text="{Binding ApiKey}"
+                        <controls:ClearableEntry Text="{Binding ApiKey}"
                                Placeholder="Enter your Integrity API key"
                                IsPassword="True"/>
                     </VerticalStackLayout>
