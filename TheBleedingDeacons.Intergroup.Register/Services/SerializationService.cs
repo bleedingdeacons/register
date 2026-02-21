@@ -1,6 +1,5 @@
 ﻿using Serilog;
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using TheBleedingDeacons.Intergroup.Register.Support;
@@ -16,61 +15,6 @@ public class SerializationService
     public SerializationService(DataService registrationService)
     {
         _registrationService = registrationService;
-    }
-
-    public async Task<bool> ImportExcelFile()
-    {
-        try
-        {
-            var result = await FilePicker.PickAsync(new PickOptions
-            {
-                PickerTitle = "Select Excel file",
-                FileTypes = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
-                {
-                    { DevicePlatform.iOS, new[] { "org.openxmlformats.spreadsheetml.sheet" } },
-                    { DevicePlatform.Android, new[] { "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" } },
-                    { DevicePlatform.WinUI, new[] { ".xlsx" } },
-                    { DevicePlatform.macOS, new[] { "xlsx" } }
-                })
-            });
-
-            if (result != null)
-            {
-                using var stream = await result.OpenReadAsync();
-
-                await _registrationService.ImportFromExcel(stream);
-
-                var page = GetActivePage();
-                if (page != null)
-                {
-                    await page.DisplayAlert("Success",
-                        "Position Excel file imported successfully!", "OK");
-                }
-                else
-                {
-                    Logger.Information("Position Excel file imported successfully! (no active Page to display alert)");
-                }
-
-                return true;
-            }
-
-            return false;
-        }
-        catch (Exception ex)
-        {
-            var page = GetActivePage();
-            if (page != null)
-            {
-                await page.DisplayAlert("Error",
-                    $"Data import failed: {ex.Message}", "OK");
-            }
-            else
-            {
-                Logger.Error(ex, "Data import failed: {Message}", ex.Message);
-            }
-
-            return false;
-        }
     }
 
     public async Task<bool> ExportExcelFile()

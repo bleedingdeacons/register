@@ -42,7 +42,7 @@ public partial class GroupEditPage : ContentPage, IQueryAttributable
         // Also try setting the Meeting directly if it exists (for Edit mode)
         if (query.ContainsKey("meeting") && query["meeting"] is Meeting meeting)
         {
-            System.Diagnostics.Debug.WriteLine($"Page: Setting Meeting directly - {meeting.GsrName}");
+            System.Diagnostics.Debug.WriteLine($"Page: Setting Meeting directly - {meeting.Group?.Gsr?.Name}");
             _viewModel.Meeting = meeting;
         }
     }
@@ -67,9 +67,9 @@ public partial class GroupEditPage : ContentPage, IQueryAttributable
 
             if (_viewModel.Meeting != null)
             {
-                System.Diagnostics.Debug.WriteLine($"Meeting.GsrName: '{_viewModel.Meeting.GsrName}'");
-                System.Diagnostics.Debug.WriteLine($"Meeting.GsrPhone: '{_viewModel.Meeting.GsrPhone}'");
-                System.Diagnostics.Debug.WriteLine($"Meeting.GsrEmailPersonal: '{_viewModel.Meeting.GsrEmailPersonal}'");
+                System.Diagnostics.Debug.WriteLine($"Meeting.GsrName: '{_viewModel.Meeting.Group?.Gsr?.Name}'");
+                System.Diagnostics.Debug.WriteLine($"Meeting.GsrPhone: '{_viewModel.Meeting.Group?.Gsr?.Phone}'");
+                System.Diagnostics.Debug.WriteLine($"Meeting.GsrEmailPersonal: '{_viewModel.Meeting.Group?.Gsr?.EmailPersonal}'");
             }
         }
 

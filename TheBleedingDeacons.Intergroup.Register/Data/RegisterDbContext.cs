@@ -7,6 +7,7 @@ public class RegisterContext : DbContext
 {
     public DbSet<Meeting> Meetings { get; set; }
     public DbSet<Group> Groups { get; set; }
+    public DbSet<Member> Members { get; set; }
     public DbSet<Position> Positions { get; set; }
 
     public RegisterContext(DbContextOptions<RegisterContext> options) : base(options)

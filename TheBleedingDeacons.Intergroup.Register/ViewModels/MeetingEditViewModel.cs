@@ -128,9 +128,9 @@ public partial class MeetingEditViewModel : BaseViewModel
     private void UpdateDisplayProperties()
     {
         if (Meeting == null) return;        
-        DisplayGsrName = Meeting.GsrName;
-        DisplayGsrEmailPersonal = Meeting.GsrEmailPersonal;
-        DisplayGsrPhone = Meeting.GsrPhone;
+        DisplayGsrName = Meeting.Group?.Gsr?.Name;
+        DisplayGsrEmailPersonal = Meeting.Group?.Gsr?.EmailPersonal;
+        DisplayGsrPhone = Meeting.Group?.Gsr?.Phone;
         DisplayMeetingGenericEmail = Meeting.MeetingGenericEmail;
         DisplayUsingGeneric = Meeting.UsingGeneric ?? false;
         Title = Meeting.Name;
@@ -265,9 +265,14 @@ public partial class MeetingEditViewModel : BaseViewModel
         try
         {
             // Copy edited values back to the meeting
-            Meeting.GsrName = EditGsrName;
-            Meeting.GsrEmailPersonal = EditGsrEmailPersonal;
-            Meeting.GsrPhone = EditGsrPhone;
+            // Persist edited GSR values back to Group.Gsr
+            if (Meeting.Group != null)
+            {
+                Meeting.Group.Gsr ??= new Models.Member { GroupId = Meeting.Group.ID };
+                Meeting.Group.Gsr.Name = EditGsrName;
+                Meeting.Group.Gsr.EmailPersonal = EditGsrEmailPersonal;
+                Meeting.Group.Gsr.Phone = EditGsrPhone;
+            }
             Meeting.MeetingGenericEmail = EditMeetingGenericEmail;
             Meeting.UsingGeneric = EditUsingGeneric;
 

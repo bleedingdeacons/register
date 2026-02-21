@@ -27,22 +27,6 @@ public partial class ImportExportViewModel : BaseViewModel
     }
 
     [RelayCommand]
-    async Task ImportExcel()
-    {
-        if (IsBusy) return;
-
-        IsBusy = true;
-        try
-        {
-            await _externalService.ImportExcelFile();
-        }
-        finally
-        {
-            IsBusy = false;
-        }
-    }
-
-    [RelayCommand]
     async Task ExportExcel()
     {
         if (IsBusy) return;

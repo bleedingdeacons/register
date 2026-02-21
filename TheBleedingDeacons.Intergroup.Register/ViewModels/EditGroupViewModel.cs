@@ -339,9 +339,14 @@ public partial class EditGroupViewModel : BaseViewModel
 
             if (Meeting != null)
             {
-                Meeting.GsrName = GsrName?.Trim();
-                Meeting.GsrPhone = string.IsNullOrWhiteSpace(GsrPhone) ? string.Empty : GsrPhone.Trim();
-                Meeting.GsrEmailPersonal = string.IsNullOrWhiteSpace(GsrEmailPersonal) ? string.Empty : GsrEmailPersonal.Trim();
+                // Ensure the group has a GSR member entity to update
+                if (Meeting.Group != null)
+                {
+                    Meeting.Group.Gsr ??= new Models.Member { GroupId = Meeting.Group.ID };
+                    Meeting.Group.Gsr.Name = GsrName?.Trim();
+                    Meeting.Group.Gsr.Phone = string.IsNullOrWhiteSpace(GsrPhone) ? string.Empty : GsrPhone.Trim();
+                    Meeting.Group.Gsr.EmailPersonal = string.IsNullOrWhiteSpace(GsrEmailPersonal) ? string.Empty : GsrEmailPersonal.Trim();
+                }
 
                 await SaveToDatabase(Meeting);
 
@@ -402,7 +407,7 @@ public partial class EditGroupViewModel : BaseViewModel
 
             Logger.Information("Meeting loaded: {MeetingName}, GSR: {GsrName}",
                 loadedMeeting?.Name ?? "null",
-                loadedMeeting?.GsrName ?? "null");
+                loadedMeeting?.Group?.Gsr?.Name ?? "null");
 
             if (loadedMeeting != null)
             {
@@ -475,9 +480,10 @@ public partial class EditGroupViewModel : BaseViewModel
         // Temporarily disable change tracking while loading
         var wasTracking = HasUnsavedChanges;
 
-        GsrName = Meeting.GsrName;
-        GsrPhone = Meeting.GsrPhone;
-        GsrEmailPersonal = Meeting.GsrEmailPersonal;
+        var gsr = Meeting.Group?.Gsr;
+        GsrName = gsr?.Name;
+        GsrPhone = gsr?.Phone;
+        GsrEmailPersonal = gsr?.EmailPersonal;
 
         // Reset change tracking
         HasUnsavedChanges = false;
@@ -571,9 +577,10 @@ public partial class EditGroupViewModel : BaseViewModel
             return;
         }
 
-        HasUnsavedChanges = Meeting.GsrName != GsrName?.Trim() ||
-                           Meeting.GsrPhone != GsrPhone?.Trim() ||
-                           Meeting.GsrEmailPersonal != GsrEmailPersonal?.Trim();
+        var gsr = Meeting.Group?.Gsr;
+        HasUnsavedChanges = gsr?.Name != GsrName?.Trim() ||
+                           gsr?.Phone != GsrPhone?.Trim() ||
+                           gsr?.EmailPersonal != GsrEmailPersonal?.Trim();
     }
 
     private void SetGsrNameError(string error) { GsrNameError = error; HasGsrNameError = true; }

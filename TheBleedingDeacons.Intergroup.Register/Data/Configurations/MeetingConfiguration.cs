@@ -24,18 +24,6 @@ public class MeetingConfiguration : IEntityTypeConfiguration<Meeting>
         builder.Property(e => e.Name)
             .HasMaxLength(255);
 
-        builder.Property(e => e.GsrName)
-            .HasColumnName("Gsr Name")
-            .HasMaxLength(255);
-
-        builder.Property(e => e.GsrEmailPersonal)
-            .HasColumnName("Gsr Email Personal")
-            .HasMaxLength(255);
-
-        builder.Property(e => e.GsrPhone)
-            .HasColumnName("Gsr Phone")
-            .HasMaxLength(60);
-
         builder.Property(e => e.MeetingGenericEmail)
             .HasColumnName("Meeting Generic Email")
             .HasMaxLength(255);

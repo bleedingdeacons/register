@@ -11,9 +11,6 @@ public class Meeting
     public string? EndTime { get; set; }
     public string? Day { get; set; }
     public string? Name { get; set; }
-    public string? GsrName { get; set; }
-    public string? GsrEmailPersonal { get; set; }
-    public string? GsrPhone { get; set; }
     public string? MeetingGenericEmail { get; set; }
     public bool? UsingGeneric { get; set; }
     public string? Location { get; set; }

@@ -76,57 +76,82 @@ public class UnityApiService : IUnityApiService
                 $"Failed to fetch members: {membersResponse.Error?.Message ?? "Unknown error"}");
         }
 
-        var meetings = MapMeetings(groupsResponse.Data, membersResponse.Data);
+        // Build a complete object graph: Group owns its Meetings + Gsr (Member).
+        // EF inserts Groups first and resolves all FKs automatically via nav properties.
+        var groups = MapGroups(groupsResponse.Data, membersResponse.Data);
+
+        // Flatten for counts and convenience — the graph is the source of truth for saving
+        var meetings = groups.SelectMany(g => g.Meetings).ToList();
+        var members = groups.Where(g => g.Gsr != null).Select(g => g.Gsr!).ToList();
+
         var positions = MapPositions(positionsResponse.Data, membersResponse.Data);
 
-        Logger.Information("Fetched {MeetingCount} meetings and {PositionCount} positions from Unity API",
-            meetings.Count, positions.Count);
+        Logger.Information(
+            "Fetched {GroupCount} groups, {MeetingCount} meetings, {PositionCount} positions, {MemberCount} GSR members from Unity API",
+            groups.Count, meetings.Count, positions.Count, members.Count);
 
-        return new RegisterData(meetings, positions);
+        return new RegisterData(groups, meetings, positions, members);
     }
 
     // ====================================================================
-    // Mapping: Unity Groups + Meetings → Local Meetings
+    // Mapping: Unity Groups → Local Groups (with Meetings + Gsr attached)
     // ====================================================================
 
-    private static List<LocalModels.Meeting> MapMeetings(
+    private static List<LocalModels.Group> MapGroups(
         List<UnityModels.Group> unityGroups,
-        List<UnityModels.Member> members)
+        List<UnityModels.Member> unityMembers)
     {
-        var meetings = new List<LocalModels.Meeting>();
-
-        // Build a lookup of GSR members by home group ID
-        var gsrsByGroupId = members
+        // Build GSR lookup by home group ID
+        var gsrsByGroupId = unityMembers
             .Where(m => m.IsGsr && m.HomeGroupId.HasValue)
             .GroupBy(m => m.HomeGroupId!.Value)
             .ToDictionary(g => g.Key, g => g.First());
+
+        var groups = new List<LocalModels.Group>();
 
         foreach (var unityGroup in unityGroups)
         {
             gsrsByGroupId.TryGetValue(unityGroup.Id, out var gsr);
 
+            var localGroup = new LocalModels.Group
+            {
+                ID = unityGroup.Id,
+                Name = unityGroup.Title,
+            };
+
+            // Attach GSR member — GroupId resolved by EF via the Group nav property
+            if (gsr != null)
+            {
+                localGroup.Gsr = new LocalModels.Member
+                {
+                    Name = gsr.AnonymousName,
+                    EmailPersonal = gsr.PersonalEmail,
+                    Phone = gsr.MobileNumber,
+                };
+            }
+
+            // Attach meetings — GroupId resolved by EF via the Group nav property
             if (unityGroup.HasExpandedMeetings && unityGroup.Meetings.Count > 0)
             {
-                // One local Meeting row per Unity meeting
                 foreach (var meeting in unityGroup.Meetings)
                 {
-                    meetings.Add(MapUnityMeetingToLocal(unityGroup, meeting, gsr));
+                    localGroup.Meetings.Add(MapUnityMeetingToLocal(unityGroup, meeting));
                 }
             }
             else
             {
-                // No meetings expanded - create a single entry from the group itself
-                meetings.Add(MapGroupOnlyToLocal(unityGroup, gsr));
+                localGroup.Meetings.Add(MapGroupOnlyToLocal(unityGroup));
             }
+
+            groups.Add(localGroup);
         }
 
-        return meetings;
+        return groups;
     }
 
     private static LocalModels.Meeting MapUnityMeetingToLocal(
         UnityModels.Group unityGroup,
-        UnityModels.Meeting meeting,
-        UnityModels.Member? gsr)
+        UnityModels.Meeting meeting)
     {
         // Prefer meeting-level contacts, fall back to group-level contacts
         var contacts = meeting.Contacts.Count > 0
@@ -140,9 +165,6 @@ public class UnityApiService : IUnityApiService
             Time = meeting.Time,
             EndTime = meeting.EndTime,
             Name = !string.IsNullOrEmpty(meeting.Name) ? meeting.Name : unityGroup.Title,
-            GsrName = gsr?.AnonymousName,
-            GsrEmailPersonal = gsr?.PersonalEmail,
-            GsrPhone = gsr?.MobileNumber,
             MeetingGenericEmail = unityGroup.Email,
             UsingGeneric = !string.IsNullOrEmpty(unityGroup.Email) ? true : null,
             Location = meeting.Location?.Name,
@@ -160,9 +182,7 @@ public class UnityApiService : IUnityApiService
         };
     }
 
-    private static LocalModels.Meeting MapGroupOnlyToLocal(
-        UnityModels.Group unityGroup,
-        UnityModels.Member? gsr)
+    private static LocalModels.Meeting MapGroupOnlyToLocal(UnityModels.Group unityGroup)
     {
         var contacts = unityGroup.Contacts;
 
@@ -170,9 +190,6 @@ public class UnityApiService : IUnityApiService
         {
             ID = unityGroup.Id,
             Name = unityGroup.Title,
-            GsrName = gsr?.AnonymousName,
-            GsrEmailPersonal = gsr?.PersonalEmail,
-            GsrPhone = gsr?.MobileNumber,
             MeetingGenericEmail = unityGroup.Email,
             UsingGeneric = !string.IsNullOrEmpty(unityGroup.Email) ? true : null,
             Contact1Name = contacts.ElementAtOrDefault(0)?.Name,

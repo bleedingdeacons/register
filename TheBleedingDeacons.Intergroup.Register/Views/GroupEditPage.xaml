@@ -72,15 +72,15 @@
 
                     <!-- GSR Name (Read-only) -->
                     <Label Text="Name" Style="{StaticResource FieldLabelStyle}"/>
-                    <Label Text="{Binding Meeting.GsrName}" Style="{StaticResource ValueLabelStyle}"/>
+                    <Label Text="{Binding Meeting.Group.Gsr.Name}" Style="{StaticResource ValueLabelStyle}"/>
 
                     <!-- GSR Email (Read-only) -->
                     <Label Text="Personal Email" Style="{StaticResource FieldLabelStyle}"/>
-                    <Label Text="{Binding Meeting.GsrEmailPersonal}" Style="{StaticResource ValueLabelStyle}" />
+                    <Label Text="{Binding Meeting.Group.Gsr.EmailPersonal}" Style="{StaticResource ValueLabelStyle}" />
 
                     <!-- GSR Phone (Read-only, Obscured) -->
                     <Label Text="Mobile Phone" Style="{StaticResource FieldLabelStyle}"/>
-                    <Label Text="{Binding Meeting.GsrPhone, Converter={StaticResource ObscurePhoneNumber}}" 
+                    <Label Text="{Binding Meeting.Group.Gsr.Phone, Converter={StaticResource ObscurePhoneNumber}}" 
                            Style="{StaticResource ValueLabelStyle}" />
 
                     <!-- Standing In Section with Border -->

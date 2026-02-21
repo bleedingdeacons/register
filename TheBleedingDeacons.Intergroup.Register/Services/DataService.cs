@@ -40,10 +40,15 @@ public class DataService
 
             var data = await unityApiService.GetRegisterDataAsync(cancellationToken);
 
+            // Delete in FK order: dependents first, then principals
+            await _context.Members.ExecuteDeleteAsync(cancellationToken);
             await _context.Meetings.ExecuteDeleteAsync(cancellationToken);
+            await _context.Groups.ExecuteDeleteAsync(cancellationToken);
             await _context.Positions.ExecuteDeleteAsync(cancellationToken);
 
-            await _context.Meetings.AddRangeAsync(data.Meetings, cancellationToken);
+            // Insert Groups only — Meetings and Members are attached as nav properties
+            // so EF resolves all FKs and inserts them in the correct order automatically
+            await _context.Groups.AddRangeAsync(data.Groups, cancellationToken);
             await _context.Positions.AddRangeAsync(data.Positions, cancellationToken);
 
             await _context.SaveChangesAsync(cancellationToken);
@@ -51,8 +56,9 @@ public class DataService
             await _meetingRepository.InvalidateAllMeetingsCacheAsync();
             await _positionRepository.InvalidateAllPositionsCacheAsync();
 
-            Logger.Information("Unity import complete: {Meetings} meetings, {Positions} positions",
-                data.Meetings.Count, data.Positions.Count);
+            Logger.Information(
+                "Unity import complete: {Groups} groups, {Meetings} meetings, {Members} GSR members, {Positions} positions",
+                data.Groups.Count, data.Meetings.Count, data.Members.Count, data.Positions.Count);
 
             return (data.Meetings.Count, data.Positions.Count);
         }
@@ -66,31 +72,6 @@ public class DataService
     // ====================================================================
     // Import/Export Methods
     // ====================================================================
-
-    public async Task ImportFromExcel(Stream excelStream)
-    {
-        try
-        {
-            RegisterData data = ExcelSerializer.DeserializeFromExcel(excelStream);
-
-            await _context.Meetings.ExecuteDeleteAsync();
-            await _context.Positions.ExecuteDeleteAsync();
-
-            await _context.Meetings.AddRangeAsync(data.Meetings);
-            await _context.Positions.AddRangeAsync(data.Positions);
-
-            await _context.SaveChangesAsync();
-
-            // Invalidate all caches after bulk import
-            await _meetingRepository.InvalidateAllMeetingsCacheAsync();
-            await _positionRepository.InvalidateAllPositionsCacheAsync();
-        }
-        catch (Exception ex)
-        {
-            Logger.Error(ex, "Import from Excel Failed!");
-            throw;
-        }
-    }
 
     public async Task<byte[]?> ExportToExcel()
     {
@@ -152,9 +133,9 @@ public class DataService
                     meetingsWorksheet.Cells[row, 3].Value = meeting.Time;
                     meetingsWorksheet.Cells[row, 4].Value = meeting.EndTime;
                     meetingsWorksheet.Cells[row, 5].Value = meeting.Name;
-                    meetingsWorksheet.Cells[row, 6].Value = meeting.GsrName;
-                    meetingsWorksheet.Cells[row, 7].Value = meeting.GsrEmailPersonal;
-                    meetingsWorksheet.Cells[row, 8].Value = meeting.GsrPhone;
+                    meetingsWorksheet.Cells[row, 6].Value = meeting.Group?.Gsr?.Name;
+                    meetingsWorksheet.Cells[row, 7].Value = meeting.Group?.Gsr?.EmailPersonal;
+                    meetingsWorksheet.Cells[row, 8].Value = meeting.Group?.Gsr?.Phone;
                     meetingsWorksheet.Cells[row, 9].Value = meeting.MeetingGenericEmail;
                     meetingsWorksheet.Cells[row, 10].Value = meeting.UsingGeneric;
                     meetingsWorksheet.Cells[row, 11].Value = meeting.Location;

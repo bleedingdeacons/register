@@ -55,8 +55,8 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
             //     MeetingContacts = entity.GetContacts()
             // };
             // var emailBody = await _emailTemplate.RenderTemplateAsync("WelcomeEmail", welcome);
-            // if (!string.IsNullOrEmpty(entity.GsrEmailPersonal))
-            //     await _mailService.SendEmailAsync(entity.GsrEmailPersonal, "Important information about your meeting.", emailBody, isHtml: true);
+            // if (!string.IsNullOrEmpty(entity.Group?.Gsr?.EmailPersonal))
+            //     await _mailService.SendEmailAsync(entity.Group?.Gsr?.EmailPersonal, "Important information about your meeting.", emailBody, isHtml: true);
 
             Logger.Information("Meeting {MeetingName} attendance registered", entity.Name);
         }

@@ -1,0 +1,17 @@
+{
+  "SmtpSettings": {
+    "Host": "mail.aa-bristol.org",
+    "Port": 465,
+    "Username": "wtf@aa-bristol.org",
+    "Password": "C|1#@*748w`l",
+    "EnableSsl": true,
+    "FromDisplayName": "Bristol and Distict Intergroup",
+    "TimeoutSeconds": 30
+  },
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  }
+}
