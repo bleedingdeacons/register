@@ -122,8 +122,7 @@ public static class MauiProgram
         builder.Services.AddTransient<EditGroupViewModel>();
         builder.Services.AddTransient<TypeSelectionViewModel>();
         builder.Services.AddTransient<DaySelectionViewModel>();
-        builder.Services.AddTransient<ImportExportViewModel>();
-        builder.Services.AddTransient<GsrVerifyViewModel>();
+        builder.Services.AddTransient<ImportExportViewModel>();        
         builder.Services.AddTransient<MeetingEditViewModel>();
         builder.Services.AddTransient<PositionSelectionViewModel>();
         builder.Services.AddTransient<PositionEditViewModel>();
