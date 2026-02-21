@@ -18,12 +18,18 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
         private readonly DataService _dataService;
         private readonly IUnityApiService _unityApiService;
         private readonly IConfigurationService _configService;
+        private readonly IApiQueueService _apiQueueService;
 
-        public SettingsViewModel(DataService dataService, IUnityApiService unityApiService, IConfigurationService configService)
+        public SettingsViewModel(
+            DataService dataService,
+            IUnityApiService unityApiService,
+            IConfigurationService configService,
+            IApiQueueService apiQueueService)
         {
             _dataService = dataService;
             _unityApiService = unityApiService;
             _configService = configService;
+            _apiQueueService = apiQueueService;
         }
 
         [ObservableProperty]
@@ -37,6 +43,22 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 
         [ObservableProperty]
         private bool isSyncStatusError = false;
+
+        // ------------------------------------------------------------------ offline mode
+
+        public bool IsOfflineModeEnabled
+        {
+            get => _apiQueueService.IsOfflineModeEnabled;
+            set
+            {
+                if (_apiQueueService.IsOfflineModeEnabled == value) return;
+                _apiQueueService.IsOfflineModeEnabled = value;
+                OnPropertyChanged();
+                Logger.Information("Offline mode toggled {State}", value ? "ON" : "OFF");
+            }
+        }
+
+        // ------------------------------------------------------------------ sync
 
         [RelayCommand]
         private async Task SyncFromUnity()

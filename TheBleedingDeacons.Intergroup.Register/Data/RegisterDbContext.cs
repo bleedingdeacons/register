@@ -10,6 +10,9 @@ public class RegisterContext : DbContext
     public DbSet<Member> Members { get; set; }
     public DbSet<Position> Positions { get; set; }
 
+    /// <summary>Outbox queue for API calls that failed or were made while offline.</summary>
+    public DbSet<QueuedApiCall> QueuedApiCalls { get; set; }
+
     public RegisterContext(DbContextOptions<RegisterContext> options) : base(options)
     {
     }

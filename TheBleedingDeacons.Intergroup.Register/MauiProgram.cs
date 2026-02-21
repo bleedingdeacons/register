@@ -44,9 +44,13 @@ public static class MauiProgram
         builder.Services.AddScoped<IAttendanceRegistration<Position>>(sp => sp.GetRequiredService<AttendanceService>());
 
         // App Database
+        // CHANGED: also register IDbContextFactory so ApiQueueService (singleton) can
+        // open its own short-lived contexts outside of a DI scope.
         var appDbPath = Path.Combine(FileSystem.AppDataDirectory, APP_DATABASE_NAME);
         builder.Services.AddDbContext<RegisterContext>(options =>
             options.UseSqlite($"Data Source={appDbPath}"));
+        builder.Services.AddDbContextFactory<RegisterContext>(options =>          // ADDED
+            options.UseSqlite($"Data Source={appDbPath}"), ServiceLifetime.Scoped);
 
         Log.Logger.Information("Register Db {databasePath}", appDbPath);
 
@@ -93,10 +97,16 @@ public static class MauiProgram
             );
         });
 
-
-
         // Register Unity API service (creates client on demand from config)
         builder.Services.AddScoped<IUnityApiService, UnityApiService>();
+
+        // ADDED: offline queue — singleton so it survives scope boundaries and can
+        // subscribe to Connectivity.ConnectivityChanged for the app's lifetime.
+        builder.Services.AddSingleton<IApiQueueService, ApiQueueService>();
+
+        // ADDED: decorator that adds offline/retry queuing to Unity write operations
+        // (RegisterAttendee, RegisterOfficer, UpdateMember, and their Unregister twins).
+        builder.Services.AddScoped<QueueingUnityApiService>();
 
         // Views
         builder.Services.AddTransient<MailSettingsPage>();
@@ -122,7 +132,7 @@ public static class MauiProgram
         builder.Services.AddTransient<EditGroupViewModel>();
         builder.Services.AddTransient<TypeSelectionViewModel>();
         builder.Services.AddTransient<DaySelectionViewModel>();
-        builder.Services.AddTransient<ImportExportViewModel>();        
+        builder.Services.AddTransient<ImportExportViewModel>();
         builder.Services.AddTransient<MeetingEditViewModel>();
         builder.Services.AddTransient<PositionSelectionViewModel>();
         builder.Services.AddTransient<PositionEditViewModel>();
@@ -136,7 +146,6 @@ public static class MauiProgram
         builder.Logging.AddDebug();
 #endif
 
-
         var mauiapp = builder.Build();
 
         // Force database creation and load data synchronously
@@ -144,7 +153,7 @@ public static class MauiProgram
         {
             var context = scope.ServiceProvider.GetRequiredService<RegisterContext>();
 
-            // Ensure database is created
+            // Ensure database is created (also creates QueuedApiCalls table on first run)
             context.Database.EnsureCreated();
 
             // Load all data synchronously
@@ -153,6 +162,11 @@ public static class MauiProgram
 
             System.Diagnostics.Debug.WriteLine($"Loaded {meetings.Count} meetings and {positions.Count} positions.");
         }
+
+        // ADDED: start the queue service — subscribes to connectivity changes and
+        // does an initial flush of any calls that were queued before the last app close.
+        var queueService = mauiapp.Services.GetRequiredService<IApiQueueService>() as ApiQueueService;
+        queueService?.Start();
 
         return mauiapp;
     }
