@@ -77,8 +77,6 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
         {
             if (Position == null) return;
 
-            await ShowFeedback();
-
             var parameters = new Dictionary<string, object> {
                 {"positionId", Position.ID.ToString()} };
 
@@ -86,10 +84,5 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 
         }
 
-        private async Task ShowFeedback()
-        {
-            //await Task.Delay(100);
-            //await Toast.Make("Loading Position...", ToastDuration.Short).Show();
-        }
     }
 }

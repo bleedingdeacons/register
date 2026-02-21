@@ -101,12 +101,11 @@ public static class MauiProgram
         // Views
         builder.Services.AddTransient<MailSettingsPage>();
         builder.Services.AddTransient<MainPage>();
-        builder.Services.AddTransient<GsrEditPage>();
+        builder.Services.AddTransient<GroupEditPage>();
         builder.Services.AddTransient<DaySelectionPage>();
         builder.Services.AddTransient<TypeSelectionPage>();
         builder.Services.AddTransient<MeetingSelectionPage>();
         builder.Services.AddTransient<ImportExportPage>();
-        builder.Services.AddTransient<GsrVerifyPage>();
         builder.Services.AddTransient<MeetingEditPage>();
         builder.Services.AddTransient<PositionEditPage>();
         builder.Services.AddTransient<PositionSelectionPage>();

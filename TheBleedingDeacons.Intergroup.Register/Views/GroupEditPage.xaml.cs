@@ -3,11 +3,11 @@ using TheBleedingDeacons.Intergroup.Register.ViewModels;
 
 namespace TheBleedingDeacons.Intergroup.Register.Views;
 
-public partial class GsrEditPage : ContentPage, IQueryAttributable
+public partial class GroupEditPage : ContentPage, IQueryAttributable
 {
     private EditGroupViewModel _viewModel;
 
-    public GsrEditPage(EditGroupViewModel viewModel)
+    public GroupEditPage(EditGroupViewModel viewModel)
     {
         InitializeComponent();
         _viewModel = viewModel;
@@ -17,7 +17,7 @@ public partial class GsrEditPage : ContentPage, IQueryAttributable
     // This is the key method that receives Shell navigation parameters
     public void ApplyQueryAttributes(IDictionary<string, object> query)
     {
-        System.Diagnostics.Debug.WriteLine("=== Page ApplyQueryAttributes called ===");
+        System.Diagnostics.Debug.WriteLine("=== GroupEditPage ApplyQueryAttributes called ===");
         System.Diagnostics.Debug.WriteLine($"Query parameters count: {query.Count}");
         System.Diagnostics.Debug.WriteLine($"ViewModel is null: {_viewModel == null}");
 
@@ -39,7 +39,7 @@ public partial class GsrEditPage : ContentPage, IQueryAttributable
             System.Diagnostics.Debug.WriteLine("ERROR: ViewModel does not implement IQueryAttributable");
         }
 
-        // Also try setting the Meeting directly if it exists
+        // Also try setting the Meeting directly if it exists (for Edit mode)
         if (query.ContainsKey("meeting") && query["meeting"] is Meeting meeting)
         {
             System.Diagnostics.Debug.WriteLine($"Page: Setting Meeting directly - {meeting.GsrName}");
@@ -54,11 +54,12 @@ public partial class GsrEditPage : ContentPage, IQueryAttributable
         // Configure keyboard for name entry with CapitalizeWord
         GsrNameEntry.Keyboard = Keyboard.Create(KeyboardFlags.CapitalizeWord);
 
-        System.Diagnostics.Debug.WriteLine("=== Page OnAppearing ===");
+        System.Diagnostics.Debug.WriteLine("=== GroupEditPage OnAppearing ===");
         System.Diagnostics.Debug.WriteLine($"ViewModel is null: {_viewModel == null}");
 
         if (_viewModel != null)
         {
+            System.Diagnostics.Debug.WriteLine($"IsVerifyMode: {_viewModel.IsVerifyMode}");
             System.Diagnostics.Debug.WriteLine($"Meeting is null: {_viewModel.Meeting == null}");
             System.Diagnostics.Debug.WriteLine($"GsrName: '{_viewModel.GsrName}'");
             System.Diagnostics.Debug.WriteLine($"GsrPhone: '{_viewModel.GsrPhone}'");
@@ -80,9 +81,13 @@ public partial class GsrEditPage : ContentPage, IQueryAttributable
     {
         if (BindingContext is EditGroupViewModel viewModel)
         {
-            // Execute the cancel command which includes unsaved changes check
-            viewModel.CancelCommand.Execute(null);
-            return true; // Prevent default back behavior
+            // In Verify mode, just go back
+            // In Edit mode, execute the cancel command which includes unsaved changes check
+            if (!viewModel.IsVerifyMode)
+            {
+                viewModel.CancelCommand.Execute(null);
+                return true; // Prevent default back behavior
+            }
         }
         return base.OnBackButtonPressed();
     }

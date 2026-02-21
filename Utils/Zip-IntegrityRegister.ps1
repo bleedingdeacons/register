@@ -9,10 +9,13 @@ $projectPaths = @(
 )
 
 # Output directory for zip files (defaults to current directory)
-$outputDir = ".\ZippedProjects"
+$outputDir = ".\"
 
-# Folders to exclude from zip
+# Folders to exclude completely from zip
 $excludeFolders = @("bin", "obj", ".vs", ".git")
+
+# Folders to keep structure but exclude contents
+$emptyContentFolders = @("Fonts", "Images")
 
 # Create output directory if it doesn't exist
 if (-not (Test-Path $outputDir)) {
@@ -20,12 +23,32 @@ if (-not (Test-Path $outputDir)) {
     Write-Host "Created output directory: $outputDir" -ForegroundColor Green
 }
 
+# Function to check if path is under resources\Fonts or resources\Images
+function Test-ShouldEmptyContents {
+    param (
+        [string]$RelativePath,
+        [string[]]$EmptyContentFolders
+    )
+    
+    $pathParts = $RelativePath -split '\\'
+    
+    # Look for "resources" followed by one of the empty content folders
+    for ($i = 0; $i -lt $pathParts.Length - 1; $i++) {
+        if ($pathParts[$i] -match "^resources$" -and $EmptyContentFolders -contains $pathParts[$i + 1]) {
+            return $true
+        }
+    }
+    
+    return $false
+}
+
 # Function to zip a project with exclusions
 function Zip-ProjectWithExclusions {
     param (
         [string]$SourcePath,
         [string]$DestinationPath,
-        [string[]]$ExcludeFolders
+        [string[]]$ExcludeFolders,
+        [string[]]$EmptyContentFolders
     )
     
     Write-Host "`nProcessing: $SourcePath" -ForegroundColor Cyan
@@ -47,6 +70,7 @@ function Zip-ProjectWithExclusions {
         New-Item -Path $tempProjectDir -ItemType Directory | Out-Null
         
         Write-Host "Copying files (excluding: $($ExcludeFolders -join ', '))..." -ForegroundColor Yellow
+        Write-Host "Empty folders (keep structure only): resources\$($EmptyContentFolders -join ', resources\')" -ForegroundColor Yellow
         
         # Get all items recursively
         Get-ChildItem -Path $SourcePath -Recurse -Force | ForEach-Object {
@@ -62,21 +86,27 @@ function Zip-ProjectWithExclusions {
                 }
             }
             
+            # Check if this is under resources\Fonts or resources\Images
+            $inEmptyContentFolder = Test-ShouldEmptyContents -RelativePath $relativePath -EmptyContentFolders $EmptyContentFolders
+            
             if (-not $shouldExclude) {
                 $destination = Join-Path $tempProjectDir $relativePath
                 
                 if ($_.PSIsContainer) {
-                    # Create directory
+                    # Create directory (including empty content folders)
                     if (-not (Test-Path $destination)) {
                         New-Item -Path $destination -ItemType Directory -Force | Out-Null
                     }
                 } else {
-                    # Copy file
-                    $destDir = Split-Path $destination -Parent
-                    if (-not (Test-Path $destDir)) {
-                        New-Item -Path $destDir -ItemType Directory -Force | Out-Null
+                    # Skip files in empty content folders
+                    if (-not $inEmptyContentFolder) {
+                        # Copy file
+                        $destDir = Split-Path $destination -Parent
+                        if (-not (Test-Path $destDir)) {
+                            New-Item -Path $destDir -ItemType Directory -Force | Out-Null
+                        }
+                        Copy-Item -Path $_.FullName -Destination $destination -Force
                     }
-                    Copy-Item -Path $_.FullName -Destination $destination -Force
                 }
             }
         }
@@ -124,7 +154,7 @@ foreach ($projectPath in $projectPaths) {
     $zipFileName = "$projectName.zip"
     $zipFilePath = Join-Path $outputDir $zipFileName
     
-    Zip-ProjectWithExclusions -SourcePath $projectPath -DestinationPath $zipFilePath -ExcludeFolders $excludeFolders
+    Zip-ProjectWithExclusions -SourcePath $projectPath -DestinationPath $zipFilePath -ExcludeFolders $excludeFolders -EmptyContentFolders $emptyContentFolders
 }
 
 Write-Host "`n========================================" -ForegroundColor Magenta

@@ -95,7 +95,7 @@
 		<MauiXaml Update="Views\MeetingSelectionPage.xaml">
 			<Generator>MSBuild:Compile</Generator>
 		</MauiXaml>
-		<MauiXaml Update="Views\GsrEditPage.xaml">
+		<MauiXaml Update="Views\GroupEditPage.xaml">
 			<Generator>MSBuild:Compile</Generator>
 		</MauiXaml>
 		<MauiXaml Update="Views\PositionEditPage.xaml">
@@ -124,6 +124,9 @@
 	<!-- TODO: Re-add Integrity.Client as a NuGet package or relative project reference -->
 
 	<ItemGroup>
+		<Compile Update="Views\GroupEditPage.xaml.cs">
+		  <DependentUpon>GroupEditPage.xaml</DependentUpon>
+		</Compile>
 		<Compile Update="Views\ImportExportPage.xaml.cs">
 			<DependentUpon>ImportExportPage.xaml</DependentUpon>
 		</Compile>
@@ -132,9 +135,6 @@
 		</Compile>
 		<Compile Update="Views\MeetingSelectionPage.xaml.cs">
 			<DependentUpon>MeetingSelectionPage.xaml</DependentUpon>
-		</Compile>
-		<Compile Update="Views\GsrVerifyPage.xaml.cs">
-			<DependentUpon>GsrVerifyPage.xaml</DependentUpon>
 		</Compile>
 	</ItemGroup>
 

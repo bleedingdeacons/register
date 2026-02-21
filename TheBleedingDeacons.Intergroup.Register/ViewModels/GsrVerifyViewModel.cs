@@ -132,7 +132,7 @@ public partial class GsrVerifyViewModel : BaseViewModel
             ["meeting"] = Meeting
         };
 
-        await Shell.Current.GoToAsync(nameof(GsrEditPage), parameters);
+        await Shell.Current.GoToAsync(nameof(GroupEditPage), parameters);
     }
 
     [RelayCommand]
