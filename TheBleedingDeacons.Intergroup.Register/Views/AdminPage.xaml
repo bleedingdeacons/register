@@ -1,0 +1,248 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage x:Class="TheBleedingDeacons.Intergroup.Register.Views.AdminPage"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
+             xmlns:models="clr-namespace:TheBleedingDeacons.Intergroup.Register.Models"
+             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+             x:DataType="vm:AdminViewModel"
+             Title="Admin">
+
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <Style x:Key="HeaderLabelStyle" TargetType="Label">
+                <Setter Property="FontSize" Value="24"/>
+                <Setter Property="FontAttributes" Value="Bold"/>
+                <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"/>
+                <Setter Property="Margin" Value="0,0,0,10"/>
+            </Style>
+
+            <Style x:Key="FieldLabelStyle" TargetType="Label">
+                <Setter Property="FontSize" Value="13"/>
+                <Setter Property="FontAttributes" Value="Bold"/>
+                <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}"/>
+                <Setter Property="Margin" Value="0,0,0,4"/>
+            </Style>
+
+            <Style x:Key="ValueLabelStyle" TargetType="Label">
+                <Setter Property="FontSize" Value="22"/>
+                <Setter Property="FontAttributes" Value="Bold"/>
+                <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Gray900}, Dark=White}"/>
+            </Style>
+
+            <toolkit:InvertedBoolConverter x:Key="InvertedBoolConverter" />
+            <toolkit:BoolToObjectConverter x:Key="ActiveRowColorConverter"
+                                           TrueObject="{AppThemeBinding Light=#E8F5E9, Dark=#1B5E20}"
+                                           FalseObject="{AppThemeBinding Light=White, Dark=#2D2D30}" />
+            <toolkit:BoolToObjectConverter x:Key="ActiveRowStrokeConverter"
+                                           TrueObject="{AppThemeBinding Light=#4CAF50, Dark=#66BB6A}"
+                                           FalseObject="{AppThemeBinding Light=#E0E0E0, Dark=#555}" />
+        </ResourceDictionary>
+    </ContentPage.Resources>
+
+    <ContentPage.Behaviors>
+        <toolkit:StatusBarBehavior StatusBarColor="{AppThemeBinding Light=White, Dark=Black}"
+                                   StatusBarStyle="{AppThemeBinding Light=DarkContent, Dark=LightContent}" />
+    </ContentPage.Behaviors>
+
+    <Grid>
+
+        <!-- Loading Indicator -->
+        <ActivityIndicator IsVisible="{Binding IsLoading}"
+                           IsRunning="{Binding IsLoading}"
+                           HorizontalOptions="Center"
+                           VerticalOptions="Center"
+                           Scale="1.5"
+                           Color="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"/>
+
+        <!-- Main Content -->
+        <Grid RowDefinitions="Auto,Auto,Auto,*"
+              IsVisible="{Binding IsLoading, Converter={StaticResource InvertedBoolConverter}}"
+              Padding="20,10,20,0">
+
+            <!-- Active meeting banner -->
+            <Border Grid.Row="0"
+                    BackgroundColor="{AppThemeBinding Light=#E8F5E9, Dark=#1B5E20}"
+                    Stroke="{AppThemeBinding Light=#4CAF50, Dark=#66BB6A}"
+                    StrokeShape="RoundRectangle 10"
+                    StrokeThickness="2"
+                    Padding="15,12"
+                    Margin="0,0,0,10"
+                    IsVisible="{Binding ActiveMeetingId, Converter={toolkit:IsNotNullConverter}}">
+                <StackLayout Orientation="Horizontal" Spacing="12">
+                    <Label Text="✅"
+                           FontSize="24"
+                           VerticalOptions="Center"/>
+                    <StackLayout VerticalOptions="Center" Spacing="2">
+                        <Label Text="Active Meeting"
+                               Style="{StaticResource FieldLabelStyle}"
+                               Margin="0"
+                               TextColor="{AppThemeBinding Light=#2E7D32, Dark=#A5D6A7}"/>
+                        <Label Text="{Binding ActiveMeetingTitle}"
+                               FontSize="16"
+                               FontAttributes="Bold"
+                               TextColor="{AppThemeBinding Light=#1B5E20, Dark=#C8E6C9}"
+                               IsVisible="{Binding ActiveMeetingTitle, Converter={toolkit:IsNotNullConverter}}"/>
+                        <Label Text="{Binding ActiveMeetingDate}"
+                               Style="{StaticResource ValueLabelStyle}"
+                               TextColor="{AppThemeBinding Light=#1B5E20, Dark=#C8E6C9}"/>
+                    </StackLayout>
+                </StackLayout>
+            </Border>
+
+            <!-- No active meeting banner -->
+            <Border Grid.Row="0"
+                    BackgroundColor="{AppThemeBinding Light=#FFF8E1, Dark=#4A3700}"
+                    Stroke="{AppThemeBinding Light=#FFC107, Dark=#FFB300}"
+                    StrokeShape="RoundRectangle 10"
+                    StrokeThickness="2"
+                    Padding="15,12"
+                    Margin="0,0,0,10"
+                    IsVisible="{Binding ActiveMeetingId, Converter={toolkit:IsNullConverter}}">
+                <StackLayout Orientation="Horizontal" Spacing="12">
+                    <Label Text="⚠️"
+                           FontSize="24"
+                           VerticalOptions="Center"/>
+                    <Label Text="No meeting selected — tap a date below to begin."
+                           FontSize="15"
+                           VerticalOptions="Center"
+                           TextColor="{AppThemeBinding Light=#5D4037, Dark=#FFE082}"/>
+                </StackLayout>
+            </Border>
+
+            <!-- Error banner -->
+            <Border Grid.Row="1"
+                    BackgroundColor="{AppThemeBinding Light=#FFEBEE, Dark=#4A0000}"
+                    Stroke="{AppThemeBinding Light=#F44336, Dark=#EF9A9A}"
+                    StrokeShape="RoundRectangle 10"
+                    StrokeThickness="2"
+                    Padding="15,12"
+                    Margin="0,0,0,10"
+                    IsVisible="{Binding ErrorMessage, Converter={toolkit:IsNotNullConverter}}">
+                <StackLayout Orientation="Horizontal" Spacing="12">
+                    <Label Text="❌"
+                           FontSize="24"
+                           VerticalOptions="Center"/>
+                    <Label Text="{Binding ErrorMessage}"
+                           FontSize="14"
+                           VerticalOptions="Center"
+                           TextColor="{AppThemeBinding Light=#B71C1C, Dark=#FFCDD2}"/>
+                </StackLayout>
+            </Border>
+
+            <!-- Section header -->
+            <Label Grid.Row="2"
+                   Text="Select Today's Meeting"
+                   Style="{StaticResource HeaderLabelStyle}"
+                   Margin="0,0,0,8"/>
+
+            <!-- Meetings list -->
+            <CollectionView Grid.Row="3"
+                            ItemsSource="{Binding Meetings}"
+                            SelectionMode="None">
+                <CollectionView.EmptyView>
+                    <StackLayout Padding="40" VerticalOptions="Center">
+                        <Label Text="📅"
+                               FontSize="64"
+                               HorizontalOptions="Center"
+                               TextColor="{StaticResource Gray300}"/>
+                        <Label Text="No Intergroup Meetings Found"
+                               FontSize="20"
+                               FontAttributes="Bold"
+                               HorizontalOptions="Center"
+                               TextColor="{StaticResource Gray500}"
+                               Margin="0,20,0,0"/>
+                        <Label Text="Sync from Unity in Settings to download intergroup meetings."
+                               FontSize="15"
+                               HorizontalOptions="Center"
+                               TextColor="{StaticResource Gray400}"
+                               HorizontalTextAlignment="Center"
+                               Margin="0,10,0,0"/>
+                    </StackLayout>
+                </CollectionView.EmptyView>
+                <CollectionView.ItemsLayout>
+                    <LinearItemsLayout Orientation="Vertical" ItemSpacing="8"/>
+                </CollectionView.ItemsLayout>
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="models:IntergroupMeeting">
+                        <Border StrokeShape="RoundRectangle 10"
+                                StrokeThickness="2"
+                                Stroke="{Binding IsActive, Converter={StaticResource ActiveRowStrokeConverter}}"
+                                Padding="0">
+
+                            <Border.BackgroundColor>
+                                <Binding Path="IsActive" Converter="{StaticResource ActiveRowColorConverter}"/>
+                            </Border.BackgroundColor>
+
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type vm:AdminViewModel}}, Path=SelectMeetingCommand}"
+                                    CommandParameter="{Binding .}"/>
+                            </Border.GestureRecognizers>
+
+                            <Grid Padding="15,12"
+                                  ColumnDefinitions="*,Auto"
+                                  RowDefinitions="Auto,Auto,Auto,Auto">
+
+                                <!-- Title -->
+                                <Label Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2"
+                                       Text="{Binding Title}"
+                                       Style="{StaticResource FieldLabelStyle}"
+                                       Margin="0,0,0,2"
+                                       IsVisible="{Binding Title, Converter={toolkit:IsNotNullConverter}}"/>
+
+                                <!-- Date -->
+                                <Label Grid.Row="1" Grid.Column="0"
+                                       Text="{Binding Date}"
+                                       Style="{StaticResource ValueLabelStyle}"/>
+
+                                <!-- Active badge -->
+                                <Border Grid.Row="1" Grid.Column="1"
+                                        BackgroundColor="#4CAF50"
+                                        StrokeShape="RoundRectangle 12"
+                                        Padding="8,4"
+                                        VerticalOptions="Center"
+                                        IsVisible="{Binding IsActive}">
+                                    <Label Text="ACTIVE"
+                                           FontSize="11"
+                                           FontAttributes="Bold"
+                                           TextColor="White"/>
+                                </Border>
+
+                                <!-- Group attendees -->
+                                <Label Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
+                                       Style="{StaticResource FieldLabelStyle}"
+                                       Margin="0,6,0,0"
+                                       IsVisible="{Binding GroupAttendeeNames, Converter={toolkit:IsNotNullConverter}}">
+                                    <Label.FormattedText>
+                                        <FormattedString>
+                                            <Span Text="👥 Groups: " FontAttributes="Bold"/>
+                                            <Span Text="{Binding GroupAttendeeNames}"/>
+                                        </FormattedString>
+                                    </Label.FormattedText>
+                                </Label>
+
+                                <!-- Officer attendees -->
+                                <Label Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2"
+                                       Style="{StaticResource FieldLabelStyle}"
+                                       Margin="0,2,0,0"
+                                       IsVisible="{Binding OfficerAttendeeNames, Converter={toolkit:IsNotNullConverter}}">
+                                    <Label.FormattedText>
+                                        <FormattedString>
+                                            <Span Text="🎖️ Officers: " FontAttributes="Bold"/>
+                                            <Span Text="{Binding OfficerAttendeeNames}"/>
+                                        </FormattedString>
+                                    </Label.FormattedText>
+                                </Label>
+
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+
+        </Grid>
+
+    </Grid>
+
+</ContentPage>

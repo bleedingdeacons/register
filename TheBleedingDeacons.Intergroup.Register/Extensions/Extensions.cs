@@ -19,10 +19,12 @@ namespace TheBleedingDeacons.Intergroup.Register.Extensions
             if (meeting == null)
                 throw new ArgumentNullException(nameof(meeting));
 
-            var gsr = meeting.Group?.Gsr;
-            return !string.IsNullOrEmpty(gsr?.Name)
-                && !string.IsNullOrEmpty(gsr?.Phone)
-                && !string.IsNullOrEmpty(gsr?.EmailPersonal);
+            // At least one GSR must have all required fields
+            var gsrs = meeting.Group?.Gsrs;
+            return gsrs != null
+                && gsrs.Any(g => !string.IsNullOrEmpty(g.Name)
+                              && !string.IsNullOrEmpty(g.Phone)
+                              && !string.IsNullOrEmpty(g.EmailPersonal));
         }
 
         public static List<MeetingContact> GetContacts(this Meeting meeting)
@@ -72,7 +74,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Extensions
             if (!string.IsNullOrWhiteSpace(meeting.ProxyName))
                 name = meeting.ProxyName;
             else
-                name = meeting.Group?.Gsr?.Name ?? string.Empty;
+                name = meeting.Group?.Gsrs.FirstOrDefault()?.Name ?? string.Empty;
 
             return name.Split(' ').First();
         }

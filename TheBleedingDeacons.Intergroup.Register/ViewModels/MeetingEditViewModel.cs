@@ -86,7 +86,7 @@ public partial class MeetingEditViewModel : BaseViewModel
                  int.TryParse(meetingIdStr, out var meetingId))
         {
             // Load meeting by ID if only ID was passed
-            _ = LoadMeetingByIdAsync(meetingId);
+            LoadMeetingByIdAsync(meetingId).SafeFireAndForget("LoadMeetingById");
         }
     }
 
@@ -114,7 +114,7 @@ public partial class MeetingEditViewModel : BaseViewModel
 
     public void Initialize(Meeting meeting)
     {
-        Meeting = meeting;        
+        Meeting = meeting;
         UpdateDisplayProperties();
         UpdateCanConfirm();
     }
@@ -127,10 +127,11 @@ public partial class MeetingEditViewModel : BaseViewModel
 
     private void UpdateDisplayProperties()
     {
-        if (Meeting == null) return;        
-        DisplayGsrName = Meeting.Group?.Gsr?.Name;
-        DisplayGsrEmailPersonal = Meeting.Group?.Gsr?.EmailPersonal;
-        DisplayGsrPhone = Meeting.Group?.Gsr?.Phone;
+        if (Meeting == null) return;
+        var primaryGsr = Meeting.Group?.Gsrs.FirstOrDefault();
+        DisplayGsrName = primaryGsr?.Name;
+        DisplayGsrEmailPersonal = primaryGsr?.EmailPersonal;
+        DisplayGsrPhone = primaryGsr?.Phone;
         DisplayMeetingGenericEmail = Meeting.MeetingGenericEmail;
         DisplayUsingGeneric = Meeting.UsingGeneric ?? false;
         Title = Meeting.Name;
@@ -170,7 +171,7 @@ public partial class MeetingEditViewModel : BaseViewModel
         UpdateCanSave();
     }
 
-    
+
 
     private void StartEditing()
     {
@@ -264,14 +265,28 @@ public partial class MeetingEditViewModel : BaseViewModel
 
         try
         {
-            // Copy edited values back to the meeting
-            // Persist edited GSR values back to Group.Gsr
+            // Persist edited GSR values back to the first GSR in Group.Gsrs.
+            // MeetingEditViewModel edits only the primary/first GSR inline;
+            // additional GSRs are managed via EditGroupViewModel.
             if (Meeting.Group != null)
             {
-                Meeting.Group.Gsr ??= new Models.Member { GroupId = Meeting.Group.ID };
-                Meeting.Group.Gsr.Name = EditGsrName;
-                Meeting.Group.Gsr.EmailPersonal = EditGsrEmailPersonal;
-                Meeting.Group.Gsr.Phone = EditGsrPhone;
+                var primaryGsr = Meeting.Group.Gsrs.FirstOrDefault();
+                if (primaryGsr != null)
+                {
+                    primaryGsr.Name = EditGsrName;
+                    primaryGsr.EmailPersonal = EditGsrEmailPersonal;
+                    primaryGsr.Phone = EditGsrPhone;
+                }
+                else
+                {
+                    Meeting.Group.Gsrs.Add(new Models.Member
+                    {
+                        GroupId = Meeting.Group.ID,
+                        Name = EditGsrName,
+                        EmailPersonal = EditGsrEmailPersonal,
+                        Phone = EditGsrPhone,
+                    });
+                }
             }
             Meeting.MeetingGenericEmail = EditMeetingGenericEmail;
             Meeting.UsingGeneric = EditUsingGeneric;

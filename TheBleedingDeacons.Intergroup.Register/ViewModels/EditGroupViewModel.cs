@@ -2,26 +2,31 @@ using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using CommunityToolkit.Mvvm.Messaging;
 using Serilog;
-using TheBleedingDeacons.Intergroup.Register.Extensions;
 using TheBleedingDeacons.Intergroup.Register.Models;
 using TheBleedingDeacons.Intergroup.Register.Services;
 using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Support;
-using TheBleedingDeacons.Intergroup.Register.Views;
 
 namespace TheBleedingDeacons.Intergroup.Register.ViewModels;
 
-[QueryProperty(nameof(MeetingId), "groupId")]
-[QueryProperty(nameof(Edited), "edited")]
+/// <summary>
+/// Handles the editable GSR information form for a meeting group.
+/// Receives a <see cref="Meeting"/> object from navigation, allows editing
+/// GSR name/phone/email, validates input, and saves back to the database.
+///
+/// A group can have more than one GSR. Navigation may optionally pass a
+/// <c>member</c> to edit an existing GSR, or omit it to create a new one.
+///
+/// Separated from the verify flow (see <see cref="VerifyGroupViewModel"/>)
+/// so each ViewModel handles a single responsibility (ARCH-002).
+/// </summary>
 public partial class EditGroupViewModel : BaseViewModel
 {
     private static readonly ILogger Logger = AppLogger.ForContext<EditGroupViewModel>();
 
     // Services
     private readonly DataService _dataService;
-    private readonly IAttendanceRegistration<Meeting> _attendanceRegistration;
     private readonly IMeetingRepository _meetingRepository;
     private readonly IPopupNotification _popupService;
 
@@ -29,8 +34,8 @@ public partial class EditGroupViewModel : BaseViewModel
     [ObservableProperty]
     private Meeting? meeting;
 
-    [ObservableProperty]
-    private int meetingId;
+    // The specific GSR being edited (null = creating a new one for the group)
+    private Member? _editingMember;
 
     // GSR Edit Properties
     [ObservableProperty]
@@ -41,25 +46,6 @@ public partial class EditGroupViewModel : BaseViewModel
 
     [ObservableProperty]
     private string? gsrEmailPersonal;
-
-    // Verification/Registration Properties
-    [ObservableProperty]
-    private string attendedStatusText = string.Empty;
-
-    [ObservableProperty]
-    private bool edited;
-
-    [ObservableProperty]
-    private bool standingIn = false;
-
-    [ObservableProperty]
-    private string? standinEmail;
-
-    [ObservableProperty]
-    private string? standinName;
-
-    [ObservableProperty]
-    private bool canRegister = false;
 
     // UI State Properties
     [ObservableProperty]
@@ -73,10 +59,6 @@ public partial class EditGroupViewModel : BaseViewModel
 
     [ObservableProperty]
     private string saveButtonText = "Save";
-
-    // Mode Control - determines which UI to show
-    [ObservableProperty]
-    private bool isVerifyMode = true; // Default to verify mode
 
     // Validation Error Properties
     [ObservableProperty]
@@ -99,16 +81,13 @@ public partial class EditGroupViewModel : BaseViewModel
 
     public EditGroupViewModel(
         DataService dataService,
-        IAttendanceRegistration<Meeting> attendanceRegistration,
         IMeetingRepository meetingRepository,
         IPopupNotification popupService)
     {
         _dataService = dataService;
-        _attendanceRegistration = attendanceRegistration;
         _meetingRepository = meetingRepository;
         _popupService = popupService;
 
-        // Initialize with default values
         ValidateForm();
     }
 
@@ -116,90 +95,31 @@ public partial class EditGroupViewModel : BaseViewModel
 
     public override void ApplyQueryAttributes(IDictionary<string, object> query)
     {
-        Logger.Information("ApplyQueryAttributes called with {Count} parameters", query.Count);
+        Logger.Information("EditGroupViewModel.ApplyQueryAttributes called with {Count} parameters", query.Count);
 
-        foreach (var kvp in query)
-        {
-            Logger.Information("  Query param: {Key} = {Value} (Type: {Type})",
-                kvp.Key, kvp.Value, kvp.Value?.GetType().Name ?? "null");
-        }
-
-        // Determine mode based on parameters
-        // If groupId is provided -> Verify mode (read-only display)
-        // If meeting object is provided -> Edit mode (editable fields)
-        bool hasGroupId = query.ContainsKey("groupId");
-        bool hasMeeting = query.ContainsKey("meeting");
-
-        if (hasGroupId)
-        {
-            IsVerifyMode = true;
-            Logger.Information("Mode: VERIFY (groupId provided)");
-        }
-        else if (hasMeeting)
-        {
-            IsVerifyMode = false;
-            Logger.Information("Mode: EDIT (meeting object provided)");
-        }
-
-        // Handle meeting object from Edit flow
+        // Handle meeting object passed from VerifyGroupViewModel
         if (query.ContainsKey("meeting") && query["meeting"] is Meeting meeting)
         {
             Meeting = meeting;
+            Logger.Information("Edit mode: received Meeting {MeetingName}", meeting.Name);
         }
 
-        // Handle edited flag from Verify flow
-        if (query.TryGetValue("edited", out var editedObj) &&
-            editedObj?.ToString() == "true")
+        // Optionally receive the specific GSR member to edit.
+        // If not supplied a new Member will be created for the group on save.
+        if (query.ContainsKey("member") && query["member"] is Member member)
         {
-            MainThread.BeginInvokeOnMainThread(() =>
-            {
-                OnPropertyChanged(nameof(Meeting));
-                // Null-safe check for HasAll
-                CanRegister = Meeting?.HasAll() ?? false;
-            });
+            _editingMember = member;
+            Logger.Information("Edit mode: editing existing GSR member ID {MemberId}", member.ID);
         }
-
-        // Handle groupId passed as string from navigation
-        if (query.TryGetValue("groupId", out var meetingIdObj))
+        else
         {
-            int parsedMeetingId = 0;
-
-            if (meetingIdObj is string meetingIdStr)
-            {
-                Logger.Information("Parsing meetingId from string: {MeetingIdStr}", meetingIdStr);
-                int.TryParse(meetingIdStr, out parsedMeetingId);
-            }
-            else if (meetingIdObj is int intValue)
-            {
-                Logger.Information("MeetingId is already int: {IntValue}", intValue);
-                parsedMeetingId = intValue;
-            }
-
-            Logger.Information("Parsed meetingId: {ParsedMeetingId}", parsedMeetingId);
-
-            if (parsedMeetingId > 0)
-            {
-                MeetingId = parsedMeetingId;
-            }
+            _editingMember = null;
         }
     }
 
     #endregion
 
     #region Property Change Handlers
-
-    partial void OnMeetingIdChanged(int value)
-    {
-        Logger.Information("OnMeetingIdChanged triggered with value: {Value}", value);
-
-        if (value > 0)
-        {
-            MainThread.BeginInvokeOnMainThread(async () =>
-            {
-                await LoadMeetingAsync(value);
-            });
-        }
-    }
 
     partial void OnMeetingChanged(Meeting? value)
     {
@@ -234,22 +154,13 @@ public partial class EditGroupViewModel : BaseViewModel
     partial void OnIsLoadingChanged(bool value)
     {
         SaveButtonText = value ? "Saving..." : "Save";
-
-        // Notify that command can execute state might have changed
         SaveCommand.NotifyCanExecuteChanged();
         CancelCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnHasUnsavedChangesChanged(bool value)
     {
-        if (value)
-        {
-            Title = "Edit GSR Information *";
-        }
-        else
-        {
-            Title = "Edit GSR Information";
-        }
+        Title = value ? "Edit GSR Information *" : "Edit GSR Information";
     }
 
     partial void OnIsFormValidChanged(bool value)
@@ -259,67 +170,7 @@ public partial class EditGroupViewModel : BaseViewModel
 
     #endregion
 
-    #region Commands - Registration/Verification Flow
-
-    [RelayCommand]
-    public async Task No()
-    {
-        if (Meeting == null)
-        {
-            Logger.Warning("Cannot navigate to edit - Meeting is null");
-            return;
-        }
-
-        var parameters = new Dictionary<string, object>
-        {
-            ["meeting"] = Meeting
-        };
-
-        // Navigate to the same page but in Edit mode
-        await Shell.Current.GoToAsync(nameof(GroupEditPage), parameters);
-    }
-
-    [RelayCommand]
-    public async Task Yes()
-    {
-        if (Meeting == null)
-        {
-            Logger.Warning("Cannot register - Meeting is null");
-            return;
-        }
-
-        try
-        {
-            Meeting.ProxyAttendance = StandingIn;
-            Meeting.ProxyEmail = StandinEmail;
-            Meeting.ProxyName = StandinName;
-
-            await _attendanceRegistration.Register(Meeting);
-
-            string personalName = Meeting.GetFirstName();
-
-            // Show success popup
-            await _popupService.ShowCountdownPopupAsync(
-                "Finished",
-                $"Thanks for registering {personalName}.",
-                async () => await Shell.Current.GoToAsync("//MainPage")
-            );
-        }
-        catch (Exception ex)
-        {
-            Logger.Error(ex, "Failed to register attendance");
-
-            var mainPage = Application.Current?.Windows?.FirstOrDefault()?.Page;
-            if (mainPage != null)
-            {
-                await mainPage.DisplayAlert("Error", $"Failed to register: {ex.Message}", "OK");
-            }
-        }
-    }
-
-    #endregion
-
-    #region Commands - Edit Flow
+    #region Commands
 
     [RelayCommand]
     private async Task Save()
@@ -337,15 +188,27 @@ public partial class EditGroupViewModel : BaseViewModel
         {
             IsLoading = true;
 
-            if (Meeting != null)
+            if (Meeting?.Group != null)
             {
-                // Ensure the group has a GSR member entity to update
-                if (Meeting.Group != null)
+                if (_editingMember != null)
                 {
-                    Meeting.Group.Gsr ??= new Models.Member { GroupId = Meeting.Group.ID };
-                    Meeting.Group.Gsr.Name = GsrName?.Trim();
-                    Meeting.Group.Gsr.Phone = string.IsNullOrWhiteSpace(GsrPhone) ? string.Empty : GsrPhone.Trim();
-                    Meeting.Group.Gsr.EmailPersonal = string.IsNullOrWhiteSpace(GsrEmailPersonal) ? string.Empty : GsrEmailPersonal.Trim();
+                    // Update the specific GSR member being edited
+                    _editingMember.Name = GsrName?.Trim();
+                    _editingMember.Phone = string.IsNullOrWhiteSpace(GsrPhone) ? string.Empty : GsrPhone.Trim();
+                    _editingMember.EmailPersonal = string.IsNullOrWhiteSpace(GsrEmailPersonal) ? string.Empty : GsrEmailPersonal.Trim();
+                }
+                else
+                {
+                    // No existing GSR selected — add a new one to the group
+                    var newGsr = new Member
+                    {
+                        GroupId = Meeting.Group.ID,
+                        Name = GsrName?.Trim(),
+                        Phone = string.IsNullOrWhiteSpace(GsrPhone) ? string.Empty : GsrPhone.Trim(),
+                        EmailPersonal = string.IsNullOrWhiteSpace(GsrEmailPersonal) ? string.Empty : GsrEmailPersonal.Trim(),
+                    };
+                    Meeting.Group.Gsrs.Add(newGsr);
+                    _editingMember = newGsr;
                 }
 
                 await SaveToDatabase(Meeting);
@@ -382,110 +245,19 @@ public partial class EditGroupViewModel : BaseViewModel
         await Shell.Current.GoToAsync("..");
     }
 
-    [RelayCommand]
-    private void TestCommand()
-    {
-        System.Diagnostics.Debug.WriteLine("=== Test command executed ===");
-        Shell.Current.DisplayAlert("Test", "Command system is working!", "OK");
-    }
-
     #endregion
 
-    #region Private Methods - Loading and Initialization
-
-    private async Task LoadMeetingAsync(int meetingId)
-    {
-        Logger.Information("LoadMeetingAsync called with meetingId: {MeetingId}", meetingId);
-
-        if (IsLoading) return;
-
-        try
-        {
-            IsLoading = true;
-
-            var loadedMeeting = await _meetingRepository.GetMeetingDirectlyAsync(meetingId);
-
-            Logger.Information("Meeting loaded: {MeetingName}, GSR: {GsrName}",
-                loadedMeeting?.Name ?? "null",
-                loadedMeeting?.Group?.Gsr?.Name ?? "null");
-
-            if (loadedMeeting != null)
-            {
-                // All UI updates happen here on the main thread
-                Meeting = loadedMeeting;
-
-                // Set title with null-safe checks
-                if (!string.IsNullOrEmpty(loadedMeeting.Name) &&
-                    !string.IsNullOrEmpty(loadedMeeting.Day) &&
-                    !loadedMeeting.Name.Contains(loadedMeeting.Day))
-                {
-                    Title = $"{loadedMeeting.Name} on {loadedMeeting.Day}";
-                }
-                else
-                {
-                    Title = loadedMeeting.Name ?? "Unknown Meeting";
-                }
-
-                CanRegister = loadedMeeting.HasAll();
-
-                // Force property change notification for bindings
-                OnPropertyChanged(nameof(Meeting));
-
-                Logger.Information("UI updated - Meeting: {MeetingName}, CanRegister: {CanRegister}",
-                    Meeting?.Name, CanRegister);
-            }
-            else
-            {
-                Logger.Warning("Meeting not found for ID: {MeetingId}", meetingId);
-                var mainPage = Application.Current?.Windows?.FirstOrDefault()?.Page;
-                if (mainPage != null)
-                {
-                    await mainPage.DisplayAlert(
-                        "Not Found",
-                        $"Meeting with ID {meetingId} was not found.",
-                        "OK");
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            Logger.Error(ex, "Failed to load meeting {MeetingId}", meetingId);
-
-            try
-            {
-                var mainPage = Application.Current?.Windows?.FirstOrDefault()?.Page;
-                if (mainPage != null)
-                {
-                    await mainPage.DisplayAlert(
-                        "Error",
-                        $"Failed to load meeting: {ex.Message}",
-                        "OK");
-                }
-            }
-            catch (Exception alertEx)
-            {
-                Logger.Error(alertEx, "Failed to show error alert");
-            }
-        }
-        finally
-        {
-            IsLoading = false;
-        }
-    }
+    #region Private Methods
 
     private void LoadMeetingData()
     {
         if (Meeting == null) return;
 
-        // Temporarily disable change tracking while loading
-        var wasTracking = HasUnsavedChanges;
+        // Populate fields from the member being edited, or leave blank for a new GSR
+        GsrName = _editingMember?.Name;
+        GsrPhone = _editingMember?.Phone;
+        GsrEmailPersonal = _editingMember?.EmailPersonal;
 
-        var gsr = Meeting.Group?.Gsr;
-        GsrName = gsr?.Name;
-        GsrPhone = gsr?.Phone;
-        GsrEmailPersonal = gsr?.EmailPersonal;
-
-        // Reset change tracking
         HasUnsavedChanges = false;
     }
 
@@ -493,7 +265,7 @@ public partial class EditGroupViewModel : BaseViewModel
     {
         if (Meeting != null && !string.IsNullOrEmpty(Meeting.Name))
         {
-            Title = $"{Meeting.Name}";
+            Title = Meeting.Name;
         }
         else
         {
@@ -534,7 +306,6 @@ public partial class EditGroupViewModel : BaseViewModel
             {
                 SetGsrPhoneError("Phone number cannot exceed 20 characters.");
             }
-            // Add more phone validation here if needed
             else if (!IsValidPhoneFormat(GsrPhone.Trim()))
             {
                 SetGsrPhoneError("Please check the phone number is valid.");
@@ -577,10 +348,9 @@ public partial class EditGroupViewModel : BaseViewModel
             return;
         }
 
-        var gsr = Meeting.Group?.Gsr;
-        HasUnsavedChanges = gsr?.Name != GsrName?.Trim() ||
-                           gsr?.Phone != GsrPhone?.Trim() ||
-                           gsr?.EmailPersonal != GsrEmailPersonal?.Trim();
+        HasUnsavedChanges = _editingMember?.Name != GsrName?.Trim() ||
+                           _editingMember?.Phone != GsrPhone?.Trim() ||
+                           _editingMember?.EmailPersonal != GsrEmailPersonal?.Trim();
     }
 
     private void SetGsrNameError(string error) { GsrNameError = error; HasGsrNameError = true; }
@@ -589,13 +359,6 @@ public partial class EditGroupViewModel : BaseViewModel
     private void ClearGsrPhoneError() { GsrPhoneError = null; HasGsrPhoneError = false; }
     private void SetGsrEmailError(string error) { GsrEmailError = error; HasGsrEmailError = true; }
     private void ClearGsrEmailError() { GsrEmailError = null; HasGsrEmailError = false; }
-
-    private void ClearAllErrors()
-    {
-        ClearGsrNameError();
-        ClearGsrPhoneError();
-        ClearGsrEmailError();
-    }
 
     private bool IsValidEmail(string email)
     {

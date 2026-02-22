@@ -9,6 +9,7 @@ public class RegisterContext : DbContext
     public DbSet<Group> Groups { get; set; }
     public DbSet<Member> Members { get; set; }
     public DbSet<Position> Positions { get; set; }
+    public DbSet<IntergroupMeeting> IntergroupMeetings { get; set; }
 
     /// <summary>Outbox queue for API calls that failed or were made while offline.</summary>
     public DbSet<QueuedApiCall> QueuedApiCalls { get; set; }

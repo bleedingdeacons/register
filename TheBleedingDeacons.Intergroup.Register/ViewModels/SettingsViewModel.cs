@@ -44,8 +44,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
         [ObservableProperty]
         private bool isSyncStatusError = false;
 
-        // ------------------------------------------------------------------ offline mode
-
+       
         public bool IsOfflineModeEnabled
         {
             get => _apiQueueService.IsOfflineModeEnabled;
@@ -58,12 +57,19 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
             }
         }
 
-        // ------------------------------------------------------------------ sync
-
+       
         [RelayCommand]
         private async Task SyncFromUnity()
         {
             if (IsSyncing) return;
+
+            bool confirmed = await Shell.Current.DisplayAlert(
+                "Sync with Unity",
+                "All existing meeting and position data will be deleted and replaced with data from Unity. This cannot be undone.\n\nAre you sure you want to continue?",
+                "Yes, Sync",
+                "No, Cancel");
+
+            if (!confirmed) return;
 
             try
             {
@@ -79,10 +85,10 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 
                 ShowSyncStatus("Syncing from Unity API...", false);
 
-                var (meetings, positions) = await _dataService.ImportFromUnityAsync(_unityApiService);
+                var (meetings, positions, members, groups, intergroupMeetings) = await _dataService.ImportFromUnityAsync(_unityApiService);
 
-                ShowSyncStatus($"Imported {meetings} meetings and {positions} positions.", false);
-                Logger.Information("Unity sync complete: {Meetings} meetings, {Positions} positions", meetings, positions);
+                ShowSyncStatus($"Sync complete: {groups} groups, {meetings} meetings, {members} members, {positions} positions, {intergroupMeetings} intergroup meetings imported.", false);
+                Logger.Information("Unity sync complete: {Groups} groups, {Meetings} meetings, {Members} members, {Positions} positions, {IntergroupMeetings} intergroup meetings", groups, meetings, members, positions, intergroupMeetings);
             }
             catch (Exception ex)
             {

@@ -32,7 +32,7 @@ public class DataService
     // Import Methods
     // ====================================================================
 
-    public async Task<(int Meetings, int Positions)> ImportFromUnityAsync(IUnityApiService unityApiService, CancellationToken cancellationToken = default)
+    public async Task<(int Meetings, int Positions, int Members, int Groups, int IntergroupMeetings)> ImportFromUnityAsync(IUnityApiService unityApiService, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -40,16 +40,22 @@ public class DataService
 
             var data = await unityApiService.GetRegisterDataAsync(cancellationToken);
 
-            // Delete in FK order: dependents first, then principals
+            // Delete in FK order: dependents first, then principals.
+            // ExecuteDeleteAsync bypasses the change tracker, so we clear it afterward
+            // to prevent identity-conflict errors when AddRangeAsync tracks the new entities.
             await _context.Members.ExecuteDeleteAsync(cancellationToken);
             await _context.Meetings.ExecuteDeleteAsync(cancellationToken);
             await _context.Groups.ExecuteDeleteAsync(cancellationToken);
             await _context.Positions.ExecuteDeleteAsync(cancellationToken);
+            await _context.IntergroupMeetings.ExecuteDeleteAsync(cancellationToken);
+
+            _context.ChangeTracker.Clear();
 
             // Insert Groups only — Meetings and Members are attached as nav properties
             // so EF resolves all FKs and inserts them in the correct order automatically
             await _context.Groups.AddRangeAsync(data.Groups, cancellationToken);
             await _context.Positions.AddRangeAsync(data.Positions, cancellationToken);
+            await _context.IntergroupMeetings.AddRangeAsync(data.IntergroupMeetings, cancellationToken);
 
             await _context.SaveChangesAsync(cancellationToken);
 
@@ -57,10 +63,10 @@ public class DataService
             await _positionRepository.InvalidateAllPositionsCacheAsync();
 
             Logger.Information(
-                "Unity import complete: {Groups} groups, {Meetings} meetings, {Members} GSR members, {Positions} positions",
-                data.Groups.Count, data.Meetings.Count, data.Members.Count, data.Positions.Count);
+                "Unity import complete: {Groups} groups, {Meetings} meetings, {Members} GSR members, {Positions} positions, {IntergroupMeetings} intergroup meetings",
+                data.Groups.Count, data.Meetings.Count, data.Members.Count, data.Positions.Count, data.IntergroupMeetings.Count);
 
-            return (data.Meetings.Count, data.Positions.Count);
+            return (data.Meetings.Count, data.Positions.Count, data.Members.Count, data.Groups.Count, data.IntergroupMeetings.Count);
         }
         catch (Exception ex)
         {
@@ -133,9 +139,10 @@ public class DataService
                     meetingsWorksheet.Cells[row, 3].Value = meeting.Time;
                     meetingsWorksheet.Cells[row, 4].Value = meeting.EndTime;
                     meetingsWorksheet.Cells[row, 5].Value = meeting.Name;
-                    meetingsWorksheet.Cells[row, 6].Value = meeting.Group?.Gsr?.Name;
-                    meetingsWorksheet.Cells[row, 7].Value = meeting.Group?.Gsr?.EmailPersonal;
-                    meetingsWorksheet.Cells[row, 8].Value = meeting.Group?.Gsr?.Phone;
+                    // Export all GSRs as a semicolon-separated list per cell
+                    meetingsWorksheet.Cells[row, 6].Value = string.Join("; ", meeting.Group?.Gsrs.Select(g => g.Name ?? "") ?? []);
+                    meetingsWorksheet.Cells[row, 7].Value = string.Join("; ", meeting.Group?.Gsrs.Select(g => g.EmailPersonal ?? "") ?? []);
+                    meetingsWorksheet.Cells[row, 8].Value = string.Join("; ", meeting.Group?.Gsrs.Select(g => g.Phone ?? "") ?? []);
                     meetingsWorksheet.Cells[row, 9].Value = meeting.MeetingGenericEmail;
                     meetingsWorksheet.Cells[row, 10].Value = meeting.UsingGeneric;
                     meetingsWorksheet.Cells[row, 11].Value = meeting.Location;

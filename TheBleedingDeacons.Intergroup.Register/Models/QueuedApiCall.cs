@@ -13,7 +13,11 @@ public class QueuedApiCall
     /// <summary>Discriminator so callers know what to do with the response (e.g. "RegisterAttendee").</summary>
     public required string OperationType { get; set; }
 
-    /// <summary>Fully-qualified endpoint URL.</summary>
+    /// <summary>
+    /// Relative API path (e.g. "wp-json/integrity/v1/members/42/update").
+    /// The full URL is resolved from current Unity config at flush time by <see cref="ApiQueueService"/>,
+    /// preventing stale base URLs if the user changes settings between enqueue and flush.
+    /// </summary>
     public required string Url { get; set; }
 
     /// <summary>HTTP method, e.g. "POST".</summary>

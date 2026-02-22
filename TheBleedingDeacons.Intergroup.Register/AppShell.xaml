@@ -43,6 +43,11 @@
       ContentTemplate="{DataTemplate local:EmailStatusPage}"
       Route="EmailStatusPage" 
       IsVisible="False" />
-    
+
+    <ShellContent Title="Admin"
+      Icon="settings.png"
+      ContentTemplate="{DataTemplate local:AdminPage}"
+      Route="AdminPage" />
+
     
 </Shell>

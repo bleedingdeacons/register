@@ -1,10 +1,15 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage x:Class="TheBleedingDeacons.Intergroup.Register.Views.MainPage"
              xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:vm="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
+             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
              x:DataType="vm:MainPageViewModel"
              Title="{Binding Title}">
+
+    <ContentPage.Resources>
+        <toolkit:InvertedBoolConverter x:Key="InvertedBoolConverter" />
+    </ContentPage.Resources>
 
     <ScrollView>
         <VerticalStackLayout Spacing="30" Padding="30,0" VerticalOptions="Center">
@@ -19,54 +24,46 @@
                    Text="Welcome to Bristol and District Intergroup"
                    HorizontalOptions="Center" />
 
+            <!-- No meeting selected warning -->
+            <Border BackgroundColor="{AppThemeBinding Light=#FFF8E1, Dark=#4A3700}"
+                    Stroke="{AppThemeBinding Light=#FFC107, Dark=#FFB300}"
+                    StrokeShape="RoundRectangle 8"
+                    Padding="15,12"
+                    IsVisible="{Binding IsMeetingSelected, Converter={StaticResource InvertedBoolConverter}}">
+                <StackLayout Orientation="Horizontal" Spacing="10">
+                    <Label Text="⚠️" FontSize="20" VerticalOptions="Center"/>
+                    <Label Text="No meeting selected. Go to Admin to choose today's meeting."
+                           FontSize="14"
+                           VerticalOptions="Center"
+                           TextColor="{AppThemeBinding Light=#5D4037, Dark=#FFE082}"
+                           LineBreakMode="WordWrap"/>
+                </StackLayout>
+            </Border>
+
             <!-- Main action buttons -->
-            <FlexLayout Direction="Row" 
-                Wrap="Wrap" 
-                JustifyContent="SpaceBetween" 
+            <FlexLayout Direction="Row"
+                Wrap="Wrap"
+                JustifyContent="SpaceBetween"
                 AlignItems="Stretch"
                 AlignContent="Start">
 
                 <Button x:Name="RegisterBtn" Style="{StaticResource PrimaryButtonStyle}"
                     Text="I'm a Group Service Representative 👆"
                     Command="{Binding SelectDayCommand}"
-                    IsEnabled="{Binding IsBusy, Converter={StaticResource InvertedBoolConverter}}"
+                    IsEnabled="{Binding IsButtonsEnabled}"
                     HeightRequest="120"
                     FlexLayout.Basis="48%"
                     Margin="0,0,5,10" />
 
                 <Button x:Name="RegisterLOBtn" Style="{StaticResource PrimaryButtonStyle}"
-                    Text="I have an Intergroup Position 👆"                    
+                    Text="I have an Intergroup Position 👆"
                     Command="{Binding SelectPositionCommand}"
-                    IsEnabled="{Binding IsBusy, Converter={StaticResource InvertedBoolConverter}}"
+                    IsEnabled="{Binding IsButtonsEnabled}"
                     HeightRequest="120"
                     FlexLayout.Basis="48%"
                     Margin="5,0,0,10" />
 
             </FlexLayout>
-            <!-- Quick info card -->
-            <!--<Border BackgroundColor="{StaticResource Gray50}"
-                   StrokeShape="RoundRectangle 12"
-                   Padding="20"
-                   Stroke="{StaticResource Gray200}"
-                   StrokeThickness="1">
-
-                <StackLayout Spacing="10">
-                    <Label Text="💡 Quick Start"
-                           FontSize="16"
-                           FontAttributes="Bold"
-                           TextColor="{StaticResource Primary}" />
-
-                    <Label FontSize="14"
-                           TextColor="{StaticResource Gray700}"
-                           LineBreakMode="WordWrap">
-                        <Label.Text>
-                            • Use "Register by Day" to find groups by day of the week
-                            • Use "View All Groups" to see the complete list
-                            • Access Settings ⚙️ to import/export Excel files
-                        </Label.Text>
-                    </Label>
-                </StackLayout>
-            </Border>-->
 
             <ActivityIndicator IsVisible="{Binding IsBusy}"
                               IsRunning="{Binding IsBusy}"

@@ -10,6 +10,7 @@ public partial class AppShell : Shell
 
         // Register routes for navigation        
         Routing.RegisterRoute(nameof(GroupEditPage), typeof(GroupEditPage));
+        Routing.RegisterRoute(nameof(GroupVerifyPage), typeof(GroupVerifyPage));
         Routing.RegisterRoute(nameof(DaySelectionPage), typeof(DaySelectionPage));
         Routing.RegisterRoute(nameof(TypeSelectionPage), typeof(TypeSelectionPage));
         Routing.RegisterRoute(nameof(MeetingSelectionPage), typeof(MeetingSelectionPage));
@@ -21,6 +22,5 @@ public partial class AppShell : Shell
         Routing.RegisterRoute(nameof(DatabaseBackupPage), typeof(DatabaseBackupPage));
         Routing.RegisterRoute(nameof(EmailStatusPage), typeof(EmailStatusPage));
         Routing.RegisterRoute(nameof(UnitySettingsPage), typeof(UnitySettingsPage));
-
     }
 }

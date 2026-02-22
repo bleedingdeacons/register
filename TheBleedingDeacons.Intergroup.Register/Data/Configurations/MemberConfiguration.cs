@@ -12,6 +12,9 @@ public class MemberConfiguration : IEntityTypeConfiguration<Member>
 
         builder.HasKey(e => e.ID);
 
+        // SQLite inserts the supplied ID when non-zero (Unity sync path),
+        // and auto-assigns a ROWID when ID == 0 (locally created GSR, not yet synced).
+
         builder.Property(e => e.Name)
             .HasColumnName("Gsr Name")
             .HasMaxLength(255);
@@ -24,10 +27,10 @@ public class MemberConfiguration : IEntityTypeConfiguration<Member>
             .HasColumnName("Gsr Phone")
             .HasMaxLength(60);
 
-        // One-to-one: Member belongs to one Group
+        // One-to-many: Member belongs to one Group as a GSR; a Group can have multiple GSRs
         builder.HasOne(e => e.Group)
-            .WithOne(g => g.Gsr)
-            .HasForeignKey<Member>(e => e.GroupId)
+            .WithMany(g => g.Gsrs)
+            .HasForeignKey(e => e.GroupId)
             .OnDelete(DeleteBehavior.Cascade);
     }
 }

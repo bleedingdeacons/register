@@ -76,25 +76,40 @@ public class UnityApiService : IUnityApiService
                 $"Failed to fetch members: {membersResponse.Error?.Message ?? "Unknown error"}");
         }
 
+        // Fetch intergroup meetings
+        var intergroupMeetingsResponse = await client.GetIntergroupMeetingsAsync(
+            perPage: 500,
+            cancellationToken: cancellationToken);
+
+        if (!intergroupMeetingsResponse.Success || intergroupMeetingsResponse.Data is null)
+        {
+            Logger.Error("Failed to fetch intergroup meetings from Unity API: {Error}",
+                intergroupMeetingsResponse.Error?.Message ?? "Unknown error");
+            throw new InvalidOperationException(
+                $"Failed to fetch intergroup meetings: {intergroupMeetingsResponse.Error?.Message ?? "Unknown error"}");
+        }
+
         // Build a complete object graph: Group owns its Meetings + Gsr (Member).
         // EF inserts Groups first and resolves all FKs automatically via nav properties.
         var groups = MapGroups(groupsResponse.Data, membersResponse.Data);
 
         // Flatten for counts and convenience — the graph is the source of truth for saving
         var meetings = groups.SelectMany(g => g.Meetings).ToList();
-        var members = groups.Where(g => g.Gsr != null).Select(g => g.Gsr!).ToList();
+        var members = groups.SelectMany(g => g.Gsrs).ToList();
 
         var positions = MapPositions(positionsResponse.Data, membersResponse.Data);
 
-        Logger.Information(
-            "Fetched {GroupCount} groups, {MeetingCount} meetings, {PositionCount} positions, {MemberCount} GSR members from Unity API",
-            groups.Count, meetings.Count, positions.Count, members.Count);
+        var intergroupMeetings = MapIntergroupMeetings(intergroupMeetingsResponse.Data);
 
-        return new RegisterData(groups, meetings, positions, members);
+        Logger.Information(
+            "Fetched {GroupCount} groups, {MeetingCount} meetings, {PositionCount} positions, {MemberCount} GSR members, {IntergroupCount} intergroup meetings from Unity API",
+            groups.Count, meetings.Count, positions.Count, members.Count, intergroupMeetings.Count);
+
+        return new RegisterData(groups, meetings, positions, members, intergroupMeetings);
     }
 
     // ====================================================================
-    // Mapping: Unity Groups → Local Groups (with Meetings + Gsr attached)
+    // Mapping: Unity Groups → Local Groups (with Meetings + Gsrs attached)
     // ====================================================================
 
     private static List<LocalModels.Group> MapGroups(
@@ -102,16 +117,17 @@ public class UnityApiService : IUnityApiService
         List<UnityModels.Member> unityMembers)
     {
         // Build GSR lookup by home group ID
+        // All GSRs per group (Unity allows multiple GSRs for one group)
         var gsrsByGroupId = unityMembers
             .Where(m => m.IsGsr && m.HomeGroupId.HasValue)
             .GroupBy(m => m.HomeGroupId!.Value)
-            .ToDictionary(g => g.Key, g => g.First());
+            .ToDictionary(g => g.Key, g => g.ToList());
 
         var groups = new List<LocalModels.Group>();
 
         foreach (var unityGroup in unityGroups)
         {
-            gsrsByGroupId.TryGetValue(unityGroup.Id, out var gsr);
+            gsrsByGroupId.TryGetValue(unityGroup.Id, out var gsrs);
 
             var localGroup = new LocalModels.Group
             {
@@ -119,15 +135,19 @@ public class UnityApiService : IUnityApiService
                 Name = unityGroup.Title,
             };
 
-            // Attach GSR member — GroupId resolved by EF via the Group nav property
-            if (gsr != null)
+            // Attach GSR members — GroupId resolved by EF via the Group nav property
+            if (gsrs != null)
             {
-                localGroup.Gsr = new LocalModels.Member
+                foreach (var gsr in gsrs)
                 {
-                    Name = gsr.AnonymousName,
-                    EmailPersonal = gsr.PersonalEmail,
-                    Phone = gsr.MobileNumber,
-                };
+                    localGroup.Gsrs.Add(new LocalModels.Member
+                    {
+                        ID = gsr.Id,
+                        Name = gsr.AnonymousName,
+                        EmailPersonal = gsr.PersonalEmail,
+                        Phone = gsr.MobileNumber,
+                    });
+                }
             }
 
             // Attach meetings — GroupId resolved by EF via the Group nav property
@@ -205,8 +225,32 @@ public class UnityApiService : IUnityApiService
     }
 
     // ====================================================================
-    // Mapping: Unity Positions + Members → Local Positions
+    // Mapping: Unity IntergroupMeetings → Local IntergroupMeetings
     // ====================================================================
+
+    private static List<LocalModels.IntergroupMeeting> MapIntergroupMeetings(
+        List<UnityModels.IntergroupMeeting> unityMeetings)
+    {
+        return unityMeetings.Select(m => new LocalModels.IntergroupMeeting
+        {
+            ID = m.Id,
+            Title = string.IsNullOrWhiteSpace(m.Title) ? null : m.Title,
+            Date = m.Date,
+            GroupAttendeeIds = m.GroupAttendeeIds.Count > 0
+                ? string.Join(",", m.GroupAttendeeIds)
+                : null,
+            GroupAttendeeNames = m.GroupAttendees.Count > 0
+                ? string.Join(", ", m.GroupAttendees.Select(a => a.Name))
+                : null,
+            OfficerAttendeeIds = m.OfficersAttendingIds.Count > 0
+                ? string.Join(",", m.OfficersAttendingIds)
+                : null,
+            OfficerAttendeeNames = m.OfficersAttending.Count > 0
+                ? string.Join(", ", m.OfficersAttending.Select(a => a.Name))
+                : null,
+        }).ToList();
+    }
+
 
     private static List<LocalModels.Position> MapPositions(
         List<UnityModels.Position> unityPositions,

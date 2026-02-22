@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Serilog;
 using System.Threading.Tasks;
@@ -15,22 +15,39 @@ public partial class MainPageViewModel : BaseViewModel
     private const string BaseTitle = "Intergroup Registration";
 
     private readonly IApiQueueService _apiQueueService;
+    private readonly IConfigurationService _configService;
 
-    public MainPageViewModel(IApiQueueService apiQueueService)
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsButtonsEnabled))]
+    private bool isMeetingSelected = false;
+
+    [ObservableProperty]
+    private string activeMeetingDate = string.Empty;
+
+    public bool IsButtonsEnabled => IsMeetingSelected && !IsBusy;
+
+    public MainPageViewModel(IApiQueueService apiQueueService, IConfigurationService configService)
     {
         _apiQueueService = apiQueueService;
+        _configService = configService;
         UpdateTitle();
 
         // Keep the title in sync whenever offline mode is toggled from Settings
         _apiQueueService.PendingCountChanged += (_, _) => UpdateTitle();
     }
 
-    // Called each time the page appears so the title refreshes if the user
-    // changed the offline mode switch on the Settings page and came back.
+    // Called each time the page appears so title and meeting state refresh.
     public override void ApplyQueryAttributes(IDictionary<string, object> query)
     {
         base.ApplyQueryAttributes(query);
         UpdateTitle();
+    }
+
+    public async Task RefreshMeetingStateAsync()
+    {
+        var config = await _configService.LoadUnityConfigurationAsync();
+        IsMeetingSelected = config.ActiveIntergroupMeetingId.HasValue;
+        OnPropertyChanged(nameof(IsButtonsEnabled));
     }
 
     [RelayCommand]

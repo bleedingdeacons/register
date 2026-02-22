@@ -112,6 +112,7 @@ public static class MauiProgram
         builder.Services.AddTransient<MailSettingsPage>();
         builder.Services.AddTransient<MainPage>();
         builder.Services.AddTransient<GroupEditPage>();
+        builder.Services.AddTransient<GroupVerifyPage>();
         builder.Services.AddTransient<DaySelectionPage>();
         builder.Services.AddTransient<TypeSelectionPage>();
         builder.Services.AddTransient<MeetingSelectionPage>();
@@ -124,12 +125,14 @@ public static class MauiProgram
         builder.Services.AddTransient<SettingsPage>();
 
         builder.Services.AddTransient<UnitySettingsPage>();
+        builder.Services.AddTransient<AdminPage>();
 
         // ViewModels        
         builder.Services.AddTransient<MailSettingsViewModel>();
         builder.Services.AddTransient<MainPageViewModel>();
         builder.Services.AddTransient<MeetingSelectionViewModel>();
         builder.Services.AddTransient<EditGroupViewModel>();
+        builder.Services.AddTransient<VerifyGroupViewModel>();
         builder.Services.AddTransient<TypeSelectionViewModel>();
         builder.Services.AddTransient<DaySelectionViewModel>();
         builder.Services.AddTransient<ImportExportViewModel>();
@@ -140,6 +143,7 @@ public static class MauiProgram
         builder.Services.AddTransient<EmailStatusViewModel>();
         builder.Services.AddTransient<SettingsViewModel>();
         builder.Services.AddTransient<UnitySettingsViewModel>();
+        builder.Services.AddTransient<AdminViewModel>();
 
 #if DEBUG
         builder.Services.AddLogging();

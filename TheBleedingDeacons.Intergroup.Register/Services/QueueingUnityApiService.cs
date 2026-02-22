@@ -67,7 +67,7 @@ public sealed class QueueingUnityApiService : IDisposable
     {
         if (!IsOnline())
         {
-            var url = BuildUrl($"intergroup-meetings/{intergroupMeetingId}/register-group");
+            var url = BuildRelativePath($"intergroup-meetings/{intergroupMeetingId}/register-group");
             var payload = Serialize(new
             {
                 member_id = memberId,
@@ -88,7 +88,7 @@ public sealed class QueueingUnityApiService : IDisposable
 
         if (!response.Success && IsTransientError(response))
         {
-            var url = BuildUrl($"intergroup-meetings/{intergroupMeetingId}/register-group");
+            var url = BuildRelativePath($"intergroup-meetings/{intergroupMeetingId}/register-group");
             var payload = Serialize(new
             {
                 member_id = memberId,
@@ -116,7 +116,7 @@ public sealed class QueueingUnityApiService : IDisposable
     {
         if (!IsOnline())
         {
-            var url = BuildUrl($"intergroup-meetings/{intergroupMeetingId}/unregister-group");
+            var url = BuildRelativePath($"intergroup-meetings/{intergroupMeetingId}/unregister-group");
             var payload = Serialize(new { member_id = memberId });
 
             Logger.Information("Device offline – queuing UnregisterAttendee for meeting {Id}", intergroupMeetingId);
@@ -129,7 +129,7 @@ public sealed class QueueingUnityApiService : IDisposable
 
         if (!response.Success && IsTransientError(response))
         {
-            var url = BuildUrl($"intergroup-meetings/{intergroupMeetingId}/unregister-group");
+            var url = BuildRelativePath($"intergroup-meetings/{intergroupMeetingId}/unregister-group");
             var payload = Serialize(new { member_id = memberId });
 
             Logger.Warning("UnregisterAttendee failed ({Code}) – queuing for retry", response.Error?.Code);
@@ -152,7 +152,7 @@ public sealed class QueueingUnityApiService : IDisposable
     {
         if (!IsOnline())
         {
-            var url = BuildUrl($"intergroup-meetings/{intergroupMeetingId}/register-officer");
+            var url = BuildRelativePath($"intergroup-meetings/{intergroupMeetingId}/register-officer");
             var payload = Serialize(new
             {
                 officer_id = officerId,
@@ -171,7 +171,7 @@ public sealed class QueueingUnityApiService : IDisposable
 
         if (!response.Success && IsTransientError(response))
         {
-            var url = BuildUrl($"intergroup-meetings/{intergroupMeetingId}/register-officer");
+            var url = BuildRelativePath($"intergroup-meetings/{intergroupMeetingId}/register-officer");
             var payload = Serialize(new
             {
                 officer_id = officerId,
@@ -197,7 +197,7 @@ public sealed class QueueingUnityApiService : IDisposable
     {
         if (!IsOnline())
         {
-            var url = BuildUrl($"intergroup-meetings/{intergroupMeetingId}/unregister-officer");
+            var url = BuildRelativePath($"intergroup-meetings/{intergroupMeetingId}/unregister-officer");
             var payload = Serialize(new { officer_id = officerId });
 
             Logger.Information("Device offline – queuing UnregisterOfficer for meeting {Id}", intergroupMeetingId);
@@ -210,7 +210,7 @@ public sealed class QueueingUnityApiService : IDisposable
 
         if (!response.Success && IsTransientError(response))
         {
-            var url = BuildUrl($"intergroup-meetings/{intergroupMeetingId}/unregister-officer");
+            var url = BuildRelativePath($"intergroup-meetings/{intergroupMeetingId}/unregister-officer");
             var payload = Serialize(new { officer_id = officerId });
 
             Logger.Warning("UnregisterOfficer failed ({Code}) – queuing for retry", response.Error?.Code);
@@ -231,7 +231,7 @@ public sealed class QueueingUnityApiService : IDisposable
     {
         if (!IsOnline())
         {
-            var url = BuildUrl($"members/{memberId}/update");
+            var url = BuildRelativePath($"members/{memberId}/update");
             var payload = Serialize(request);
 
             Logger.Information("Device offline – queuing UpdateMember for member {Id}", memberId);
@@ -244,7 +244,7 @@ public sealed class QueueingUnityApiService : IDisposable
 
         if (!response.Success && IsTransientError(response))
         {
-            var url = BuildUrl($"members/{memberId}/update");
+            var url = BuildRelativePath($"members/{memberId}/update");
             var payload = Serialize(request);
 
             Logger.Warning("UpdateMember failed ({Code}) – queuing for retry", response.Error?.Code);
@@ -299,13 +299,12 @@ public sealed class QueueingUnityApiService : IDisposable
         return _innerClient;
     }
 
-    private string BuildUrl(string relativeEndpoint)
+    private static string BuildRelativePath(string relativeEndpoint)
     {
-        // Config may not be loaded yet; we store the cached base URL from the last GetClientAsync call.
-        // If that is null we fall back to a relative-only placeholder — the queue processor
-        // rebuilds the full URL from config at flush time anyway (see ApiQueueService).
-        var baseUrl = _cachedBaseUrl?.TrimEnd('/') ?? string.Empty;
-        return $"{baseUrl}/wp-json/integrity/v1/{relativeEndpoint}";
+        // Store only the relative API path in the queue. The full URL is resolved
+        // from current config at flush time by ApiQueueService, preventing stale
+        // base URLs if the user changes Unity settings between enqueue and flush.
+        return $"wp-json/integrity/v1/{relativeEndpoint}";
     }
 
     private static string Serialize(object payload) =>

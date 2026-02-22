@@ -19,5 +19,7 @@ public class GroupConfiguration : IEntityTypeConfiguration<Group>
             .WithOne(m => m.Group)
             .HasForeignKey(m => m.GroupId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        // Gsrs (one-to-many) is configured on MemberConfiguration via WithMany(g => g.Gsrs)
     }
 }

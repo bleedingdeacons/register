@@ -17,5 +17,8 @@ namespace TheBleedingDeacons.Intergroup.Register.Services.Interfaces
         UnityConfiguration GetUnityConfiguration();
         Task SaveUnityConfigurationAsync(UnityConfiguration config);
         Task<UnityConfiguration> LoadUnityConfigurationAsync();
+
+        /// <summary>Persists only the active intergroup meeting ID, leaving all other settings untouched.</summary>
+        Task SaveActiveIntergroupMeetingAsync(int? meetingId);
     }
 }

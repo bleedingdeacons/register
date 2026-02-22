@@ -13,6 +13,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 
         private const string SMTP_PASSWORD_KEY = "smtp_password";
         private const string UNITY_API_KEY = "unity_api_key";
+        private const string UNITY_ACTIVE_MEETING_KEY = "unity_active_meeting_id";
         private readonly IConfiguration _configuration;
         private readonly string _configFilePath;
         private readonly string _unityConfigFilePath;
@@ -128,8 +129,6 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
             if (_cachedUnityConfig != null)
                 return _cachedUnityConfig;
 
-            // Return what we can synchronously (base URL from file, no API key)
-            // Callers needing the API key should use LoadUnityConfigurationAsync
             string baseUrl = "";
 
             if (File.Exists(_unityConfigFilePath))
@@ -155,7 +154,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
             _cachedUnityConfig = new UnityConfiguration
             {
                 BaseUrl = baseUrl,
-                ApiKey = ""
+                ApiKey = "",
             };
 
             return _cachedUnityConfig;
@@ -178,7 +177,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
             {
                 UnitySettings = new
                 {
-                    config.BaseUrl
+                    config.BaseUrl,
                 }
             };
 
@@ -225,13 +224,47 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
                 Logger.Warning(ex, "SecureStorage unavailable for Unity API key");
             }
 
+            int? activeIntergroupMeetingId = null;
+            try
+            {
+                var raw = await SecureStorage.GetAsync(UNITY_ACTIVE_MEETING_KEY);
+                if (int.TryParse(raw, out var parsedId) && parsedId > 0)
+                    activeIntergroupMeetingId = parsedId;
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning(ex, "SecureStorage unavailable for active intergroup meeting ID");
+            }
+
             _cachedUnityConfig = new UnityConfiguration
             {
                 BaseUrl = baseUrl,
-                ApiKey = apiKey
+                ApiKey = apiKey,
+                ActiveIntergroupMeetingId = activeIntergroupMeetingId,
             };
 
             return _cachedUnityConfig;
+        }
+
+        public async Task SaveActiveIntergroupMeetingAsync(int? meetingId)
+        {
+            try
+            {
+                if (meetingId.HasValue && meetingId.Value > 0)
+                    await SecureStorage.SetAsync(UNITY_ACTIVE_MEETING_KEY, meetingId.Value.ToString());
+                else
+                    SecureStorage.Remove(UNITY_ACTIVE_MEETING_KEY);
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning(ex, "SecureStorage unavailable for active intergroup meeting ID");
+            }
+
+            // Keep the in-memory cache consistent
+            if (_cachedUnityConfig != null)
+                _cachedUnityConfig.ActiveIntergroupMeetingId = meetingId;
+
+            Logger.Information("Active intergroup meeting set to {MeetingId}", meetingId?.ToString() ?? "none");
         }
     }
 }

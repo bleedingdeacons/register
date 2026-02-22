@@ -2,11 +2,11 @@ using TheBleedingDeacons.Intergroup.Register.ViewModels;
 
 namespace TheBleedingDeacons.Intergroup.Register.Views;
 
-public partial class MainPage : ContentPage
+public partial class AdminPage : ContentPage
 {
-    private readonly MainPageViewModel _viewModel;
+    private readonly AdminViewModel _viewModel;
 
-    public MainPage(MainPageViewModel viewModel)
+    public AdminPage(AdminViewModel viewModel)
     {
         InitializeComponent();
         BindingContext = _viewModel = viewModel;
@@ -15,6 +15,6 @@ public partial class MainPage : ContentPage
     protected override void OnAppearing()
     {
         base.OnAppearing();
-        _ = _viewModel.RefreshMeetingStateAsync();
+        _ = _viewModel.LoadDataAsync();
     }
 }

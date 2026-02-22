@@ -17,7 +17,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
         {
             _configService = configService;
             // Fire async load - config will populate when ready
-            _ = LoadConfigurationAsync();
+            LoadConfigurationAsync().SafeFireAndForget("LoadUnityConfig");
         }
 
         [ObservableProperty]
@@ -116,7 +116,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
                 var config = new UnityConfiguration
                 {
                     BaseUrl = BaseUrl.Trim().TrimEnd('/'),
-                    ApiKey = ApiKey.Trim()
+                    ApiKey = ApiKey.Trim(),
                 };
 
                 await _configService.SaveUnityConfigurationAsync(config);

@@ -9,6 +9,6 @@ public class Group
     public string? Name { get; set; }
     public List<Meeting> Meetings { get; set; } = new();
 
-    // One-to-one: the GSR for this group
-    public Member? Gsr { get; set; }
+    // One-to-many: a group can have more than one GSR
+    public List<Member> Gsrs { get; set; } = new();
 }

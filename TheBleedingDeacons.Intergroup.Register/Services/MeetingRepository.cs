@@ -51,7 +51,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
                 async () => await _context.Meetings
                     .AsNoTracking()
                     .Include(m => m.Group)
-                        .ThenInclude(g => g.Gsr)
+                        .ThenInclude(g => g.Gsrs)
                     .ToListAsync()
                     .ConfigureAwait(false),
                 GetCacheDuration(15)
@@ -88,32 +88,39 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
                 _context.Entry(existingMeeting).CurrentValues.SetValues(meeting);
                 existingMeeting.Updated = DateTime.Now;
 
-                // Update the GSR Member if present.
-                // CurrentValues.SetValues only copies Meeting scalars, so the related
-                // Member must be updated explicitly.
-                if (meeting.Group?.Gsr != null)
+                // Update GSR Members if present.
+                // CurrentValues.SetValues only copies Meeting scalars, so related
+                // Members must be updated explicitly.
+                // A group can have more than one GSR; each is matched by ID.
+                if (meeting.Group?.Gsrs is { Count: > 0 } incomingGsrs)
                 {
-                    var incomingGsr = meeting.Group.Gsr;
-                    var existingMember = await _context.Members
-                        .FirstOrDefaultAsync(m => m.GroupId == meeting.GroupId)
-                        .ConfigureAwait(false);
-
-                    if (existingMember != null)
+                    foreach (var incomingGsr in incomingGsrs)
                     {
-                        existingMember.Name = incomingGsr.Name;
-                        existingMember.EmailPersonal = incomingGsr.EmailPersonal;
-                        existingMember.Phone = incomingGsr.Phone;
-                    }
-                    else if (meeting.GroupId.HasValue)
-                    {
-                        // No GSR record yet for this group - create one
-                        _context.Members.Add(new Member
+                        if (incomingGsr.ID > 0)
                         {
-                            GroupId = meeting.GroupId.Value,
-                            Name = incomingGsr.Name,
-                            EmailPersonal = incomingGsr.EmailPersonal,
-                            Phone = incomingGsr.Phone,
-                        });
+                            // Existing member — update in place
+                            var existingMember = await _context.Members
+                                .FirstOrDefaultAsync(m => m.ID == incomingGsr.ID)
+                                .ConfigureAwait(false);
+
+                            if (existingMember != null)
+                            {
+                                existingMember.Name = incomingGsr.Name;
+                                existingMember.EmailPersonal = incomingGsr.EmailPersonal;
+                                existingMember.Phone = incomingGsr.Phone;
+                            }
+                        }
+                        else if (meeting.GroupId.HasValue)
+                        {
+                            // New GSR for this group — insert
+                            _context.Members.Add(new Member
+                            {
+                                GroupId = meeting.GroupId.Value,
+                                Name = incomingGsr.Name,
+                                EmailPersonal = incomingGsr.EmailPersonal,
+                                Phone = incomingGsr.Phone,
+                            });
+                        }
                     }
                 }
 
@@ -145,7 +152,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
                 async () => await _context.Meetings
                     .AsNoTracking()
                     .Include(m => m.Group)
-                        .ThenInclude(g => g.Gsr)
+                        .ThenInclude(g => g.Gsrs)
                     .FirstOrDefaultAsync(m => m.ID == id)
                     .ConfigureAwait(false),
                 GetCacheDuration(10)
@@ -161,7 +168,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 
             return await _context.Meetings
                 .Include(m => m.Group)
-                    .ThenInclude(g => g.Gsr)
+                    .ThenInclude(g => g.Gsrs)
                 .FirstOrDefaultAsync(m => m.ID == id)
                 .ConfigureAwait(false);
         }
@@ -180,7 +187,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
                 async () => await _context.Meetings
                     .AsNoTracking()
                     .Include(m => m.Group)
-                        .ThenInclude(g => g.Gsr)
+                        .ThenInclude(g => g.Gsrs)
                     .Where(m => m.Day.ToLower() == normalizedDay)
                     .ToListAsync()
                     .ConfigureAwait(false),

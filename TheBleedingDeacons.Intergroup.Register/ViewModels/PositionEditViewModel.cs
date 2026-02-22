@@ -73,7 +73,7 @@ public partial class PositionEditViewModel : BaseViewModel
                  int.TryParse(positionIdStr, out var positionId))
         {
             // Load position by ID if only ID was passed
-            _ = LoadPositionByIdAsync(positionId);
+            LoadPositionByIdAsync(positionId).SafeFireAndForget("LoadPositionById");
         }
     }
 

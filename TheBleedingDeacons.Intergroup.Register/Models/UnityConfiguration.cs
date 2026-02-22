@@ -6,6 +6,12 @@ namespace TheBleedingDeacons.Intergroup.Register.Models
         public string ApiKey { get; set; } = string.Empty;
 
         /// <summary>
+        /// The ID of the active intergroup meeting for the current session.
+        /// Selected on the Start of Meeting page before each register session.
+        /// </summary>
+        public int? ActiveIntergroupMeetingId { get; set; }
+
+        /// <summary>
         /// Validates the Unity API configuration.
         /// </summary>
         /// <returns>True if configuration is valid, false otherwise.</returns>

@@ -7,7 +7,6 @@ using TheBleedingDeacons.Intergroup.Register.Data;
 using TheBleedingDeacons.Intergroup.Register.Models;
 using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Support;
-
 namespace TheBleedingDeacons.Intergroup.Register.Services;
 
 /// <summary>
@@ -25,7 +24,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services;
 public class ApiQueueService : IApiQueueService, IDisposable
 {
     
-    private const int MaxAttempts = 10;
+    private const int MaxAttempts = ServiceConstants.ApiQueueMaxAttempts;
     private static readonly ILogger Logger = AppLogger.ForContext<ApiQueueService>();
 
     private readonly IDbContextFactory<RegisterContext> _dbFactory;
@@ -43,7 +42,7 @@ public class ApiQueueService : IApiQueueService, IDisposable
         {
             if (Preferences.Default.Get(OfflineModePreferenceKey, false) == value) return;
             Preferences.Default.Set(OfflineModePreferenceKey, value);
-            if (!value) _ = FlushAsync();
+            if (!value) FlushAsync().SafeFireAndForget("OfflineModeDisabled");
         }
     }
 
@@ -65,7 +64,7 @@ public class ApiQueueService : IApiQueueService, IDisposable
         Logger.Information("ApiQueueService started – connectivity monitoring active");
 
         
-        _ = FlushAsync();
+        FlushAsync().SafeFireAndForget("InitialFlush");
     }
 
    
@@ -128,6 +127,7 @@ public class ApiQueueService : IApiQueueService, IDisposable
             }
 
             using var http = CreateHttpClient(config.ApiKey);
+            var baseUrl = config.BaseUrl.TrimEnd('/');
 
             await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
 
@@ -156,7 +156,10 @@ public class ApiQueueService : IApiQueueService, IDisposable
 
                 try
                 {
-                    using var response = await SendAsync(http, entry, cancellationToken);
+                    // Resolve full URL from current config + stored relative path
+                    var resolvedUrl = $"{baseUrl}/{entry.Url.TrimStart('/')}";
+
+                    using var response = await SendAsync(http, entry, resolvedUrl, cancellationToken);
 
                     if (response.IsSuccessStatusCode)
                     {
@@ -268,32 +271,33 @@ public class ApiQueueService : IApiQueueService, IDisposable
     private static async Task<HttpResponseMessage> SendAsync(
         HttpClient http,
         QueuedApiCall entry,
+        string resolvedUrl,
         CancellationToken cancellationToken)
     {
         return entry.HttpMethod switch
         {
             "POST" => await http.PostAsync(
-                entry.Url,
+                resolvedUrl,
                 entry.JsonPayload is null
                     ? null
                     : new StringContent(entry.JsonPayload, Encoding.UTF8, "application/json"),
                 cancellationToken),
 
             "PUT" => await http.PutAsync(
-                entry.Url,
+                resolvedUrl,
                 entry.JsonPayload is null
                     ? null
                     : new StringContent(entry.JsonPayload, Encoding.UTF8, "application/json"),
                 cancellationToken),
 
             "PATCH" => await http.PatchAsync(
-                entry.Url,
+                resolvedUrl,
                 entry.JsonPayload is null
                     ? null
                     : new StringContent(entry.JsonPayload, Encoding.UTF8, "application/json"),
                 cancellationToken),
 
-            "DELETE" => await http.DeleteAsync(entry.Url, cancellationToken),
+            "DELETE" => await http.DeleteAsync(resolvedUrl, cancellationToken),
 
             _ => throw new InvalidOperationException($"Unsupported HTTP method: {entry.HttpMethod}")
         };
@@ -304,7 +308,7 @@ public class ApiQueueService : IApiQueueService, IDisposable
         if (e.NetworkAccess == NetworkAccess.Internet)
         {
             Logger.Information("Connectivity restored – triggering queue flush");
-            _ = FlushAsync();
+            FlushAsync().SafeFireAndForget("ConnectivityRestored");
         }
     }
 
