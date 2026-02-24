@@ -16,8 +16,8 @@ namespace TheBleedingDeacons.Intergroup.Register.Services;
 /// they should fall back to the local SQLite cache via the normal code paths.
 ///
 /// Queued write operations:
-///   • RegisterAttendeeAsync   (intergroup meeting group registration)
-///   • UnregisterAttendeeAsync
+///   • RegisterGroupAsync      (intergroup meeting group registration)
+///   • UnregisterGroupAsync
 ///   • RegisterOfficerAsync    (intergroup meeting officer registration)
 ///   • UnregisterOfficerAsync
 ///   • UpdateMemberAsync
@@ -56,10 +56,10 @@ public sealed class QueueingUnityApiService : IDisposable
     /// Registers a group/GSR as an attendee of an intergroup meeting.
     /// Enqueues the call if the device is offline or the request fails.
     /// </summary>
-    public async Task<ApiResponse<IntergroupMeetingRegistration>> RegisterAttendeeAsync(
+    public async Task<ApiResponse<IntergroupMeetingRegistration>> RegisterGroupAsync(
         int intergroupMeetingId,
+        int groupId,
         int memberId,
-        string meetingGroup,
         string gsrName,
         bool gsrProxy = false,
         string? gsrProxyName = null,
@@ -70,36 +70,36 @@ public sealed class QueueingUnityApiService : IDisposable
             var url = BuildRelativePath($"intergroup-meetings/{intergroupMeetingId}/register-group");
             var payload = Serialize(new
             {
+                group_id = groupId,
                 member_id = memberId,
-                meeting_group = meetingGroup,
                 gsr_name = gsrName,
                 gsr_proxy = gsrProxy,
                 gsr_proxy_name = gsrProxyName ?? string.Empty
             });
 
-            Logger.Information("Device offline – queuing RegisterAttendee for meeting {Id}", intergroupMeetingId);
-            await _queue.EnqueueAsync("RegisterAttendee", url, "POST", payload, cancellationToken);
+            Logger.Information("Device offline – queuing RegisterGroup for meeting {Id}", intergroupMeetingId);
+            await _queue.EnqueueAsync("RegisterGroup", url, "POST", payload, cancellationToken);
             return OfflineQueued<IntergroupMeetingRegistration>();
         }
 
         var client = await GetClientAsync();
-        var response = await client.RegisterAttendeeAsync(
-            intergroupMeetingId, memberId, meetingGroup, gsrName, gsrProxy, gsrProxyName, cancellationToken);
+        var response = await client.RegisterGroupAsync(
+            intergroupMeetingId, groupId, memberId, gsrName, gsrProxy, gsrProxyName, cancellationToken);
 
         if (!response.Success && IsTransientError(response))
         {
             var url = BuildRelativePath($"intergroup-meetings/{intergroupMeetingId}/register-group");
             var payload = Serialize(new
             {
+                group_id = groupId,
                 member_id = memberId,
-                meeting_group = meetingGroup,
                 gsr_name = gsrName,
                 gsr_proxy = gsrProxy,
                 gsr_proxy_name = gsrProxyName ?? string.Empty
             });
 
-            Logger.Warning("RegisterAttendee failed ({Code}) – queuing for retry", response.Error?.Code);
-            await _queue.EnqueueAsync("RegisterAttendee", url, "POST", payload, cancellationToken);
+            Logger.Warning("RegisterGroup failed ({Code}) – queuing for retry", response.Error?.Code);
+            await _queue.EnqueueAsync("RegisterGroup", url, "POST", payload, cancellationToken);
         }
 
         return response;
@@ -109,31 +109,31 @@ public sealed class QueueingUnityApiService : IDisposable
     /// Unregisters a group/GSR from an intergroup meeting.
     /// Enqueues the call if the device is offline or the request fails.
     /// </summary>
-    public async Task<ApiResponse<IntergroupMeetingRegistration>> UnregisterAttendeeAsync(
+    public async Task<ApiResponse<IntergroupMeetingRegistration>> UnregisterGroupAsync(
         int intergroupMeetingId,
-        int memberId,
+        int groupId,
         CancellationToken cancellationToken = default)
     {
         if (!IsOnline())
         {
             var url = BuildRelativePath($"intergroup-meetings/{intergroupMeetingId}/unregister-group");
-            var payload = Serialize(new { member_id = memberId });
+            var payload = Serialize(new { group_id = groupId });
 
-            Logger.Information("Device offline – queuing UnregisterAttendee for meeting {Id}", intergroupMeetingId);
-            await _queue.EnqueueAsync("UnregisterAttendee", url, "POST", payload, cancellationToken);
+            Logger.Information("Device offline – queuing UnregisterGroup for meeting {Id}", intergroupMeetingId);
+            await _queue.EnqueueAsync("UnregisterGroup", url, "POST", payload, cancellationToken);
             return OfflineQueued<IntergroupMeetingRegistration>();
         }
 
         var client = await GetClientAsync();
-        var response = await client.UnregisterAttendeeAsync(intergroupMeetingId, memberId, cancellationToken);
+        var response = await client.UnregisterGroupAsync(intergroupMeetingId, groupId, cancellationToken);
 
         if (!response.Success && IsTransientError(response))
         {
             var url = BuildRelativePath($"intergroup-meetings/{intergroupMeetingId}/unregister-group");
-            var payload = Serialize(new { member_id = memberId });
+            var payload = Serialize(new { group_id = groupId });
 
-            Logger.Warning("UnregisterAttendee failed ({Code}) – queuing for retry", response.Error?.Code);
-            await _queue.EnqueueAsync("UnregisterAttendee", url, "POST", payload, cancellationToken);
+            Logger.Warning("UnregisterGroup failed ({Code}) – queuing for retry", response.Error?.Code);
+            await _queue.EnqueueAsync("UnregisterGroup", url, "POST", payload, cancellationToken);
         }
 
         return response;

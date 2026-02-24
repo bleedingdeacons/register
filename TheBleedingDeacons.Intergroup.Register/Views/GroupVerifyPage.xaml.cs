@@ -26,7 +26,7 @@ public partial class GroupVerifyPage : ContentPage, IQueryAttributable
         base.OnAppearing();
 
         System.Diagnostics.Debug.WriteLine("=== GroupVerifyPage OnAppearing ===");
-        System.Diagnostics.Debug.WriteLine($"Meeting is null: {_viewModel.Meeting == null}");
+        System.Diagnostics.Debug.WriteLine($"Group is null: {_viewModel.Group == null}");
         System.Diagnostics.Debug.WriteLine($"CanRegister: {_viewModel.CanRegister}");
     }
 }

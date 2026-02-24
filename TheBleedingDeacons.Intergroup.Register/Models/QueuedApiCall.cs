@@ -1,4 +1,5 @@
 ﻿using System;
+using TheBleedingDeacons.Intergroup.Register.Services;
 
 namespace TheBleedingDeacons.Intergroup.Register.Models;
 
@@ -10,7 +11,7 @@ public class QueuedApiCall
 {
     public int Id { get; set; }
 
-    /// <summary>Discriminator so callers know what to do with the response (e.g. "RegisterAttendee").</summary>
+    /// <summary>Discriminator so callers know what to do with the response (e.g. "RegisterGroup").</summary>
     public required string OperationType { get; set; }
 
     /// <summary>

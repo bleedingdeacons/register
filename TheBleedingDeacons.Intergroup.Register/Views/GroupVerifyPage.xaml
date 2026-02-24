@@ -54,8 +54,13 @@
         <ScrollView IsVisible="{Binding IsLoading, Converter={StaticResource InvertedBoolConverter}}">
             <StackLayout Padding="20" Spacing="10">
 
-                <Label Text="Group Service Representative" 
+                <!-- Group Name -->
+                <Label Text="{Binding Group.Name}"
                        Style="{StaticResource HeaderLabelStyle}"/>
+
+                <Label Text="Group Service Representative"
+                       Style="{StaticResource FieldLabelStyle}"
+                       Margin="0,0,0,10"/>
 
                 <!-- GSR Name (Read-only) -->
                 <Label Text="Name" Style="{StaticResource FieldLabelStyle}"/>

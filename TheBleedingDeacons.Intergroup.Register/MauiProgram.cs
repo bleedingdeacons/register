@@ -105,7 +105,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<IApiQueueService, ApiQueueService>();
 
         // ADDED: decorator that adds offline/retry queuing to Unity write operations
-        // (RegisterAttendee, RegisterOfficer, UpdateMember, and their Unregister twins).
+        // (RegisterGroupAsync, RegisterOfficer, UpdateMember, and their Unregister twins).
         builder.Services.AddScoped<QueueingUnityApiService>();
 
         // Views

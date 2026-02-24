@@ -11,142 +11,114 @@
 
     <ContentPage.Resources>
         <ResourceDictionary>
-            <!-- Styles -->
-            <Style x:Key="HeaderLabelStyle" TargetType="Label">
-                <Setter Property="FontSize" Value="24"/>
-                <Setter Property="FontAttributes" Value="Bold"/>
-                <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"/>
-                <Setter Property="Margin" Value="0,0,0,10"/>
-            </Style>
-
-            <Style x:Key="FieldLabelStyle" TargetType="Label">
-                <Setter Property="FontSize" Value="20"/>
-                <Setter Property="FontAttributes" Value="Bold"/>
-                <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}"/>
-                <Setter Property="Margin" Value="0,0,0,5"/>
-            </Style>
-
-            <Style x:Key="ValueLabelStyle" TargetType="Label">
-                <Setter Property="FontSize" Value="20"/>
-                <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"/>
-                <Setter Property="Margin" Value="0,0,0,15"/>
-            </Style>
-
             <Style x:Key="EditFieldLabelStyle" TargetType="Label">
                 <Setter Property="FontAttributes" Value="Bold"/>
                 <Setter Property="FontSize" Value="24"/>
                 <Setter Property="TextColor" Value="{AppThemeBinding Light=Black, Dark=White}"/>
             </Style>
 
-            <!-- Converters -->
             <toolkit:InvertedBoolConverter x:Key="InvertedBoolConverter" />
-            <converters:ObscurePhoneNumberConverter x:Key="ObscurePhoneNumber" />
         </ResourceDictionary>
     </ContentPage.Resources>
 
     <ContentPage.Behaviors>
-        <toolkit:StatusBarBehavior StatusBarColor="{AppThemeBinding Light=White, Dark=Black}" 
+        <toolkit:StatusBarBehavior StatusBarColor="{AppThemeBinding Light=White, Dark=Black}"
                                    StatusBarStyle="{AppThemeBinding Light=DarkContent, Dark=LightContent}" />
     </ContentPage.Behaviors>
 
     <Grid>
         <!-- Loading Indicator -->
-        <ActivityIndicator IsVisible="{Binding IsLoading}" 
-                          IsRunning="{Binding IsLoading}"
-                          HorizontalOptions="Center"
-                          VerticalOptions="Center"
-                          Scale="1.5"
-                          Color="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"/>
+        <ActivityIndicator IsVisible="{Binding IsLoading}"
+                           IsRunning="{Binding IsLoading}"
+                           HorizontalOptions="Center"
+                           VerticalOptions="Center"
+                           Scale="1.5"
+                           Color="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"/>
 
         <!-- Main Content -->
         <ScrollView IsVisible="{Binding IsLoading, Converter={StaticResource InvertedBoolConverter}}">
             <StackLayout Padding="20" Spacing="20">
 
-                <!-- EDIT MODE - Editable fields with Save/Cancel buttons -->
-                <StackLayout x:Name="EditModeContent"
-                            Spacing="20">
+                <!-- Header -->
+                <Label Text="{Binding Title}"
+                       FontSize="24"
+                       FontAttributes="Bold"
+                       HorizontalOptions="Center"
+                       Margin="0,0,0,10" />
 
-                    <!-- Header -->
-                    <Label Text="{Binding Title}"
+                <!-- GSR Name Field -->
+                <StackLayout Spacing="5">
+                    <Label Text="Name"
+                           Style="{StaticResource EditFieldLabelStyle}" />
+                    <controls:ClearableEntry x:Name="GsrNameEntry"
+                           Text="{Binding GsrName, Mode=TwoWay}"
+                           Placeholder="Tap to enter your name..."
                            FontSize="24"
-                           FontAttributes="Bold"
-                           HorizontalOptions="Center"
-                           Margin="0,0,0,10" />
-
-                    <!-- GSR Name Field (Editable) -->
-                    <StackLayout Spacing="5">
-                        <Label Text="Name" 
-                               Style="{StaticResource EditFieldLabelStyle}" />
-                        <controls:ClearableEntry x:Name="GsrNameEntry"
-                               Text="{Binding GsrName, Mode=TwoWay}"                           
-                               Placeholder="Tap to enter your name..."
-                               FontSize="24"
-                               BackgroundColor="{AppThemeBinding Light=White, Dark=#2D2D30}"
-                               TextColor="{AppThemeBinding Light=Black, Dark=White}"
-                               PlaceholderColor="{AppThemeBinding Light=Gray, Dark=LightGray}"/>
-                        <Label Text="{Binding GsrNameError}" 
-                               TextColor="Red" 
-                               FontSize="14"
-                               IsVisible="{Binding HasGsrNameError}" />
-                    </StackLayout>
-
-                    <!-- GSR Phone Field (Editable) -->
-                    <StackLayout Spacing="5">
-                        <Label Text="Mobile Phone" 
-                               Style="{StaticResource EditFieldLabelStyle}" />
-                        <controls:ClearableEntry x:Name="GsrPhoneEntry"
-                               Text="{Binding GsrPhone, Mode=TwoWay}"
-                               FontSize="24"
-                               Placeholder="Tap to enter phone number..."
-                               Keyboard="Telephone"
-                               BackgroundColor="{AppThemeBinding Light=White, Dark=#2D2D30}"
-                               TextColor="{AppThemeBinding Light=Black, Dark=White}"
-                               PlaceholderColor="{AppThemeBinding Light=Gray, Dark=LightGray}" />
-                        <Label Text="{Binding GsrPhoneError}" 
-                               TextColor="Red" 
-                               FontSize="14"
-                               IsVisible="{Binding HasGsrPhoneError}" />
-                    </StackLayout>
-
-                    <!-- GSR Email Field (Editable) -->
-                    <StackLayout Spacing="5">
-                        <Label Text="Personal Email" 
-                               Style="{StaticResource EditFieldLabelStyle}" />
-                        <controls:ClearableEntry x:Name="GsrEmailEntry"
-                               Text="{Binding GsrEmailPersonal, Mode=TwoWay}"
-                               Placeholder="Tap to enter email address..."
-                               FontSize="24"
-                               Keyboard="Email"
-                               BackgroundColor="{AppThemeBinding Light=White, Dark=#2D2D30}"
-                               TextColor="{AppThemeBinding Light=Black, Dark=White}"
-                               PlaceholderColor="{AppThemeBinding Light=Gray, Dark=LightGray}" />
-                        <Label Text="{Binding GsrEmailError}" 
-                               TextColor="Red" 
-                               FontSize="14"
-                               IsVisible="{Binding HasGsrEmailError}" />
-                    </StackLayout>
-
-                    <!-- Edit Mode Action Buttons -->
-                    <Grid ColumnSpacing="15" Margin="0,10,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-
-                        <Button Grid.Column="0"
-                                Style="{StaticResource PrimaryButtonStyle}"
-                                Text="Cancel"
-                                BackgroundColor="{AppThemeBinding Light=#6C757D, Dark=#495057}"
-                                Command="{Binding CancelCommand}" 
-                                HeightRequest="120" />
-
-                        <Button Grid.Column="1"
-                                Style="{StaticResource PrimaryButtonStyle}"
-                                Text="{Binding SaveButtonText}"
-                                Command="{Binding SaveCommand}" 
-                                HeightRequest="120" />
-                    </Grid>
+                           BackgroundColor="{AppThemeBinding Light=White, Dark=#2D2D30}"
+                           TextColor="{AppThemeBinding Light=Black, Dark=White}"
+                           PlaceholderColor="{AppThemeBinding Light=Gray, Dark=LightGray}"/>
+                    <Label Text="{Binding GsrNameError}"
+                           TextColor="Red"
+                           FontSize="14"
+                           IsVisible="{Binding HasGsrNameError}" />
                 </StackLayout>
+
+                <!-- GSR Phone Field -->
+                <StackLayout Spacing="5">
+                    <Label Text="Mobile Phone"
+                           Style="{StaticResource EditFieldLabelStyle}" />
+                    <controls:ClearableEntry x:Name="GsrPhoneEntry"
+                           Text="{Binding GsrPhone, Mode=TwoWay}"
+                           FontSize="24"
+                           Placeholder="Tap to enter phone number..."
+                           Keyboard="Telephone"
+                           BackgroundColor="{AppThemeBinding Light=White, Dark=#2D2D30}"
+                           TextColor="{AppThemeBinding Light=Black, Dark=White}"
+                           PlaceholderColor="{AppThemeBinding Light=Gray, Dark=LightGray}" />
+                    <Label Text="{Binding GsrPhoneError}"
+                           TextColor="Red"
+                           FontSize="14"
+                           IsVisible="{Binding HasGsrPhoneError}" />
+                </StackLayout>
+
+                <!-- GSR Email Field -->
+                <StackLayout Spacing="5">
+                    <Label Text="Personal Email"
+                           Style="{StaticResource EditFieldLabelStyle}" />
+                    <controls:ClearableEntry x:Name="GsrEmailEntry"
+                           Text="{Binding GsrEmailPersonal, Mode=TwoWay}"
+                           Placeholder="Tap to enter email address..."
+                           FontSize="24"
+                           Keyboard="Email"
+                           BackgroundColor="{AppThemeBinding Light=White, Dark=#2D2D30}"
+                           TextColor="{AppThemeBinding Light=Black, Dark=White}"
+                           PlaceholderColor="{AppThemeBinding Light=Gray, Dark=LightGray}" />
+                    <Label Text="{Binding GsrEmailError}"
+                           TextColor="Red"
+                           FontSize="14"
+                           IsVisible="{Binding HasGsrEmailError}" />
+                </StackLayout>
+
+                <!-- Action Buttons -->
+                <Grid ColumnSpacing="15" Margin="0,10,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Button Grid.Column="0"
+                            Style="{StaticResource PrimaryButtonStyle}"
+                            Text="Cancel"
+                            BackgroundColor="{AppThemeBinding Light=#6C757D, Dark=#495057}"
+                            Command="{Binding CancelCommand}"
+                            HeightRequest="120" />
+
+                    <Button Grid.Column="1"
+                            Style="{StaticResource PrimaryButtonStyle}"
+                            Text="{Binding SaveButtonText}"
+                            Command="{Binding SaveCommand}"
+                            HeightRequest="120" />
+                </Grid>
 
             </StackLayout>
         </ScrollView>

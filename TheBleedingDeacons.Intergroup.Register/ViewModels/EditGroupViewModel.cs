@@ -1,22 +1,19 @@
 using System.ComponentModel.DataAnnotations;
-using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Serilog;
+using TheBleedingDeacons.Intergroup.Register.Data;
 using TheBleedingDeacons.Intergroup.Register.Models;
-using TheBleedingDeacons.Intergroup.Register.Services;
 using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Support;
 
 namespace TheBleedingDeacons.Intergroup.Register.ViewModels;
 
 /// <summary>
-/// Handles the editable GSR information form for a meeting group.
-/// Receives a <see cref="Meeting"/> object from navigation, allows editing
-/// GSR name/phone/email, validates input, and saves back to the database.
-///
-/// A group can have more than one GSR. Navigation may optionally pass a
-/// <c>member</c> to edit an existing GSR, or omit it to create a new one.
+/// Handles the editable GSR information form for a group.
+/// Receives a <see cref="Group"/> object from navigation (extracted from the
+/// selected meeting's Group nav property), allows editing the primary GSR's
+/// name / phone / email, and saves directly to the Members table.
 ///
 /// Separated from the verify flow (see <see cref="VerifyGroupViewModel"/>)
 /// so each ViewModel handles a single responsibility (ARCH-002).
@@ -25,16 +22,13 @@ public partial class EditGroupViewModel : BaseViewModel
 {
     private static readonly ILogger Logger = AppLogger.ForContext<EditGroupViewModel>();
 
-    // Services
-    private readonly DataService _dataService;
-    private readonly IMeetingRepository _meetingRepository;
+    private readonly RegisterContext _context;
     private readonly IPopupNotification _popupService;
 
-    // Meeting Properties
-    [ObservableProperty]
-    private Meeting? meeting;
+    // The group whose primary GSR is being edited
+    private Group? _group;
 
-    // The specific GSR being edited (null = creating a new one for the group)
+    // The specific GSR member being edited (null = creating a new one)
     private Member? _editingMember;
 
     // GSR Edit Properties
@@ -80,12 +74,10 @@ public partial class EditGroupViewModel : BaseViewModel
     private bool hasGsrEmailError;
 
     public EditGroupViewModel(
-        DataService dataService,
-        IMeetingRepository meetingRepository,
+        RegisterContext context,
         IPopupNotification popupService)
     {
-        _dataService = dataService;
-        _meetingRepository = meetingRepository;
+        _context = context;
         _popupService = popupService;
 
         ValidateForm();
@@ -97,38 +89,22 @@ public partial class EditGroupViewModel : BaseViewModel
     {
         Logger.Information("EditGroupViewModel.ApplyQueryAttributes called with {Count} parameters", query.Count);
 
-        // Handle meeting object passed from VerifyGroupViewModel
-        if (query.ContainsKey("meeting") && query["meeting"] is Meeting meeting)
+        if (query.TryGetValue("group", out var groupObj) && groupObj is Group group)
         {
-            Meeting = meeting;
-            Logger.Information("Edit mode: received Meeting {MeetingName}", meeting.Name);
-        }
+            _group = group;
+            _editingMember = group.Gsrs.FirstOrDefault();
 
-        // Optionally receive the specific GSR member to edit.
-        // If not supplied a new Member will be created for the group on save.
-        if (query.ContainsKey("member") && query["member"] is Member member)
-        {
-            _editingMember = member;
-            Logger.Information("Edit mode: editing existing GSR member ID {MemberId}", member.ID);
-        }
-        else
-        {
-            _editingMember = null;
+            Logger.Information("Edit mode: group {GroupName}, GSR member ID {MemberId}",
+                group.Name, _editingMember?.ID);
+
+            PopulateFields();
+            UpdateTitle();
         }
     }
 
     #endregion
 
     #region Property Change Handlers
-
-    partial void OnMeetingChanged(Meeting? value)
-    {
-        if (value != null)
-        {
-            LoadMeetingData();
-            UpdateTitle();
-        }
-    }
 
     partial void OnGsrNameChanged(string? value)
     {
@@ -184,41 +160,49 @@ public partial class EditGroupViewModel : BaseViewModel
             return;
         }
 
+        if (_group == null)
+        {
+            Logger.Warning("Save called but _group is null");
+            return;
+        }
+
         try
         {
             IsLoading = true;
 
-            if (Meeting?.Group != null)
+            if (_editingMember != null && _editingMember.ID > 0)
             {
-                if (_editingMember != null)
+                // Update the existing tracked member directly
+                var tracked = await _context.Members.FindAsync(_editingMember.ID);
+                if (tracked != null)
                 {
-                    // Update the specific GSR member being edited
-                    _editingMember.Name = GsrName?.Trim();
-                    _editingMember.Phone = string.IsNullOrWhiteSpace(GsrPhone) ? string.Empty : GsrPhone.Trim();
-                    _editingMember.EmailPersonal = string.IsNullOrWhiteSpace(GsrEmailPersonal) ? string.Empty : GsrEmailPersonal.Trim();
+                    tracked.Name = GsrName?.Trim();
+                    tracked.Phone = GsrPhone?.Trim() ?? string.Empty;
+                    tracked.EmailPersonal = GsrEmailPersonal?.Trim() ?? string.Empty;
                 }
-                else
-                {
-                    // No existing GSR selected — add a new one to the group
-                    var newGsr = new Member
-                    {
-                        GroupId = Meeting.Group.ID,
-                        Name = GsrName?.Trim(),
-                        Phone = string.IsNullOrWhiteSpace(GsrPhone) ? string.Empty : GsrPhone.Trim(),
-                        EmailPersonal = string.IsNullOrWhiteSpace(GsrEmailPersonal) ? string.Empty : GsrEmailPersonal.Trim(),
-                    };
-                    Meeting.Group.Gsrs.Add(newGsr);
-                    _editingMember = newGsr;
-                }
-
-                await SaveToDatabase(Meeting);
-
-                HasUnsavedChanges = false;
-                await Shell.Current.GoToAsync($"..?edited=true");
             }
+            else
+            {
+                // No GSR on record — insert a new one for this group
+                var newGsr = new Member
+                {
+                    GroupId = _group.ID,
+                    Name = GsrName?.Trim(),
+                    Phone = GsrPhone?.Trim() ?? string.Empty,
+                    EmailPersonal = GsrEmailPersonal?.Trim() ?? string.Empty,
+                };
+                _context.Members.Add(newGsr);
+                _editingMember = newGsr;
+            }
+
+            await _context.SaveChangesAsync();
+
+            HasUnsavedChanges = false;
+            await Shell.Current.GoToAsync($"..?edited=true");
         }
         catch (Exception ex)
         {
+            Logger.Error(ex, "Failed to save GSR information");
             await Shell.Current.DisplayAlert("Error", $"Failed to save GSR information: {ex.Message}", "OK");
         }
         finally
@@ -249,33 +233,17 @@ public partial class EditGroupViewModel : BaseViewModel
 
     #region Private Methods
 
-    private void LoadMeetingData()
+    private void PopulateFields()
     {
-        if (Meeting == null) return;
-
-        // Populate fields from the member being edited, or leave blank for a new GSR
         GsrName = _editingMember?.Name;
         GsrPhone = _editingMember?.Phone;
         GsrEmailPersonal = _editingMember?.EmailPersonal;
-
         HasUnsavedChanges = false;
     }
 
     private void UpdateTitle()
     {
-        if (Meeting != null && !string.IsNullOrEmpty(Meeting.Name))
-        {
-            Title = Meeting.Name;
-        }
-        else
-        {
-            Title = "Group Service Representative";
-        }
-    }
-
-    private async Task SaveToDatabase(Meeting meeting)
-    {
-        await _meetingRepository.SaveMeetingAsync(meeting);
+        Title = !string.IsNullOrEmpty(_group?.Name) ? _group!.Name : "Edit GSR Information";
     }
 
     #endregion
@@ -287,13 +255,9 @@ public partial class EditGroupViewModel : BaseViewModel
         ClearGsrNameError();
 
         if (string.IsNullOrWhiteSpace(GsrName))
-        {
             SetGsrNameError("Your Name is required.");
-        }
         else if (GsrName.Trim().Length > 255)
-        {
             SetGsrNameError("Your Name cannot exceed 255 characters.");
-        }
     }
 
     private void ValidateGsrPhone()
@@ -303,13 +267,9 @@ public partial class EditGroupViewModel : BaseViewModel
         if (!string.IsNullOrWhiteSpace(GsrPhone))
         {
             if (GsrPhone.Trim().Length > 20)
-            {
                 SetGsrPhoneError("Phone number cannot exceed 20 characters.");
-            }
             else if (!IsValidPhoneFormat(GsrPhone.Trim()))
-            {
                 SetGsrPhoneError("Please check the phone number is valid.");
-            }
         }
     }
 
@@ -320,13 +280,9 @@ public partial class EditGroupViewModel : BaseViewModel
         if (!string.IsNullOrWhiteSpace(GsrEmailPersonal))
         {
             if (GsrEmailPersonal.Trim().Length > 255)
-            {
                 SetGsrEmailError("Email address cannot exceed 255 characters.");
-            }
             else if (!IsValidEmail(GsrEmailPersonal.Trim()))
-            {
                 SetGsrEmailError("Please check the email address is correct.");
-            }
         }
     }
 
@@ -342,15 +298,11 @@ public partial class EditGroupViewModel : BaseViewModel
 
     private void CheckForUnsavedChanges()
     {
-        if (Meeting == null)
-        {
-            HasUnsavedChanges = false;
-            return;
-        }
+        if (_group == null) { HasUnsavedChanges = false; return; }
 
         HasUnsavedChanges = _editingMember?.Name != GsrName?.Trim() ||
-                           _editingMember?.Phone != GsrPhone?.Trim() ||
-                           _editingMember?.EmailPersonal != GsrEmailPersonal?.Trim();
+                            _editingMember?.Phone != GsrPhone?.Trim() ||
+                            _editingMember?.EmailPersonal != GsrEmailPersonal?.Trim();
     }
 
     private void SetGsrNameError(string error) { GsrNameError = error; HasGsrNameError = true; }
@@ -360,21 +312,17 @@ public partial class EditGroupViewModel : BaseViewModel
     private void SetGsrEmailError(string error) { GsrEmailError = error; HasGsrEmailError = true; }
     private void ClearGsrEmailError() { GsrEmailError = null; HasGsrEmailError = false; }
 
-    private bool IsValidEmail(string email)
+    private static bool IsValidEmail(string email)
     {
-        try
-        {
-            var emailAttribute = new EmailAddressAttribute();
-            return emailAttribute.IsValid(email);
-        }
+        try { return new EmailAddressAttribute().IsValid(email); }
         catch { return false; }
     }
 
-    private bool IsValidPhoneFormat(string phone)
+    private static bool IsValidPhoneFormat(string phone)
     {
         if (string.IsNullOrWhiteSpace(phone)) return false;
-        var digitsOnly = new string(phone.Where(char.IsDigit).ToArray());
-        return digitsOnly.Length >= 7 && digitsOnly.Length <= 15;
+        var digits = new string(phone.Where(char.IsDigit).ToArray());
+        return digits.Length >= 7 && digits.Length <= 15;
     }
 
     #endregion

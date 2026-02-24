@@ -91,18 +91,18 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
                     ? entity.ProxyName ?? string.Empty
                     : entity.Group?.Gsrs.FirstOrDefault()?.Name ?? string.Empty;
 
-                // Unity register-group requires the member ID of the GSR on record.
-                // A proxy attends on behalf of the same group slot.
+                // Unity register-group requires the group ID (group CPT post ID).
+                var groupId = entity.Group?.ID ?? 0;
+
+                // Member ID of the GSR on record (optional, for the attendance record).
                 var memberId = entity.Group?.Gsrs.FirstOrDefault()?.ID ?? 0;
 
-                if (memberId > 0)
+                if (groupId > 0)
                 {
-                    var meetingGroup = entity.Group?.Name ?? entity.Name ?? string.Empty;
-
-                    var response = await _unityApiService.RegisterAttendeeAsync(
+                    var response = await _unityApiService.RegisterGroupAsync(
                         intergroupMeetingId: config.ActiveIntergroupMeetingId.Value,
+                        groupId: groupId,
                         memberId: memberId,
-                        meetingGroup: meetingGroup,
                         gsrName: registeredGsrName,
                         gsrProxy: isProxy,
                         gsrProxyName: isProxy ? entity.ProxyName : null);
@@ -117,7 +117,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
                 else
                 {
                     Logger.Warning(
-                        "Meeting {MeetingName} has no GSR with a Unity member ID — skipping API registration",
+                        "Meeting {MeetingName} has no group ID — skipping API registration",
                         entity.Name);
                 }
             }
@@ -165,13 +165,13 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
             var config = await _configService.LoadUnityConfigurationAsync();
             if (config.ActiveIntergroupMeetingId.HasValue && config.IsValid())
             {
-                var memberId = entity.Group?.Gsrs.FirstOrDefault()?.ID ?? 0;
+                var groupId = entity.Group?.ID ?? 0;
 
-                if (memberId > 0)
+                if (groupId > 0)
                 {
-                    var response = await _unityApiService.UnregisterAttendeeAsync(
+                    var response = await _unityApiService.UnregisterGroupAsync(
                         intergroupMeetingId: config.ActiveIntergroupMeetingId.Value,
-                        memberId: memberId);
+                        groupId: groupId);
 
                     if (response.Success)
                         Logger.Information("Meeting {MeetingName} group attendance unregistered with Unity API", entity.Name);
@@ -183,7 +183,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
                 else
                 {
                     Logger.Warning(
-                        "Meeting {MeetingName} has no GSR with a Unity member ID — skipping API unregistration",
+                        "Meeting {MeetingName} has no group ID — skipping API unregistration",
                         entity.Name);
                 }
             }

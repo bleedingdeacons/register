@@ -111,8 +111,14 @@ public partial class MeetingSelectionViewModel : BaseViewModel
     {
         if (meeting == null) return;
 
+        if (meeting.GroupId == null || meeting.GroupId <= 0)
+        {
+            await Shell.Current.DisplayAlert("Error", "This meeting has no associated group.", "OK");
+            return;
+        }
+
         var parameters = new Dictionary<string, object> {
-                {"groupId", meeting.ID.ToString()} };
+                {"groupId", meeting.GroupId.Value.ToString()} };
 
         await Shell.Current.GoToAsync(nameof(GroupVerifyPage), parameters);
     }
