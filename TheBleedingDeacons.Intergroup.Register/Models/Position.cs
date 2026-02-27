@@ -7,6 +7,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Models;
 public class Position
 {
     public int ID { get; set; }
+    public int? MemberId { get; set; }
     public string? PositionName { get; set; }
     public string? PositionLongName { get; set; }
     public string? PositionGenericEmail { get; set; }

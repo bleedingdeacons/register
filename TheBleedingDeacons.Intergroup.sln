@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheBleedingDeacons.Unity.Cl
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheBleedingDeacons.Unity.Models", "..\..\..\Users\David\Local Sites\unity-dev\app\public\wp-content\plugins\integrity\sharp\TheBleedingDeacons.Unity.Models\TheBleedingDeacons.Unity.Models.csproj", "{5EB18989-9921-9119-8002-5946DD0D09DC}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheBleedingDeacons.Unity.Tests", "..\..\..\Users\David\Local Sites\unity-dev\app\public\wp-content\plugins\integrity\sharp\TheBleedingDeacons.Unity.Tests\TheBleedingDeacons.Unity.Tests.csproj", "{C7C72F39-7B76-A5A7-C03F-7B178A810B74}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -28,6 +30,10 @@ Global
 		{5EB18989-9921-9119-8002-5946DD0D09DC}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5EB18989-9921-9119-8002-5946DD0D09DC}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5EB18989-9921-9119-8002-5946DD0D09DC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C7C72F39-7B76-A5A7-C03F-7B178A810B74}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C7C72F39-7B76-A5A7-C03F-7B178A810B74}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C7C72F39-7B76-A5A7-C03F-7B178A810B74}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C7C72F39-7B76-A5A7-C03F-7B178A810B74}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

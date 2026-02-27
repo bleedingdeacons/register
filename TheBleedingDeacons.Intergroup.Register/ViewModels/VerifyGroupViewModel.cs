@@ -1,4 +1,5 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using System.Collections.ObjectModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
@@ -15,11 +16,11 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels;
 /// Handles the read-only verification and registration flow for a meeting group.
 /// The user confirms their GSR details are correct (Yes) or navigates to edit them (No).
 ///
+/// Displays ALL active GSRs for the group as a member-centric list, filtering out
+/// any members that have been marked for deletion.
+///
 /// Receives a groupId from navigation and loads the Group (with Meetings + GSRs)
 /// directly, so verify/edit always operate on the group rather than a specific meeting.
-///
-/// Split from EditGroupViewModel (ARCH-002) to separate verify (read-only Yes/No)
-/// from edit (editable form) concerns.
 /// </summary>
 [QueryProperty(nameof(GroupId), "groupId")]
 [QueryProperty(nameof(Edited), "edited")]
@@ -59,10 +60,21 @@ public partial class VerifyGroupViewModel : BaseViewModel
     private bool isLoading;
 
     /// <summary>
-    /// The primary GSR for the selected group.
-    /// Exposed as a flat property so XAML can bind without indexer syntax.
+    /// Active (non-deleted) GSR members for the group, displayed as a list.
     /// </summary>
-    public Member? PrimaryGsr => Group?.Gsrs.FirstOrDefault();
+    public ObservableCollection<Member> ActiveGsrs { get; } = new();
+
+    /// <summary>
+    /// True when the group has at least one active GSR to display.
+    /// </summary>
+    [ObservableProperty]
+    private bool hasActiveGsrs;
+
+    /// <summary>
+    /// Descriptive text showing how many GSRs are registered for this group.
+    /// </summary>
+    [ObservableProperty]
+    private string gsrCountText = string.Empty;
 
     public VerifyGroupViewModel(
         IAttendanceRegistration<Meeting> attendanceRegistration,
@@ -129,7 +141,7 @@ public partial class VerifyGroupViewModel : BaseViewModel
         if (value != null)
         {
             UpdateTitle();
-            OnPropertyChanged(nameof(PrimaryGsr));
+            RefreshActiveGsrs();
             UpdateCanRegister();
         }
     }
@@ -264,6 +276,32 @@ public partial class VerifyGroupViewModel : BaseViewModel
         }
     }
 
+    /// <summary>
+    /// Rebuild the observable list of active (non-deleted) GSRs from the loaded Group.
+    /// </summary>
+    private void RefreshActiveGsrs()
+    {
+        ActiveGsrs.Clear();
+
+        if (Group?.Gsrs != null)
+        {
+            foreach (var gsr in Group.Gsrs.Where(g => !g.IsMarkedForDeletion))
+            {
+                ActiveGsrs.Add(gsr);
+            }
+        }
+
+        HasActiveGsrs = ActiveGsrs.Count > 0;
+
+        var count = ActiveGsrs.Count;
+        GsrCountText = count switch
+        {
+            0 => "No Group Service Representatives",
+            1 => "1 Group Service Representative",
+            _ => $"{count} Group Service Representatives"
+        };
+    }
+
     private void UpdateTitle()
     {
         Title = !string.IsNullOrEmpty(Group?.Name) ? Group!.Name : "Group Service Representative";
@@ -271,11 +309,11 @@ public partial class VerifyGroupViewModel : BaseViewModel
 
     private void UpdateCanRegister()
     {
-        var gsr = Group?.Gsrs.FirstOrDefault();
-        CanRegister = gsr != null
-            && !string.IsNullOrEmpty(gsr.Name)
-            && !string.IsNullOrEmpty(gsr.Phone)
-            && !string.IsNullOrEmpty(gsr.EmailPersonal);
+        // At least one active GSR must have all required contact fields filled in
+        CanRegister = ActiveGsrs.Any(g =>
+            !string.IsNullOrEmpty(g.Name) &&
+            !string.IsNullOrEmpty(g.Phone) &&
+            !string.IsNullOrEmpty(g.EmailPersonal));
     }
 
     #endregion

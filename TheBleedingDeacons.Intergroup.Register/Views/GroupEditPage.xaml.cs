@@ -22,14 +22,14 @@ public partial class GroupEditPage : ContentPage, IQueryAttributable
     protected override void OnAppearing()
     {
         base.OnAppearing();
-        GsrNameEntry.Keyboard = Keyboard.Create(KeyboardFlags.CapitalizeWord);
+        EditNameEntry.Keyboard = Keyboard.Create(KeyboardFlags.CapitalizeWord);
     }
 
     protected override bool OnBackButtonPressed()
     {
         if (BindingContext is EditGroupViewModel viewModel)
         {
-            viewModel.CancelCommand.Execute(null);
+            viewModel.DoneCommand.Execute(null);
             return true;
         }
         return base.OnBackButtonPressed();

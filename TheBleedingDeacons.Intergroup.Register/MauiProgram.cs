@@ -183,7 +183,7 @@ public static class MauiProgram
         Directory.CreateDirectory(logPath);
 
         // Get app configuration
-        var appName = builder.Configuration["App:Name"] ?? "FareShare";
+        var appName = builder.Configuration["App:Name"] ?? "Badi";
         var environment = builder.Configuration["App:Environment"] ?? "Development";
 
         var config = new LoggerConfiguration()

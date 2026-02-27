@@ -27,6 +27,11 @@ public class MemberConfiguration : IEntityTypeConfiguration<Member>
             .HasColumnName("Gsr Phone")
             .HasMaxLength(60);
 
+        builder.Property(e => e.IsMarkedForDeletion)
+            .HasDefaultValue(false);
+
+        builder.Property(e => e.MarkedForDeletionDate);
+
         // One-to-many: Member belongs to one Group as a GSR; a Group can have multiple GSRs
         builder.HasOne(e => e.Group)
             .WithMany(g => g.Gsrs)

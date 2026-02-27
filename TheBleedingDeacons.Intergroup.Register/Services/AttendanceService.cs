@@ -52,21 +52,30 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
             var config = await _configService.LoadUnityConfigurationAsync();
             if (config.ActiveIntergroupMeetingId.HasValue && config.IsValid())
             {
-                var officerName = entity.MemberAnonymousName ?? string.Empty;
-                var positionName = entity.PositionName ?? entity.PositionLongName ?? string.Empty;
-
-                var response = await _unityApiService.RegisterOfficerAsync(
-                    intergroupMeetingId: config.ActiveIntergroupMeetingId.Value,
-                    officerId: entity.ID,
-                    positionName: positionName,
-                    officerName: officerName);
-
-                if (response.Success)
-                    Logger.Information("Position {PositionName} attendance registered with Unity API", positionName);
-                else if (response.Error?.Code == "queued_offline")
-                    Logger.Information("Position {PositionName} Unity API registration queued (offline)", positionName);
+                if (!entity.MemberId.HasValue || entity.MemberId.Value == 0)
+                {
+                    Logger.Warning(
+                        "Position {PositionName} has no associated member — skipping Unity API registration",
+                        entity.PositionName);
+                }
                 else
-                    Logger.Warning("Position {PositionName} Unity API registration returned: {Error}", positionName, response.Error?.Message);
+                {
+                    var officerName = entity.MemberAnonymousName ?? string.Empty;
+                    var positionName = entity.PositionName ?? entity.PositionLongName ?? string.Empty;
+
+                    var response = await _unityApiService.RegisterOfficerAsync(
+                        intergroupMeetingId: config.ActiveIntergroupMeetingId.Value,
+                        officerId: entity.MemberId.Value,
+                        positionName: positionName,
+                        officerName: officerName);
+
+                    if (response.Success)
+                        Logger.Information("Position {PositionName} attendance registered with Unity API", positionName);
+                    else if (response.Error?.Code == "queued_offline")
+                        Logger.Information("Position {PositionName} Unity API registration queued (offline)", positionName);
+                    else
+                        Logger.Warning("Position {PositionName} Unity API registration returned: {Error}", positionName, response.Error?.Message);
+                }
             }
             else
             {

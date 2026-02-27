@@ -12,6 +12,9 @@ public class PositionConfiguration : IEntityTypeConfiguration<Position>
 
         builder.HasKey(e => e.ID);
 
+        builder.Property(e => e.MemberId)
+            .HasColumnName("Member Id");
+
         builder.Property(e => e.PositionName)
             .HasColumnName("Position Name")
             .HasMaxLength(100);

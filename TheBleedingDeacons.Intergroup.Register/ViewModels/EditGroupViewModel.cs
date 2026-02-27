@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.ComponentModel.DataAnnotations;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -11,9 +12,9 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels;
 
 /// <summary>
 /// Handles the editable GSR information form for a group.
-/// Receives a <see cref="Group"/> object from navigation (extracted from the
-/// selected meeting's Group nav property), allows editing the primary GSR's
-/// name / phone / email, and saves directly to the Members table.
+/// Now member-centric: displays a list of ALL GSRs for the group, allows
+/// editing each one, adding new members, and marking members for deletion
+/// (with replacement).
 ///
 /// Separated from the verify flow (see <see cref="VerifyGroupViewModel"/>)
 /// so each ViewModel handles a single responsibility (ARCH-002).
@@ -25,25 +26,46 @@ public partial class EditGroupViewModel : BaseViewModel
     private readonly RegisterContext _context;
     private readonly IPopupNotification _popupService;
 
-    // The group whose primary GSR is being edited
+    // The group whose GSRs are being managed
     private Group? _group;
 
-    // The specific GSR member being edited (null = creating a new one)
-    private Member? _editingMember;
-
-    // GSR Edit Properties
+    /// <summary>
+    /// The currently selected member being edited (null when not editing).
+    /// </summary>
     [ObservableProperty]
-    private string? gsrName;
+    private Member? selectedMember;
+
+    /// <summary>
+    /// Observable list of active (non-deleted) members for the group.
+    /// </summary>
+    public ObservableCollection<Member> ActiveMembers { get; } = new();
+
+    /// <summary>
+    /// Members that have been marked for deletion during this session.
+    /// </summary>
+    public ObservableCollection<Member> DeletedMembers { get; } = new();
+
+    // ── Editing fields (bound to the form when a member is selected) ──
 
     [ObservableProperty]
-    private string? gsrPhone;
+    private string? editName;
 
     [ObservableProperty]
-    private string? gsrEmailPersonal;
+    private string? editPhone;
 
-    // UI State Properties
+    [ObservableProperty]
+    private string? editEmail;
+
+    // ── UI State ──
+
     [ObservableProperty]
     private bool isLoading;
+
+    [ObservableProperty]
+    private bool isEditing;
+
+    [ObservableProperty]
+    private bool isCreatingNew;
 
     [ObservableProperty]
     private bool hasUnsavedChanges;
@@ -54,24 +76,34 @@ public partial class EditGroupViewModel : BaseViewModel
     [ObservableProperty]
     private string saveButtonText = "Save";
 
-    // Validation Error Properties
     [ObservableProperty]
-    private string? gsrNameError;
+    private bool hasActiveMembers;
 
     [ObservableProperty]
-    private string? gsrPhoneError;
+    private bool hasDeletedMembers;
 
     [ObservableProperty]
-    private string? gsrEmailError;
+    private string memberCountText = string.Empty;
+
+    // ── Validation Errors ──
 
     [ObservableProperty]
-    private bool hasGsrNameError;
+    private string? nameError;
 
     [ObservableProperty]
-    private bool hasGsrPhoneError;
+    private string? phoneError;
 
     [ObservableProperty]
-    private bool hasGsrEmailError;
+    private string? emailError;
+
+    [ObservableProperty]
+    private bool hasNameError;
+
+    [ObservableProperty]
+    private bool hasPhoneError;
+
+    [ObservableProperty]
+    private bool hasEmailError;
 
     public EditGroupViewModel(
         RegisterContext context,
@@ -92,12 +124,10 @@ public partial class EditGroupViewModel : BaseViewModel
         if (query.TryGetValue("group", out var groupObj) && groupObj is Group group)
         {
             _group = group;
-            _editingMember = group.Gsrs.FirstOrDefault();
+            Logger.Information("Edit mode: group {GroupName} with {GsrCount} GSRs",
+                group.Name, group.Gsrs.Count);
 
-            Logger.Information("Edit mode: group {GroupName}, GSR member ID {MemberId}",
-                group.Name, _editingMember?.ID);
-
-            PopulateFields();
+            PopulateMemberLists();
             UpdateTitle();
         }
     }
@@ -106,23 +136,23 @@ public partial class EditGroupViewModel : BaseViewModel
 
     #region Property Change Handlers
 
-    partial void OnGsrNameChanged(string? value)
+    partial void OnEditNameChanged(string? value)
     {
-        ValidateGsrName();
+        ValidateName();
         CheckForUnsavedChanges();
         ValidateForm();
     }
 
-    partial void OnGsrPhoneChanged(string? value)
+    partial void OnEditPhoneChanged(string? value)
     {
-        ValidateGsrPhone();
+        ValidatePhone();
         CheckForUnsavedChanges();
         ValidateForm();
     }
 
-    partial void OnGsrEmailPersonalChanged(string? value)
+    partial void OnEditEmailChanged(string? value)
     {
-        ValidateGsrEmail();
+        ValidateEmail();
         CheckForUnsavedChanges();
         ValidateForm();
     }
@@ -130,39 +160,90 @@ public partial class EditGroupViewModel : BaseViewModel
     partial void OnIsLoadingChanged(bool value)
     {
         SaveButtonText = value ? "Saving..." : "Save";
-        SaveCommand.NotifyCanExecuteChanged();
-        CancelCommand.NotifyCanExecuteChanged();
+        SaveMemberCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnIsEditingChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsEditing));
     }
 
     partial void OnHasUnsavedChangesChanged(bool value)
     {
-        Title = value ? "Edit GSR Information *" : "Edit GSR Information";
+        UpdateTitle();
     }
 
     partial void OnIsFormValidChanged(bool value)
     {
-        SaveCommand.NotifyCanExecuteChanged();
+        SaveMemberCommand.NotifyCanExecuteChanged();
     }
 
     #endregion
 
     #region Commands
 
+    /// <summary>
+    /// Select a member from the list to begin editing their details.
+    /// </summary>
     [RelayCommand]
-    private async Task Save()
+    private void SelectMember(Member member)
+    {
+        if (member == null) return;
+
+        SelectedMember = member;
+        IsCreatingNew = false;
+        IsEditing = true;
+
+        EditName = member.Name;
+        EditPhone = member.Phone;
+        EditEmail = member.EmailPersonal;
+
+        HasUnsavedChanges = false;
+        ClearAllErrors();
+        ValidateForm();
+
+        Logger.Information("Selected member {MemberName} (ID={MemberId}) for editing", member.Name, member.ID);
+    }
+
+    /// <summary>
+    /// Begin creating a new member for this group.
+    /// </summary>
+    [RelayCommand]
+    private void AddNewMember()
+    {
+        SelectedMember = null;
+        IsCreatingNew = true;
+        IsEditing = true;
+
+        EditName = string.Empty;
+        EditPhone = string.Empty;
+        EditEmail = string.Empty;
+
+        HasUnsavedChanges = false;
+        ClearAllErrors();
+        ValidateForm();
+
+        Logger.Information("Starting new member creation for group {GroupName}", _group?.Name);
+    }
+
+    /// <summary>
+    /// Save the currently-edited or newly-created member.
+    /// </summary>
+    [RelayCommand]
+    private async Task SaveMember()
     {
         if (!IsFormValid)
         {
-            ValidateGsrName();
-            ValidateGsrPhone();
-            ValidateGsrEmail();
+            ValidateName();
+            ValidatePhone();
+            ValidateEmail();
             await Shell.Current.DisplayAlert("Validation Error", "Please fix the form errors before saving.", "OK");
             return;
         }
 
         if (_group == null)
         {
-            Logger.Warning("Save called but _group is null");
+            Logger.Warning("SaveMember called but _group is null");
             return;
         }
 
@@ -170,40 +251,60 @@ public partial class EditGroupViewModel : BaseViewModel
         {
             IsLoading = true;
 
-            if (_editingMember != null && _editingMember.ID > 0)
+            if (IsCreatingNew)
             {
-                // Update the existing tracked member directly
-                var tracked = await _context.Members.FindAsync(_editingMember.ID);
-                if (tracked != null)
-                {
-                    tracked.Name = GsrName?.Trim();
-                    tracked.Phone = GsrPhone?.Trim() ?? string.Empty;
-                    tracked.EmailPersonal = GsrEmailPersonal?.Trim() ?? string.Empty;
-                }
-            }
-            else
-            {
-                // No GSR on record — insert a new one for this group
-                var newGsr = new Member
+                // Create a brand-new member for this group
+                var newMember = new Member
                 {
                     GroupId = _group.ID,
-                    Name = GsrName?.Trim(),
-                    Phone = GsrPhone?.Trim() ?? string.Empty,
-                    EmailPersonal = GsrEmailPersonal?.Trim() ?? string.Empty,
+                    Name = EditName?.Trim(),
+                    Phone = EditPhone?.Trim() ?? string.Empty,
+                    EmailPersonal = EditEmail?.Trim() ?? string.Empty,
                 };
-                _context.Members.Add(newGsr);
-                _editingMember = newGsr;
+                _context.Members.Add(newMember);
+                await _context.SaveChangesAsync();
+
+                // Add to the group's in-memory collection and our observable list
+                _group.Gsrs.Add(newMember);
+                ActiveMembers.Add(newMember);
+
+                Logger.Information("Created new member {MemberName} for group {GroupName}",
+                    newMember.Name, _group.Name);
+            }
+            else if (SelectedMember != null && SelectedMember.ID > 0)
+            {
+                // Update an existing tracked member
+                var tracked = await _context.Members.FindAsync(SelectedMember.ID);
+                if (tracked != null)
+                {
+                    tracked.Name = EditName?.Trim();
+                    tracked.Phone = EditPhone?.Trim() ?? string.Empty;
+                    tracked.EmailPersonal = EditEmail?.Trim() ?? string.Empty;
+
+                    await _context.SaveChangesAsync();
+
+                    // Reflect changes in the in-memory object for the list
+                    SelectedMember.Name = tracked.Name;
+                    SelectedMember.Phone = tracked.Phone;
+                    SelectedMember.EmailPersonal = tracked.EmailPersonal;
+
+                    Logger.Information("Updated member {MemberName} (ID={MemberId})",
+                        tracked.Name, tracked.ID);
+                }
             }
 
-            await _context.SaveChangesAsync();
-
             HasUnsavedChanges = false;
-            await Shell.Current.GoToAsync($"..?edited=true");
+            IsEditing = false;
+            IsCreatingNew = false;
+            SelectedMember = null;
+
+            RefreshMemberCountText();
+            UpdateHasActiveMembers();
         }
         catch (Exception ex)
         {
-            Logger.Error(ex, "Failed to save GSR information");
-            await Shell.Current.DisplayAlert("Error", $"Failed to save GSR information: {ex.Message}", "OK");
+            Logger.Error(ex, "Failed to save member");
+            await Shell.Current.DisplayAlert("Error", $"Failed to save member: {ex.Message}", "OK");
         }
         finally
         {
@@ -211,8 +312,102 @@ public partial class EditGroupViewModel : BaseViewModel
         }
     }
 
+    /// <summary>
+    /// Mark the selected member for deletion. If they are being replaced, the user
+    /// should add a new member first. The member stays in the DB but is flagged.
+    /// </summary>
     [RelayCommand]
-    private async Task Cancel()
+    private async Task MarkForDeletion(Member member)
+    {
+        if (member == null) return;
+
+        bool confirmed = await Shell.Current.DisplayAlert(
+            "Mark for Deletion",
+            $"Mark \"{member.Name}\" for deletion?\n\nThis member will be hidden and removed on the next sync. You can add a replacement member afterwards.",
+            "Mark for Deletion", "Cancel");
+
+        if (!confirmed) return;
+
+        try
+        {
+            var tracked = await _context.Members.FindAsync(member.ID);
+            if (tracked != null)
+            {
+                tracked.IsMarkedForDeletion = true;
+                tracked.MarkedForDeletionDate = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+
+                // Also update the in-memory object
+                member.IsMarkedForDeletion = true;
+                member.MarkedForDeletionDate = tracked.MarkedForDeletionDate;
+            }
+
+            ActiveMembers.Remove(member);
+            DeletedMembers.Add(member);
+
+            // If we were editing this member, close the form
+            if (SelectedMember?.ID == member.ID)
+            {
+                IsEditing = false;
+                IsCreatingNew = false;
+                SelectedMember = null;
+            }
+
+            RefreshMemberCountText();
+            UpdateHasActiveMembers();
+            HasDeletedMembers = DeletedMembers.Count > 0;
+
+            Logger.Information("Marked member {MemberName} (ID={MemberId}) for deletion", member.Name, member.ID);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Failed to mark member {MemberId} for deletion", member.ID);
+            await Shell.Current.DisplayAlert("Error", $"Failed to mark member for deletion: {ex.Message}", "OK");
+        }
+    }
+
+    /// <summary>
+    /// Restore a previously-deleted member.
+    /// </summary>
+    [RelayCommand]
+    private async Task RestoreMember(Member member)
+    {
+        if (member == null) return;
+
+        try
+        {
+            var tracked = await _context.Members.FindAsync(member.ID);
+            if (tracked != null)
+            {
+                tracked.IsMarkedForDeletion = false;
+                tracked.MarkedForDeletionDate = null;
+                await _context.SaveChangesAsync();
+
+                member.IsMarkedForDeletion = false;
+                member.MarkedForDeletionDate = null;
+            }
+
+            DeletedMembers.Remove(member);
+            ActiveMembers.Add(member);
+
+            RefreshMemberCountText();
+            UpdateHasActiveMembers();
+            HasDeletedMembers = DeletedMembers.Count > 0;
+
+            Logger.Information("Restored member {MemberName} (ID={MemberId})", member.Name, member.ID);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Failed to restore member {MemberId}", member.ID);
+            await Shell.Current.DisplayAlert("Error", $"Failed to restore member: {ex.Message}", "OK");
+        }
+    }
+
+    /// <summary>
+    /// Cancel the current edit without saving.
+    /// </summary>
+    [RelayCommand]
+    private async Task CancelEdit()
     {
         if (IsLoading) return;
 
@@ -226,91 +421,158 @@ public partial class EditGroupViewModel : BaseViewModel
             if (!shouldCancel) return;
         }
 
-        await Shell.Current.GoToAsync("..");
+        IsEditing = false;
+        IsCreatingNew = false;
+        SelectedMember = null;
+        ClearAllErrors();
+    }
+
+    /// <summary>
+    /// Done editing — navigate back to verify page.
+    /// </summary>
+    [RelayCommand]
+    private async Task Done()
+    {
+        if (IsEditing && HasUnsavedChanges)
+        {
+            bool shouldLeave = await Shell.Current.DisplayAlert(
+                "Unsaved Changes",
+                "You have unsaved changes on the current member. Discard and go back?",
+                "Discard", "Keep Editing");
+
+            if (!shouldLeave) return;
+        }
+
+        await Shell.Current.GoToAsync($"..?edited=true");
     }
 
     #endregion
 
     #region Private Methods
 
-    private void PopulateFields()
+    private void PopulateMemberLists()
     {
-        GsrName = _editingMember?.Name;
-        GsrPhone = _editingMember?.Phone;
-        GsrEmailPersonal = _editingMember?.EmailPersonal;
-        HasUnsavedChanges = false;
+        ActiveMembers.Clear();
+        DeletedMembers.Clear();
+
+        if (_group?.Gsrs != null)
+        {
+            foreach (var gsr in _group.Gsrs)
+            {
+                if (gsr.IsMarkedForDeletion)
+                    DeletedMembers.Add(gsr);
+                else
+                    ActiveMembers.Add(gsr);
+            }
+        }
+
+        UpdateHasActiveMembers();
+        HasDeletedMembers = DeletedMembers.Count > 0;
+        RefreshMemberCountText();
+    }
+
+    private void UpdateHasActiveMembers()
+    {
+        HasActiveMembers = ActiveMembers.Count > 0;
+    }
+
+    private void RefreshMemberCountText()
+    {
+        var count = ActiveMembers.Count;
+        MemberCountText = count switch
+        {
+            0 => "No members — tap + to add one",
+            1 => "1 member",
+            _ => $"{count} members"
+        };
     }
 
     private void UpdateTitle()
     {
-        Title = !string.IsNullOrEmpty(_group?.Name) ? _group!.Name : "Edit GSR Information";
+        var baseName = !string.IsNullOrEmpty(_group?.Name) ? _group!.Name : "Edit Members";
+        Title = HasUnsavedChanges ? $"{baseName} *" : baseName;
     }
 
     #endregion
 
     #region Validation Methods
 
-    private void ValidateGsrName()
+    private void ValidateName()
     {
-        ClearGsrNameError();
+        ClearNameError();
 
-        if (string.IsNullOrWhiteSpace(GsrName))
-            SetGsrNameError("Your Name is required.");
-        else if (GsrName.Trim().Length > 255)
-            SetGsrNameError("Your Name cannot exceed 255 characters.");
+        if (string.IsNullOrWhiteSpace(EditName))
+            SetNameError("Name is required.");
+        else if (EditName.Trim().Length > 255)
+            SetNameError("Name cannot exceed 255 characters.");
     }
 
-    private void ValidateGsrPhone()
+    private void ValidatePhone()
     {
-        ClearGsrPhoneError();
+        ClearPhoneError();
 
-        if (!string.IsNullOrWhiteSpace(GsrPhone))
+        if (!string.IsNullOrWhiteSpace(EditPhone))
         {
-            if (GsrPhone.Trim().Length > 20)
-                SetGsrPhoneError("Phone number cannot exceed 20 characters.");
-            else if (!IsValidPhoneFormat(GsrPhone.Trim()))
-                SetGsrPhoneError("Please check the phone number is valid.");
+            if (EditPhone.Trim().Length > 20)
+                SetPhoneError("Phone number cannot exceed 20 characters.");
+            else if (!IsValidPhoneFormat(EditPhone.Trim()))
+                SetPhoneError("Please check the phone number is valid.");
         }
     }
 
-    private void ValidateGsrEmail()
+    private void ValidateEmail()
     {
-        ClearGsrEmailError();
+        ClearEmailError();
 
-        if (!string.IsNullOrWhiteSpace(GsrEmailPersonal))
+        if (!string.IsNullOrWhiteSpace(EditEmail))
         {
-            if (GsrEmailPersonal.Trim().Length > 255)
-                SetGsrEmailError("Email address cannot exceed 255 characters.");
-            else if (!IsValidEmail(GsrEmailPersonal.Trim()))
-                SetGsrEmailError("Please check the email address is correct.");
+            if (EditEmail.Trim().Length > 255)
+                SetEmailError("Email address cannot exceed 255 characters.");
+            else if (!IsValidEmail(EditEmail.Trim()))
+                SetEmailError("Please check the email address is correct.");
         }
     }
 
     private void ValidateForm()
     {
-        IsFormValid = !HasGsrNameError &&
-                     !HasGsrPhoneError &&
-                     !HasGsrEmailError &&
-                     !string.IsNullOrWhiteSpace(GsrName) &&
-                     !string.IsNullOrWhiteSpace(GsrPhone) &&
-                     !string.IsNullOrWhiteSpace(GsrEmailPersonal);
+        IsFormValid = !HasNameError &&
+                     !HasPhoneError &&
+                     !HasEmailError &&
+                     !string.IsNullOrWhiteSpace(EditName) &&
+                     !string.IsNullOrWhiteSpace(EditPhone) &&
+                     !string.IsNullOrWhiteSpace(EditEmail);
     }
 
     private void CheckForUnsavedChanges()
     {
-        if (_group == null) { HasUnsavedChanges = false; return; }
+        if (IsCreatingNew)
+        {
+            HasUnsavedChanges = !string.IsNullOrWhiteSpace(EditName) ||
+                                !string.IsNullOrWhiteSpace(EditPhone) ||
+                                !string.IsNullOrWhiteSpace(EditEmail);
+            return;
+        }
 
-        HasUnsavedChanges = _editingMember?.Name != GsrName?.Trim() ||
-                            _editingMember?.Phone != GsrPhone?.Trim() ||
-                            _editingMember?.EmailPersonal != GsrEmailPersonal?.Trim();
+        if (SelectedMember == null) { HasUnsavedChanges = false; return; }
+
+        HasUnsavedChanges = SelectedMember.Name != EditName?.Trim() ||
+                            SelectedMember.Phone != EditPhone?.Trim() ||
+                            SelectedMember.EmailPersonal != EditEmail?.Trim();
     }
 
-    private void SetGsrNameError(string error) { GsrNameError = error; HasGsrNameError = true; }
-    private void ClearGsrNameError() { GsrNameError = null; HasGsrNameError = false; }
-    private void SetGsrPhoneError(string error) { GsrPhoneError = error; HasGsrPhoneError = true; }
-    private void ClearGsrPhoneError() { GsrPhoneError = null; HasGsrPhoneError = false; }
-    private void SetGsrEmailError(string error) { GsrEmailError = error; HasGsrEmailError = true; }
-    private void ClearGsrEmailError() { GsrEmailError = null; HasGsrEmailError = false; }
+    private void ClearAllErrors()
+    {
+        ClearNameError();
+        ClearPhoneError();
+        ClearEmailError();
+    }
+
+    private void SetNameError(string error) { NameError = error; HasNameError = true; }
+    private void ClearNameError() { NameError = null; HasNameError = false; }
+    private void SetPhoneError(string error) { PhoneError = error; HasPhoneError = true; }
+    private void ClearPhoneError() { PhoneError = null; HasPhoneError = false; }
+    private void SetEmailError(string error) { EmailError = error; HasEmailError = true; }
+    private void ClearEmailError() { EmailError = null; HasEmailError = false; }
 
     private static bool IsValidEmail(string email)
     {
