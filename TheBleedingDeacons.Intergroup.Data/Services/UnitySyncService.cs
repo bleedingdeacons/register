@@ -12,10 +12,10 @@ namespace TheBleedingDeacons.Unity.Data.Services;
 /// </summary>
 public class UnitySyncService
 {
-    private readonly UnityDbContext _db;
+    private readonly IntergroupDbContext _db;
     private readonly UnityRestSharp _client;
 
-    public UnitySyncService(UnityDbContext db, UnityRestSharp client)
+    public UnitySyncService(IntergroupDbContext db, UnityRestSharp client)
     {
         _db = db;
         _client = client;

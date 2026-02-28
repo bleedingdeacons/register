@@ -3,7 +3,7 @@ using TheBleedingDeacons.Intergroup.Data.Models;
 
 namespace TheBleedingDeacons.Intergroup.Data;
 
-public class UnityDbContext : DbContext
+public class IntergroupDbContext : DbContext
 {
     public DbSet<Group> Groups => Set<Group>();
     public DbSet<Member> Members => Set<Member>();
@@ -11,7 +11,7 @@ public class UnityDbContext : DbContext
     public DbSet<Meeting> Meetings => Set<Meeting>();
     public DbSet<IntergroupMeeting> IntergroupMeetings => Set<IntergroupMeeting>();
 
-    public UnityDbContext(DbContextOptions<UnityDbContext> options) : base(options) { }
+    public IntergroupDbContext(DbContextOptions<IntergroupDbContext> options) : base(options) { }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -22,7 +22,7 @@ public class UnityDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.ApplyConfigurationsFromAssembly(typeof(UnityDbContext).Assembly);
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(IntergroupDbContext).Assembly);
         base.OnModelCreating(modelBuilder);
     }
 }
