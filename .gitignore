@@ -113,3 +113,5 @@ yarn-error.log*
 /Utils/TheBleedingDeacons.Unity.Client.zip
 /Utils/TheBleedingDeacons.Intergroup.Register.zip
 /Utils/TheBleedingDeacons.Unity.Client.zip
+
+*.zip
