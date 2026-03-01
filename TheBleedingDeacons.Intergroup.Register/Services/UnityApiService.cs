@@ -269,6 +269,7 @@ public class UnityApiService : IUnityApiService
             return new LocalModels.Position
             {
                 ID = p.Id,
+                UnityPositionId = p.Id,
                 MemberId = holder?.Id,
                 PositionName = p.ShortDescription,
                 PositionLongName = p.LongName,

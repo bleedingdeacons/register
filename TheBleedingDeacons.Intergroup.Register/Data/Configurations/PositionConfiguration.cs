@@ -12,6 +12,10 @@ public class PositionConfiguration : IEntityTypeConfiguration<Position>
 
         builder.HasKey(e => e.ID);
 
+        builder.Property(e => e.UnityPositionId)
+            .HasColumnName("Unity Position Id")
+            .IsRequired();
+
         builder.Property(e => e.MemberId)
             .HasColumnName("Member Id");
 
