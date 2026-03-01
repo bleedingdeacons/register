@@ -1,4 +1,4 @@
-namespace TheBleedingDeacons.Intergroup.Data.Models;
+namespace TheBleedingDeacons.Unity.Data.Entities;
 
 /// <summary>
 /// Represents a meeting synced from the Unity API.

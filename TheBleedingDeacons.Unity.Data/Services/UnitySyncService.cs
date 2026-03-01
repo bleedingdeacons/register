@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using TheBleedingDeacons.Unity.Client;
-using TheBleedingDeacons.Intergroup.Data;
+using TheBleedingDeacons.Unity.Data.Data;
 using UnityModels = TheBleedingDeacons.Unity.Models;
-using Entities = TheBleedingDeacons.Intergroup.Data;
+using Entities = TheBleedingDeacons.Unity.Data.Entities;
 
 namespace TheBleedingDeacons.Unity.Data.Services;
 
@@ -12,10 +12,10 @@ namespace TheBleedingDeacons.Unity.Data.Services;
 /// </summary>
 public class UnitySyncService
 {
-    private readonly IntergroupDbContext _db;
+    private readonly UnityDbContext _db;
     private readonly UnityRestSharp _client;
 
-    public UnitySyncService(IntergroupDbContext db, UnityRestSharp client)
+    public UnitySyncService(UnityDbContext db, UnityRestSharp client)
     {
         _db = db;
         _client = client;
@@ -77,11 +77,11 @@ public class UnitySyncService
 
     // ── Mapping ──────────────────────────────────────────────────────
 
-    private static List<Models.Group> MapGroups(List<UnityModels.Group> source) =>
-        source.Select(g => new Models.Group
+    private static List<Entities.Group> MapGroups(List<UnityModels.Group> source) =>
+        source.Select(g => new Entities.Group
         {
             Id = g.Id,
-            Title = g.Title,
+            Name = g.Title,
             Email = NullIfEmpty(g.Email),
             Phone = NullIfEmpty(g.Phone),
             Website = NullIfEmpty(g.Website),
@@ -89,10 +89,10 @@ public class UnitySyncService
             DistrictId = g.DistrictId,
         }).ToList();
 
-    private static List<Models.Meeting> MapMeetings(List<UnityModels.Group> groups) =>
+    private static List<Entities.Meeting> MapMeetings(List<UnityModels.Group> groups) =>
         groups
             .Where(g => g.HasExpandedMeetings)
-            .SelectMany(g => g.Meetings.Select(m => new Models.Meeting
+            .SelectMany(g => g.Meetings.Select(m => new Entities.Meeting
             {
                 Id = m.Id,
                 Name = !string.IsNullOrEmpty(m.Name) ? m.Name : g.Title,
@@ -109,8 +109,8 @@ public class UnitySyncService
             }))
             .ToList();
 
-    private static List<Models.Member> MapMembers(List<UnityModels.Member> source) =>
-        source.Select(m => new Models.Member
+    private static List<Entities.Member> MapMembers(List<UnityModels.Member> source) =>
+        source.Select(m => new Entities.Member
         {
             Id = m.Id,
             AnonymousName = m.AnonymousName,
@@ -123,9 +123,9 @@ public class UnitySyncService
             IntergroupPositionId = m.IntergroupPositionId,
         }).ToList();
 
-    private static List<Models.Position> MapPositions(
+    private static List<Entities.Position> MapPositions(
         List<UnityModels.Position> source) =>
-        source.Select(p => new Models.Position
+        source.Select(p => new Entities.Position
         {
             Id = p.Id,
             ShortDescription = p.ShortDescription,
@@ -135,9 +135,9 @@ public class UnitySyncService
             TermYears = p.TermYears,
         }).ToList();
 
-    private static List<Models.IntergroupMeeting> MapIntergroupMeetings(
+    private static List<Entities.IntergroupMeeting> MapIntergroupMeetings(
         List<UnityModels.IntergroupMeeting> source) =>
-        source.Select(m => new Models.IntergroupMeeting
+        source.Select(m => new Entities.IntergroupMeeting
         {
             Id = m.Id,
             Title = NullIfEmpty(m.Title),

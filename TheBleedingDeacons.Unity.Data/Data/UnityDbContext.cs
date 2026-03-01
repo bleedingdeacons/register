@@ -1,9 +1,9 @@
 using Microsoft.EntityFrameworkCore;
-using TheBleedingDeacons.Intergroup.Data.Models;
+using TheBleedingDeacons.Unity.Data.Entities;
 
-namespace TheBleedingDeacons.Intergroup.Data;
+namespace TheBleedingDeacons.Unity.Data.Data;
 
-public class IntergroupDbContext : DbContext
+public class UnityDbContext : DbContext
 {
     public DbSet<Group> Groups => Set<Group>();
     public DbSet<Member> Members => Set<Member>();
@@ -11,7 +11,7 @@ public class IntergroupDbContext : DbContext
     public DbSet<Meeting> Meetings => Set<Meeting>();
     public DbSet<IntergroupMeeting> IntergroupMeetings => Set<IntergroupMeeting>();
 
-    public IntergroupDbContext(DbContextOptions<IntergroupDbContext> options) : base(options) { }
+    public UnityDbContext(DbContextOptions<UnityDbContext> options) : base(options) { }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -22,7 +22,7 @@ public class IntergroupDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.ApplyConfigurationsFromAssembly(typeof(IntergroupDbContext).Assembly);
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(UnityDbContext).Assembly);
         base.OnModelCreating(modelBuilder);
     }
 }

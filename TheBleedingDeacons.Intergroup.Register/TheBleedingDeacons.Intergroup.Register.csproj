@@ -119,6 +119,7 @@
 	<ItemGroup>
 	  <ProjectReference Include="..\..\..\..\Users\David\Local Sites\unity-dev\app\public\wp-content\plugins\integrity\sharp\TheBleedingDeacons.Unity.Client\TheBleedingDeacons.Unity.Client.csproj" />
 	  <ProjectReference Include="..\..\..\..\Users\David\Local Sites\unity-dev\app\public\wp-content\plugins\integrity\sharp\TheBleedingDeacons.Unity.Models\TheBleedingDeacons.Unity.Models.csproj" />
+	  <ProjectReference Include="..\TheBleedingDeacons.Unity.Data\TheBleedingDeacons.Unity.Data.csproj" />
 	</ItemGroup>
 
 	<!-- TODO: Re-add Integrity.Client as a NuGet package or relative project reference -->

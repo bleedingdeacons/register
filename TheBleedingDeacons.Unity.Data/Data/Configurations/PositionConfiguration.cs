@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using TheBleedingDeacons.Intergroup.Data.Models;
+using TheBleedingDeacons.Unity.Data.Entities;
 
-namespace TheBleedingDeacons.Intergroup.Data.Configurations;
+namespace TheBleedingDeacons.Unity.Data.Data.Configurations;
 
 public class PositionConfiguration : IEntityTypeConfiguration<Position>
 {

@@ -64,8 +64,10 @@ public static class MauiProgram
         builder.Services.AddScoped<SerializationService>();
         builder.Services.AddMemoryCache();
         builder.Services.AddSingleton<CacheService>();
+
         builder.Services.AddScoped<IMeetingRepository, MeetingRepository>();
         builder.Services.AddScoped<IPositionRepository, PositionRepository>();
+        
         builder.Services.AddScoped<IPopupNotification, PopupNotificationService>();
 
         // Register Email Templates
