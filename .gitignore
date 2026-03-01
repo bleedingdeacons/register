@@ -109,3 +109,5 @@ yarn-error.log*
 *.tmp
 *.temp
 *.cache
+/Utils/TheBleedingDeacons.Intergroup.Register.zip
+/Utils/TheBleedingDeacons.Unity.Client.zip
