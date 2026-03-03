@@ -1,14 +1,13 @@
-using CommunityToolkit.Maui.Alerts;
-using CommunityToolkit.Maui.Core;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Serilog;
 using System.Collections.ObjectModel;
 using TheBleedingDeacons.Intergroup.Register.Extensions;
 using TheBleedingDeacons.Intergroup.Register.Models;
-using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Support;
 using TheBleedingDeacons.Intergroup.Register.Views;
+using TheBleedingDeacons.Unity.Data.Entities;
+using TheBleedingDeacons.Unity.Data.Repositories.Interfaces;
 
 namespace TheBleedingDeacons.Intergroup.Register.ViewModels;
 
@@ -32,28 +31,20 @@ public partial class MeetingSelectionViewModel : BaseViewModel
     [ObservableProperty]
     bool isDataLoaded = false;
 
-
     public MeetingSelectionViewModel(IMeetingRepository meetingRepository)
     {
-
         _meetingRepository = meetingRepository;
-
         Title = "Select Meeting";
     }
 
     public override void ApplyQueryAttributes(IDictionary<string, object> query)
     {
-
         if (query == null) return;
-
         Criteria = (MeetingCriteria)query["criteria"];
-
-
     }
 
     partial void OnCriteriaChanged(MeetingCriteria value)
     {
-        // Use MainThread for proper Android compatibility
         MainThread.BeginInvokeOnMainThread(async () =>
         {
             await LoadDataAsync();
@@ -71,22 +62,21 @@ public partial class MeetingSelectionViewModel : BaseViewModel
             IsLoading = true;
             IsDataLoaded = false;
 
-
             await Task.Yield();
 
             Meetings.Clear();
 
-            var allMeetings = await _meetingRepository.GetAllMeetingsAsync();
+            var allMeetings = await _meetingRepository.GetAllAsync();
 
             var filteredMeetings = allMeetings
                 .Where(m =>
                 {
-                    return string.Equals(m.Day, Criteria.Day, StringComparison.OrdinalIgnoreCase) && m.IsOnline() == (Criteria.MeetingType == "Online");
+                    return string.Equals(m.DayOfWeek, Criteria.Day, StringComparison.OrdinalIgnoreCase)
+                        && m.IsOnline() == (Criteria.MeetingType == "Online");
                 }).ToList();
 
             MainThread.BeginInvokeOnMainThread(() =>
             {
-
                 foreach (var meeting in filteredMeetings)
                 {
                     Meetings.Add(meeting);
@@ -95,7 +85,6 @@ public partial class MeetingSelectionViewModel : BaseViewModel
                 IsDataLoaded = true;
                 IsLoading = false;
             });
-
 
             Header = $"{Criteria.Day} {Criteria.MeetingType} Meetings";
         }
@@ -118,9 +107,8 @@ public partial class MeetingSelectionViewModel : BaseViewModel
         }
 
         var parameters = new Dictionary<string, object> {
-                {"groupId", meeting.GroupId.Value.ToString()} };
+            {"groupId", meeting.GroupId.Value.ToString()} };
 
         await Shell.Current.GoToAsync(nameof(GroupVerifyPage), parameters);
     }
-
 }

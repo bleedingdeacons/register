@@ -4,9 +4,10 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Serilog;
 using TheBleedingDeacons.Intergroup.Register.Extensions;
-using TheBleedingDeacons.Intergroup.Register.Models;
 using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Support;
+using TheBleedingDeacons.Unity.Data.Entities;
+using TheBleedingDeacons.Unity.Data.Repositories.Interfaces;
 
 namespace TheBleedingDeacons.Intergroup.Register.ViewModels;
 
@@ -20,41 +21,16 @@ public partial class MeetingEditViewModel : BaseViewModel
     private Meeting? _meeting;
 
     [ObservableProperty]
-    private bool _isEditing;
-
-    [ObservableProperty]
-    private string? _editGsrName;
-
-    [ObservableProperty]
-    private string? _editGsrEmailPersonal;
-
-    [ObservableProperty]
-    private string? _editGsrPhone;
-
-    [ObservableProperty]
-    private string? _editMeetingGenericEmail;
-
-    [ObservableProperty]
-    private bool _editUsingGeneric;
-
-    [ObservableProperty]
     private bool _canConfirm;
 
-    // Display properties that will notify when changed
     [ObservableProperty]
     private string? _displayGsrName;
 
     [ObservableProperty]
-    private string? _displayGsrEmailPersonal;
+    private string? _displayGsrEmail;
 
     [ObservableProperty]
     private string? _displayGsrPhone;
-
-    [ObservableProperty]
-    private string? _displayMeetingGenericEmail;
-
-    [ObservableProperty]
-    private bool _displayUsingGeneric;
 
     [ObservableProperty]
     private bool _hasValidationErrors;
@@ -62,13 +38,13 @@ public partial class MeetingEditViewModel : BaseViewModel
     [ObservableProperty]
     private string? _validationMessage;
 
-    [ObservableProperty]
-    private bool _canSave;
-
     private readonly IPopupNotification _popupService;
     private readonly IAttendanceRegistration<Meeting> _attendanceRegistration;
 
-    public MeetingEditViewModel(IMeetingRepository meetingRepository, IPopupNotification popupService, IAttendanceRegistration<Meeting> attendanceRegistration)
+    public MeetingEditViewModel(
+        IMeetingRepository meetingRepository,
+        IPopupNotification popupService,
+        IAttendanceRegistration<Meeting> attendanceRegistration)
     {
         _meetingRepository = meetingRepository ?? throw new ArgumentNullException(nameof(meetingRepository));
         _attendanceRegistration = attendanceRegistration ?? throw new ArgumentNullException(nameof(attendanceRegistration));
@@ -85,7 +61,6 @@ public partial class MeetingEditViewModel : BaseViewModel
                  meetingIdObj is string meetingIdStr &&
                  int.TryParse(meetingIdStr, out var meetingId))
         {
-            // Load meeting by ID if only ID was passed
             LoadMeetingByIdAsync(meetingId).SafeFireAndForget("LoadMeetingById");
         }
     }
@@ -94,7 +69,7 @@ public partial class MeetingEditViewModel : BaseViewModel
     {
         try
         {
-            var meeting = await _meetingRepository.GetMeetingByIdAsync(meetingId);
+            var meeting = await _meetingRepository.GetByIdAsync(meetingId);
             if (meeting != null)
             {
                 Initialize(meeting);
@@ -128,206 +103,27 @@ public partial class MeetingEditViewModel : BaseViewModel
     private void UpdateDisplayProperties()
     {
         if (Meeting == null) return;
-        var primaryGsr = Meeting.Group?.Gsrs.FirstOrDefault();
-        DisplayGsrName = primaryGsr?.Name;
-        DisplayGsrEmailPersonal = primaryGsr?.EmailPersonal;
-        DisplayGsrPhone = primaryGsr?.Phone;
-        DisplayMeetingGenericEmail = Meeting.MeetingGenericEmail;
-        DisplayUsingGeneric = Meeting.UsingGeneric ?? false;
+        var primaryGsr = Meeting.Group?.Members.FirstOrDefault(m => m.IsGsr);
+        DisplayGsrName = primaryGsr?.AnonymousName;
+        DisplayGsrEmail = primaryGsr?.PersonalEmail;
+        DisplayGsrPhone = primaryGsr?.MobileNumber;
         Title = Meeting.Name;
-    }
-
-    partial void OnIsEditingChanged(bool value)
-    {
-        if (value)
-        {
-            StartEditing();
-        }
-        UpdateCanSave();
-    }
-
-    partial void OnEditGsrNameChanged(string? value)
-    {
-        UpdateCanSave();
-    }
-
-    partial void OnEditGsrEmailPersonalChanged(string? value)
-    {
-        UpdateCanSave();
-    }
-
-    partial void OnEditGsrPhoneChanged(string? value)
-    {
-        UpdateCanSave();
-    }
-
-    partial void OnEditMeetingGenericEmailChanged(string? value)
-    {
-        UpdateCanSave();
-    }
-
-    partial void OnEditUsingGenericChanged(bool value)
-    {
-        UpdateCanSave();
-    }
-
-
-
-    private void StartEditing()
-    {
-        if (Meeting == null) return;
-
-        EditGsrName = DisplayGsrName;
-        EditGsrEmailPersonal = DisplayGsrEmailPersonal;
-        EditGsrPhone = DisplayGsrPhone;
-        EditMeetingGenericEmail = DisplayMeetingGenericEmail;
-        EditUsingGeneric = DisplayUsingGeneric;
-
-        UpdateCanSave();
     }
 
     private void UpdateCanConfirm()
     {
-        // GSR Name is required
         bool hasGsrName = !string.IsNullOrWhiteSpace(DisplayGsrName);
-
-        // Either GSR Phone or GSR Email is required (but not necessarily both)
         bool hasGsrContact = !string.IsNullOrWhiteSpace(DisplayGsrPhone) ||
-                            !string.IsNullOrWhiteSpace(DisplayGsrEmailPersonal);
+                            !string.IsNullOrWhiteSpace(DisplayGsrEmail);
 
         CanConfirm = hasGsrName && hasGsrContact;
 
-        // Update validation message
-        UpdateValidationMessage(hasGsrName, hasGsrContact);
-    }
-
-    private void UpdateValidationMessage(bool hasGsrName, bool hasGsrContact)
-    {
         var errors = new List<string>();
-
-        if (!hasGsrName)
-            errors.Add("GSR Name is required");
-
-        if (!hasGsrContact)
-            errors.Add("Either GSR Email or GSR Phone is required");
+        if (!hasGsrName) errors.Add("GSR Name is required");
+        if (!hasGsrContact) errors.Add("Either GSR Email or GSR Phone is required");
 
         HasValidationErrors = errors.Count > 0;
         ValidationMessage = errors.Count > 0 ? string.Join(", ", errors) : null;
-    }
-
-    private void UpdateCanSave()
-    {
-        if (!IsEditing)
-        {
-            CanSave = false;
-            return;
-        }
-
-        bool hasGsrName = !string.IsNullOrWhiteSpace(EditGsrName);
-        bool hasGsrContact = !string.IsNullOrWhiteSpace(EditGsrPhone) ||
-                            !string.IsNullOrWhiteSpace(EditGsrEmailPersonal);
-
-        CanSave = hasGsrName && hasGsrContact;
-    }
-
-    [RelayCommand]
-    private void StartEdit()
-    {
-        IsEditing = true;
-    }
-
-    [RelayCommand]
-    private async Task Save()
-    {
-        if (Meeting == null) return;
-
-        await ShowSaveFeedback();
-
-        // Validate required fields before saving
-        bool hasGsrName = !string.IsNullOrWhiteSpace(EditGsrName);
-        bool hasGsrContact = !string.IsNullOrWhiteSpace(EditGsrPhone) ||
-                            !string.IsNullOrWhiteSpace(EditGsrEmailPersonal);
-
-        if (!hasGsrName || !hasGsrContact)
-        {
-            var errors = new List<string>();
-
-            if (!hasGsrName)
-                errors.Add("GSR Name is required");
-
-            if (!hasGsrContact)
-                errors.Add("Either GSR Email or GSR Phone is required");
-
-            string errorMessage = string.Join("\n", errors);
-            await Shell.Current.DisplayAlert("Validation Error", $"Please fix the following errors:\n\n{errorMessage}", "OK");
-            return;
-        }
-
-        try
-        {
-            // Persist edited GSR values back to the first GSR in Group.Gsrs.
-            // MeetingEditViewModel edits only the primary/first GSR inline;
-            // additional GSRs are managed via EditGroupViewModel.
-            if (Meeting.Group != null)
-            {
-                var primaryGsr = Meeting.Group.Gsrs.FirstOrDefault();
-                if (primaryGsr != null)
-                {
-                    primaryGsr.Name = EditGsrName;
-                    primaryGsr.EmailPersonal = EditGsrEmailPersonal;
-                    primaryGsr.Phone = EditGsrPhone;
-                }
-                else
-                {
-                    Meeting.Group.Gsrs.Add(new Models.Member
-                    {
-                        GroupId = Meeting.Group.ID,
-                        Name = EditGsrName,
-                        EmailPersonal = EditGsrEmailPersonal,
-                        Phone = EditGsrPhone,
-                    });
-                }
-            }
-            Meeting.MeetingGenericEmail = EditMeetingGenericEmail;
-            Meeting.UsingGeneric = EditUsingGeneric;
-
-            // Save to repository
-            var savedMeeting = await _meetingRepository.SaveMeetingAsync(Meeting);
-
-            // Update the Meeting property to trigger UI refresh
-            Meeting = savedMeeting;
-
-            // Exit editing mode
-            IsEditing = false;
-        }
-        catch (Exception ex)
-        {
-            await Shell.Current.DisplayAlert("Error", $"Failed to save meeting: {ex.Message}", "OK");
-        }
-    }
-
-    [RelayCommand]
-    private async Task Cancel()
-    {
-        if (IsEditing)
-        {
-            // Check if there are unsaved changes
-            bool hasChanges = HasUnsavedChanges();
-
-            if (hasChanges)
-            {
-                bool shouldDiscard = await Shell.Current.DisplayAlert(
-                    "Discard Changes?",
-                    "You have unsaved changes. Are you sure you want to discard them?",
-                    "Discard",
-                    "Keep Editing");
-
-                if (!shouldDiscard)
-                    return;
-            }
-
-            IsEditing = false;
-        }
     }
 
     [RelayCommand]
@@ -337,20 +133,17 @@ public partial class MeetingEditViewModel : BaseViewModel
 
         try
         {
-            // Mark as attended and save
             if (Meeting != null)
             {
                 await _attendanceRegistration.Register(Meeting);
 
                 string personalName = Meeting.GetFirstName();
 
-                // Show success popup
                 await _popupService.ShowCountdownPopupAsync(
                     "Finished",
                     $"Thanks for registering {personalName}.",
                     async () => await Shell.Current.GoToAsync("//MainPage")
                 );
-
             }
         }
         catch (Exception ex)
@@ -358,20 +151,4 @@ public partial class MeetingEditViewModel : BaseViewModel
             await Shell.Current.DisplayAlert("Error", $"Failed to confirm meeting: {ex.Message}", "OK");
         }
     }
-
-    private bool HasUnsavedChanges()
-    {
-        return EditGsrName != DisplayGsrName ||
-               EditGsrEmailPersonal != DisplayGsrEmailPersonal ||
-               EditGsrPhone != DisplayGsrPhone ||
-               EditMeetingGenericEmail != DisplayMeetingGenericEmail ||
-               EditUsingGeneric != DisplayUsingGeneric;
-    }
-
-    private async Task ShowSaveFeedback()
-    {
-        await Task.Delay(100);
-        await Toast.Make("Updating Meeting...", ToastDuration.Short).Show();
-    }
-
 }

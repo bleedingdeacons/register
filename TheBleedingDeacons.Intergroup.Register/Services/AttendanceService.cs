@@ -1,8 +1,7 @@
 using Serilog;
-using TheBleedingDeacons.Intergroup.Register.Extensions;
-using TheBleedingDeacons.Intergroup.Register.Models;
 using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Support;
+using TheBleedingDeacons.Unity.Data.Entities;
 
 namespace TheBleedingDeacons.Intergroup.Register.Services
 {
@@ -12,8 +11,6 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 
         private readonly IMailService _mailService;
         private readonly IEmailTemplateService _emailTemplate;
-        private readonly IMeetingRepository _meetingRepository;
-        private readonly IPositionRepository _positionRepository;
         private readonly QueueingUnityApiService _unityApiService;
         private readonly IConfigurationService _configService;
 
@@ -22,15 +19,11 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
         private bool _disposed;
 
         public AttendanceService(
-            IMeetingRepository meetingRepository,
-            IPositionRepository positionRepository,
             IEmailTemplateService emailTemplate,
             IMailService mailService,
             QueueingUnityApiService unityApiService,
             IConfigurationService configService)
         {
-            _positionRepository = positionRepository;
-            _meetingRepository = meetingRepository;
             _mailService = mailService;
             _emailTemplate = emailTemplate;
             _unityApiService = unityApiService;
@@ -45,27 +38,23 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 
         public async Task Register(Position entity)
         {
-            entity.Attended = true;
-            await _positionRepository.SavePositionAsync(entity);
-
-            // Notify the Unity API that this position holder has registered attendance
             var config = await _configService.LoadUnityConfigurationAsync();
             if (config.ActiveIntergroupMeetingId.HasValue && config.IsValid())
             {
-                if (!entity.MemberId.HasValue || entity.MemberId.Value == 0)
+                var holder = entity.Holders.FirstOrDefault();
+                if (holder == null || holder.Id == 0)
                 {
-                    Logger.Warning(
-                        "Position {PositionName} has no associated member — skipping Unity API registration",
-                        entity.PositionName);
+                    Logger.Warning("Position {PositionName} has no associated member — skipping Unity API registration",
+                        entity.ShortDescription);
                 }
                 else
                 {
-                    var officerName = entity.MemberAnonymousName ?? string.Empty;
-                    var positionName = entity.PositionName ?? entity.PositionLongName ?? string.Empty;
+                    var officerName = holder.AnonymousName;
+                    var positionName = entity.ShortDescription ?? entity.LongName ?? string.Empty;
 
                     var response = await _unityApiService.RegisterOfficerAsync(
                         intergroupMeetingId: config.ActiveIntergroupMeetingId.Value,
-                        officerId: entity.MemberId.Value,
+                        officerId: holder.Id,
                         positionName: positionName,
                         officerName: officerName);
 
@@ -81,30 +70,20 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
             {
                 Logger.Information(
                     "Position {PositionName} attendance registered locally (Unity API not configured or no active meeting set)",
-                    entity.PositionName);
+                    entity.ShortDescription);
             }
         }
 
         public async Task Register(Meeting entity)
         {
-            entity.Attended = true;
-            await _meetingRepository.SaveMeetingAsync(entity);
-
-            // Notify the Unity API that this group/GSR has registered attendance
             var config = await _configService.LoadUnityConfigurationAsync();
             if (config.ActiveIntergroupMeetingId.HasValue && config.IsValid())
             {
-                // When standing in, the proxy is the attending GSR; otherwise use the primary GSR
-                var isProxy = entity.ProxyAttendance == true;
-                var registeredGsrName = isProxy
-                    ? entity.ProxyName ?? string.Empty
-                    : entity.Group?.Gsrs.FirstOrDefault()?.Name ?? string.Empty;
-
-                // Unity register-group requires the group ID (group CPT post ID).
-                var groupId = entity.Group?.ID ?? 0;
-
-                // Member ID of the GSR on record (optional, for the attendance record).
-                var memberId = entity.Group?.Gsrs.FirstOrDefault()?.ID ?? 0;
+                var isProxy = false; // TODO: proxy info needs to come from ViewModel context
+                var gsr = entity.Group?.Members.FirstOrDefault(m => m.IsGsr);
+                var gsrName = gsr?.AnonymousName ?? string.Empty;
+                var groupId = entity.Group?.Id ?? 0;
+                var memberId = gsr?.Id ?? 0;
 
                 if (groupId > 0)
                 {
@@ -112,9 +91,9 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
                         intergroupMeetingId: config.ActiveIntergroupMeetingId.Value,
                         groupId: groupId,
                         memberId: memberId,
-                        gsrName: registeredGsrName,
+                        gsrName: gsrName,
                         gsrProxy: isProxy,
-                        gsrProxyName: isProxy ? entity.ProxyName : null);
+                        gsrProxyName: null);
 
                     if (response.Success)
                         Logger.Information("Meeting {MeetingName} group attendance registered with Unity API", entity.Name);
@@ -125,9 +104,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
                 }
                 else
                 {
-                    Logger.Warning(
-                        "Meeting {MeetingName} has no group ID — skipping API registration",
-                        entity.Name);
+                    Logger.Warning("Meeting {MeetingName} has no group ID — skipping API registration", entity.Name);
                 }
             }
             else
@@ -137,44 +114,21 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
                     entity.Name);
             }
 
-            // TODO: Enable welcome email sending once SMTP is configured
-            // var welcome = new WelcomeEmail
-            // {
-            //     FirstName = entity.GetFirstName(),
-            //     MeetingName = entity.Name,
-            //     StartTime = entity.Time,
-            //     Location = entity.Location,
-            //     Address = entity.Address,
-            //     MeetingContacts = entity.GetContacts()
-            // };
-            // var emailBody = await _emailTemplate.RenderTemplateAsync("WelcomeEmail", welcome);
-            // foreach (var gsr in entity.Group?.Gsrs ?? [])
-            //     if (!string.IsNullOrEmpty(gsr.EmailPersonal))
-            //         await _mailService.SendEmailAsync(gsr.EmailPersonal, "Important information about your meeting.", emailBody, isHtml: true);
-
             Logger.Information("Meeting {MeetingName} attendance registered", entity.Name);
         }
 
         public async Task Unregister(Position entity)
         {
-            entity.Attended = false;
-            await _positionRepository.SavePositionAsync(entity);
-            Logger.Information("Position {PositionName} attendance unregistered", entity.PositionName);
+            Logger.Information("Position {PositionName} attendance unregistered", entity.ShortDescription);
+            await Task.CompletedTask;
         }
 
         public async Task Unregister(Meeting entity)
         {
-            entity.Attended = false;
-            entity.ProxyAttendance = false;
-            entity.ProxyEmail = null;
-            entity.ProxyName = null;
-            await _meetingRepository.SaveMeetingAsync(entity);
-
-            // Notify the Unity API that this group has unregistered
             var config = await _configService.LoadUnityConfigurationAsync();
             if (config.ActiveIntergroupMeetingId.HasValue && config.IsValid())
             {
-                var groupId = entity.Group?.ID ?? 0;
+                var groupId = entity.Group?.Id ?? 0;
 
                 if (groupId > 0)
                 {
@@ -189,18 +143,6 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
                     else
                         Logger.Warning("Meeting {MeetingName} Unity API unregistration returned: {Error}", entity.Name, response.Error?.Message);
                 }
-                else
-                {
-                    Logger.Warning(
-                        "Meeting {MeetingName} has no group ID — skipping API unregistration",
-                        entity.Name);
-                }
-            }
-            else
-            {
-                Logger.Information(
-                    "Meeting {MeetingName} attendance unregistered locally (Unity API not configured or no active meeting set)",
-                    entity.Name);
             }
 
             Logger.Information("Meeting {MeetingName} attendance unregistered", entity.Name);
@@ -215,6 +157,5 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
                 _disposed = true;
             }
         }
-
     }
 }

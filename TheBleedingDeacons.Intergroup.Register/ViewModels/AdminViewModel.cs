@@ -2,11 +2,10 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Serilog;
 using System.Collections.ObjectModel;
-using TheBleedingDeacons.Intergroup.Register.Data;
-using TheBleedingDeacons.Intergroup.Register.Models;
 using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Support;
-using Microsoft.EntityFrameworkCore;
+using TheBleedingDeacons.Unity.Data.Entities;
+using TheBleedingDeacons.Unity.Data.Repositories.Interfaces;
 
 namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 {
@@ -14,7 +13,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
     {
         private static readonly ILogger Logger = AppLogger.ForContext<AdminViewModel>();
 
-        private readonly RegisterContext _context;
+        private readonly IIntergroupMeetingRepository _intergroupMeetingRepository;
         private readonly IConfigurationService _configService;
 
         [ObservableProperty]
@@ -29,19 +28,17 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
         [ObservableProperty]
         private int? activeMeetingId = null;
 
-        /// <summary>The date string of whichever meeting is currently active, for display.</summary>
         [ObservableProperty]
         private string activeMeetingDate = string.Empty;
 
-        /// <summary>The title of whichever meeting is currently active, for display.</summary>
         [ObservableProperty]
         private string activeMeetingTitle = string.Empty;
 
         public ObservableCollection<IntergroupMeeting> Meetings { get; } = new();
 
-        public AdminViewModel(RegisterContext context, IConfigurationService configService)
+        public AdminViewModel(IIntergroupMeetingRepository intergroupMeetingRepository, IConfigurationService configService)
         {
-            _context = context;
+            _intergroupMeetingRepository = intergroupMeetingRepository;
             _configService = configService;
         }
 
@@ -61,9 +58,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
                 var config = await _configService.LoadUnityConfigurationAsync();
                 ActiveMeetingId = config.ActiveIntergroupMeetingId;
 
-                var meetings = await _context.IntergroupMeetings
-                    .OrderByDescending(m => m.Date)
-                    .ToListAsync();
+                var meetings = await _intergroupMeetingRepository.GetAllAsync();
 
                 Logger.Information("Loaded {Count} intergroup meetings from database", meetings.Count);
 
@@ -72,7 +67,6 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
                     Meetings.Clear();
                     foreach (var meeting in meetings)
                     {
-                        meeting.IsActive = meeting.ID == ActiveMeetingId;
                         Meetings.Add(meeting);
                     }
 
@@ -99,16 +93,13 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
         {
             if (meeting == null) return;
 
-            await _configService.SaveActiveIntergroupMeetingAsync(meeting.ID);
+            await _configService.SaveActiveIntergroupMeetingAsync(meeting.Id);
 
-            // Update IsActive on all meetings
-            foreach (var m in Meetings)
-                m.IsActive = m.ID == meeting.ID;
-
-            ActiveMeetingId = meeting.ID;
+            ActiveMeetingId = meeting.Id;
             UpdateActiveMeetingDate();
 
-            Logger.Information("Active intergroup meeting set to ID {Id}, Title {Title}, Date {Date}", meeting.ID, meeting.Title, meeting.Date);
+            Logger.Information("Active intergroup meeting set to ID {Id}, Title {Title}, Date {Date}",
+                meeting.Id, meeting.Title, meeting.Date);
 
             var label = string.IsNullOrWhiteSpace(meeting.Title) ? meeting.Date : $"{meeting.Title} ({meeting.Date})";
             await Shell.Current.DisplayAlert(
@@ -121,7 +112,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
         {
             if (ActiveMeetingId.HasValue)
             {
-                var match = Meetings.FirstOrDefault(m => m.ID == ActiveMeetingId.Value);
+                var match = Meetings.FirstOrDefault(m => m.Id == ActiveMeetingId.Value);
                 ActiveMeetingDate = match?.Date ?? string.Empty;
                 ActiveMeetingTitle = match?.Title ?? string.Empty;
             }

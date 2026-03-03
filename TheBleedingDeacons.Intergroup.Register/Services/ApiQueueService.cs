@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Serilog;
 using System.Net.Http.Headers;
 using System.Text;
@@ -7,32 +7,24 @@ using TheBleedingDeacons.Intergroup.Register.Data;
 using TheBleedingDeacons.Intergroup.Register.Models;
 using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Support;
+
 namespace TheBleedingDeacons.Intergroup.Register.Services;
 
 /// <summary>
 /// Outbox-pattern service that persists failed or offline Unity API calls to SQLite
 /// and replays them when the device regains connectivity.
-///
-/// Lifecycle
-/// ---------
-/// • Call <see cref="StartAsync"/> once from <c>MauiProgram</c> (or App.xaml.cs) after the
-///   DI container is built. The service subscribes to <see cref="Connectivity.ConnectivityChanged"/>
-///   and automatically flushes on every transition to an online state.
-/// • Individual callers just <c>await EnqueueAsync(…)</c> — they do not need to know whether
-///   the device is online.
+/// Now uses <see cref="QueueDbContext"/> instead of the old RegisterContext.
 /// </summary>
 public class ApiQueueService : IApiQueueService, IDisposable
 {
-    
     private const int MaxAttempts = ServiceConstants.ApiQueueMaxAttempts;
     private static readonly ILogger Logger = AppLogger.ForContext<ApiQueueService>();
 
-    private readonly IDbContextFactory<RegisterContext> _dbFactory;
+    private readonly IDbContextFactory<QueueDbContext> _dbFactory;
     private readonly IConfigurationService _configService;
     private readonly SemaphoreSlim _flushLock = new(1, 1);
     private bool _disposed;
 
-    // ------------------------------------------------------------------ ctor / lifecycle
     private const string OfflineModePreferenceKey = "api_queue_offline_mode";
 
     public bool IsOfflineModeEnabled
@@ -47,37 +39,25 @@ public class ApiQueueService : IApiQueueService, IDisposable
     }
 
     public ApiQueueService(
-        IDbContextFactory<RegisterContext> dbFactory,
+        IDbContextFactory<QueueDbContext> dbFactory,
         IConfigurationService configService)
     {
         _dbFactory = dbFactory;
         _configService = configService;
     }
 
-    /// <summary>
-    /// Subscribes to connectivity changes and does an initial flush.
-    /// Call this once during app startup.
-    /// </summary>
     public void Start()
     {
         Connectivity.ConnectivityChanged += OnConnectivityChanged;
         Logger.Information("ApiQueueService started – connectivity monitoring active");
-
-        
         FlushAsync().SafeFireAndForget("InitialFlush");
     }
 
-   
-    /// <inheritdoc />
     public event EventHandler<int>? PendingCountChanged;
 
-    /// <inheritdoc />
     public async Task EnqueueAsync(
-        string operationType,
-        string url,
-        string httpMethod,
-        string? jsonPayload = null,
-        CancellationToken cancellationToken = default)
+        string operationType, string url, string httpMethod,
+        string? jsonPayload = null, CancellationToken cancellationToken = default)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
 
@@ -93,18 +73,15 @@ public class ApiQueueService : IApiQueueService, IDisposable
         db.QueuedApiCalls.Add(entry);
         await db.SaveChangesAsync(cancellationToken);
 
-        Logger.Information(
-            "Enqueued API call {OperationType} → {Url} (queue entry {Id})",
+        Logger.Information("Enqueued API call {OperationType} → {Url} (queue entry {Id})",
             operationType, url, entry.Id);
 
         var pending = await GetPendingCountAsync(cancellationToken);
         RaisePendingCountChanged(pending);
     }
 
-    /// <inheritdoc />
     public async Task FlushAsync(CancellationToken cancellationToken = default)
     {
-        // Only one flush at a time
         if (!await _flushLock.WaitAsync(0, cancellationToken))
         {
             Logger.Debug("FlushAsync skipped – another flush is already running");
@@ -113,18 +90,10 @@ public class ApiQueueService : IApiQueueService, IDisposable
 
         try
         {
-            if (!IsOnline())
-            {
-                Logger.Debug("FlushAsync skipped – device is offline");
-                return;
-            }
+            if (!IsOnline()) { Logger.Debug("FlushAsync skipped – device is offline"); return; }
 
             var config = await _configService.LoadUnityConfigurationAsync();
-            if (!config.IsValid())
-            {
-                Logger.Warning("FlushAsync skipped – Unity API not configured");
-                return;
-            }
+            if (!config.IsValid()) { Logger.Warning("FlushAsync skipped – Unity API not configured"); return; }
 
             using var http = CreateHttpClient(config.ApiKey);
             var baseUrl = config.BaseUrl.TrimEnd('/');
@@ -136,11 +105,7 @@ public class ApiQueueService : IApiQueueService, IDisposable
                 .OrderBy(q => q.CreatedUtc)
                 .ToListAsync(cancellationToken);
 
-            if (pending.Count == 0)
-            {
-                Logger.Debug("FlushAsync – queue is empty");
-                return;
-            }
+            if (pending.Count == 0) { Logger.Debug("FlushAsync – queue is empty"); return; }
 
             Logger.Information("FlushAsync – processing {Count} queued call(s)", pending.Count);
 
@@ -149,24 +114,20 @@ public class ApiQueueService : IApiQueueService, IDisposable
             foreach (var entry in pending)
             {
                 if (cancellationToken.IsCancellationRequested) break;
-                if (!IsOnline()) break; // stop early if we lose connectivity mid-flush
+                if (!IsOnline()) break;
 
                 entry.AttemptCount++;
                 entry.LastAttemptUtc = DateTime.UtcNow;
 
                 try
                 {
-                    // Resolve full URL from current config + stored relative path
                     var resolvedUrl = $"{baseUrl}/{entry.Url.TrimStart('/')}";
-
                     using var response = await SendAsync(http, entry, resolvedUrl, cancellationToken);
 
                     if (response.IsSuccessStatusCode)
                     {
-                        Logger.Information(
-                            "Queued call {Id} ({OperationType}) succeeded on attempt {Attempt}",
+                        Logger.Information("Queued call {Id} ({Op}) succeeded on attempt {Attempt}",
                             entry.Id, entry.OperationType, entry.AttemptCount);
-
                         db.QueuedApiCalls.Remove(entry);
                         succeeded++;
                     }
@@ -175,130 +136,79 @@ public class ApiQueueService : IApiQueueService, IDisposable
                         var body = await response.Content.ReadAsStringAsync(cancellationToken);
                         entry.LastError = $"HTTP {(int)response.StatusCode}: {body.Truncate(200)}";
 
-                        // Permanent failures (4xx except 429 Too Many Requests) — give up
-                        if ((int)response.StatusCode is >= 400 and < 500
-                            and not 429
-                            and not 408)
+                        if ((int)response.StatusCode is >= 400 and < 500 and not 429 and not 408)
                         {
                             entry.IsFailed = true;
-                            Logger.Warning(
-                                "Queued call {Id} ({OperationType}) permanently failed: {Error}",
+                            Logger.Warning("Queued call {Id} ({Op}) permanently failed: {Error}",
                                 entry.Id, entry.OperationType, entry.LastError);
                         }
                         else
                         {
-                            Logger.Warning(
-                                "Queued call {Id} ({OperationType}) failed (attempt {Attempt}/{Max}): {Error}",
+                            Logger.Warning("Queued call {Id} ({Op}) failed (attempt {Attempt}/{Max}): {Error}",
                                 entry.Id, entry.OperationType, entry.AttemptCount, MaxAttempts, entry.LastError);
                         }
-
                         failed++;
                     }
                 }
                 catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or OperationCanceledException)
                 {
                     entry.LastError = ex.Message.Truncate(200);
-
-                    Logger.Warning(
-                        ex,
-                        "Queued call {Id} ({OperationType}) network error on attempt {Attempt}",
+                    Logger.Warning(ex, "Queued call {Id} ({Op}) network error on attempt {Attempt}",
                         entry.Id, entry.OperationType, entry.AttemptCount);
-
                     failed++;
-
-                    // Network error – no point trying the rest right now
                     break;
                 }
 
                 if (entry.AttemptCount >= MaxAttempts && !entry.IsFailed)
                 {
                     entry.IsFailed = true;
-                    Logger.Error(
-                        "Queued call {Id} ({OperationType}) abandoned after {Max} attempts",
+                    Logger.Error("Queued call {Id} ({Op}) abandoned after {Max} attempts",
                         entry.Id, entry.OperationType, MaxAttempts);
                 }
             }
 
             await db.SaveChangesAsync(cancellationToken);
-
-            Logger.Information(
-                "FlushAsync complete – {Succeeded} succeeded, {Failed} failed/deferred",
-                succeeded, failed);
+            Logger.Information("FlushAsync complete – {Succeeded} succeeded, {Failed} failed/deferred", succeeded, failed);
 
             var remaining = await GetPendingCountAsync(cancellationToken);
             RaisePendingCountChanged(remaining);
         }
-        finally
-        {
-            _flushLock.Release();
-        }
+        finally { _flushLock.Release(); }
     }
 
-    /// <inheritdoc />
     public async Task<int> GetPendingCountAsync(CancellationToken cancellationToken = default)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
-
-        return await db.QueuedApiCalls
-            .CountAsync(q => !q.IsFailed, cancellationToken);
+        return await db.QueuedApiCalls.CountAsync(q => !q.IsFailed, cancellationToken);
     }
-
-    // ------------------------------------------------------------------ private helpers
 
     private static bool IsOnline()
     {
-        try
-        {
-            return Connectivity.Current.NetworkAccess == NetworkAccess.Internet;
-        }
-        catch
-        {
-            return false;
-        }
+        try { return Connectivity.Current.NetworkAccess == NetworkAccess.Internet; }
+        catch { return false; }
     }
 
     private HttpClient CreateHttpClient(string apiKey)
     {
         var client = new HttpClient();
-        client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", apiKey);
-        client.DefaultRequestHeaders.Accept.Add(
-            new MediaTypeWithQualityHeaderValue("application/json"));
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+        client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         client.DefaultRequestHeaders.UserAgent.ParseAdd("IntegrityClient/1.0");
         return client;
     }
 
     private static async Task<HttpResponseMessage> SendAsync(
-        HttpClient http,
-        QueuedApiCall entry,
-        string resolvedUrl,
-        CancellationToken cancellationToken)
+        HttpClient http, QueuedApiCall entry, string resolvedUrl, CancellationToken ct)
     {
         return entry.HttpMethod switch
         {
-            "POST" => await http.PostAsync(
-                resolvedUrl,
-                entry.JsonPayload is null
-                    ? null
-                    : new StringContent(entry.JsonPayload, Encoding.UTF8, "application/json"),
-                cancellationToken),
-
-            "PUT" => await http.PutAsync(
-                resolvedUrl,
-                entry.JsonPayload is null
-                    ? null
-                    : new StringContent(entry.JsonPayload, Encoding.UTF8, "application/json"),
-                cancellationToken),
-
-            "PATCH" => await http.PatchAsync(
-                resolvedUrl,
-                entry.JsonPayload is null
-                    ? null
-                    : new StringContent(entry.JsonPayload, Encoding.UTF8, "application/json"),
-                cancellationToken),
-
-            "DELETE" => await http.DeleteAsync(resolvedUrl, cancellationToken),
-
+            "POST" => await http.PostAsync(resolvedUrl,
+                entry.JsonPayload is null ? null : new StringContent(entry.JsonPayload, Encoding.UTF8, "application/json"), ct),
+            "PUT" => await http.PutAsync(resolvedUrl,
+                entry.JsonPayload is null ? null : new StringContent(entry.JsonPayload, Encoding.UTF8, "application/json"), ct),
+            "PATCH" => await http.PatchAsync(resolvedUrl,
+                entry.JsonPayload is null ? null : new StringContent(entry.JsonPayload, Encoding.UTF8, "application/json"), ct),
+            "DELETE" => await http.DeleteAsync(resolvedUrl, ct),
             _ => throw new InvalidOperationException($"Unsupported HTTP method: {entry.HttpMethod}")
         };
     }
@@ -317,8 +227,6 @@ public class ApiQueueService : IApiQueueService, IDisposable
         try { PendingCountChanged?.Invoke(this, count); }
         catch (Exception ex) { Logger.Warning(ex, "PendingCountChanged handler threw"); }
     }
-
-    // ------------------------------------------------------------------ IDisposable
 
     public void Dispose()
     {

@@ -1,23 +1,29 @@
-﻿using CommunityToolkit.Maui;
+using CommunityToolkit.Maui;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Serilog.Events;
 using Serilog;
 using System.Reflection;
 using TheBleedingDeacons.Intergroup.Register.Data;
-using TheBleedingDeacons.Intergroup.Register.Models;
 using TheBleedingDeacons.Intergroup.Register.Services;
 using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Support;
 using TheBleedingDeacons.Intergroup.Register.ViewModels;
 using TheBleedingDeacons.Intergroup.Register.Views;
+using TheBleedingDeacons.Unity.Client;
+using TheBleedingDeacons.Unity.Data.Data;
+using TheBleedingDeacons.Unity.Data.Entities;
+using TheBleedingDeacons.Unity.Data.Repositories;
+using TheBleedingDeacons.Unity.Data.Repositories.Interfaces;
+using TheBleedingDeacons.Unity.Data.Services;
 using PopupNotificationService = TheBleedingDeacons.Intergroup.Register.Services.PopupNotificationService;
 
 namespace TheBleedingDeacons.Intergroup.Register;
 
 public static class MauiProgram
 {
-    public const string APP_DATABASE_NAME = "register.db";
+    public const string UNITY_DATABASE_NAME = "unity.db";
+    public const string QUEUE_DATABASE_NAME = "queue.db";
     public const string MAIL_DATABASE_NAME = "emails.db";
 
     public static MauiApp CreateMauiApp()
@@ -30,7 +36,6 @@ public static class MauiProgram
             {
                 fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
                 fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
-                //fonts.AddFont("Font Awesome 7 Brands-Regular-400.otf", "FontAwesome");
             });
 
         // Register logging service
@@ -39,35 +44,54 @@ public static class MauiProgram
         // Add configuration service
         builder.Services.AddSingleton<IConfigurationService, ConfigurationService>();
 
-        builder.Services.AddScoped<AttendanceService>();
-        builder.Services.AddScoped<IAttendanceRegistration<Meeting>>(sp => sp.GetRequiredService<AttendanceService>());
-        builder.Services.AddScoped<IAttendanceRegistration<Position>>(sp => sp.GetRequiredService<AttendanceService>());
+        // ── Unity.Data: DbContext + Repositories ──────────────────────
+        var unityDbPath = Path.Combine(FileSystem.AppDataDirectory, UNITY_DATABASE_NAME);
+        builder.Services.AddDbContext<UnityDbContext>(options =>
+            options.UseSqlite($"Data Source={unityDbPath}"));
 
-        // App Database
-        // CHANGED: also register IDbContextFactory so ApiQueueService (singleton) can
-        // open its own short-lived contexts outside of a DI scope.
-        var appDbPath = Path.Combine(FileSystem.AppDataDirectory, APP_DATABASE_NAME);
-        builder.Services.AddDbContext<RegisterContext>(options =>
-            options.UseSqlite($"Data Source={appDbPath}"));
-        builder.Services.AddDbContextFactory<RegisterContext>(options =>          // ADDED
-            options.UseSqlite($"Data Source={appDbPath}"), ServiceLifetime.Scoped);
+        Log.Logger.Information("Unity Db {databasePath}", unityDbPath);
 
-        Log.Logger.Information("Register Db {databasePath}", appDbPath);
+        builder.Services.AddScoped<IGroupRepository, GroupRepository>();
+        builder.Services.AddScoped<IMeetingRepository, MeetingRepository>();
+        builder.Services.AddScoped<IMemberRepository, MemberRepository>();
+        builder.Services.AddScoped<IPositionRepository, PositionRepository>();
+        builder.Services.AddScoped<IIntergroupMeetingRepository, IntergroupMeetingRepository>();
 
-        // Mail Database
+        // Unity REST client — created on demand from config
+        builder.Services.AddScoped<UnityRestSharp>(sp =>
+        {
+            var configService = sp.GetRequiredService<IConfigurationService>();
+            var config = configService.GetUnityConfiguration();
+            if (!config.IsValid())
+                throw new InvalidOperationException("Unity API is not configured.");
+            return new UnityRestSharp(config.BaseUrl, config.ApiKey);
+        });
+
+        // UnitySyncService — fetches from API and replaces local SQLite data
+        builder.Services.AddScoped<UnitySyncService>();
+
+        // ── Queue DB (offline API call outbox) ────────────────────────
+        var queueDbPath = Path.Combine(FileSystem.AppDataDirectory, QUEUE_DATABASE_NAME);
+        builder.Services.AddDbContextFactory<QueueDbContext>(options =>
+            options.UseSqlite($"Data Source={queueDbPath}"), ServiceLifetime.Scoped);
+
+        Log.Logger.Information("Queue Db {databasePath}", queueDbPath);
+
+        // ── Mail Database ─────────────────────────────────────────────
         var mailDbPath = Path.Combine(FileSystem.AppDataDirectory, MAIL_DATABASE_NAME);
         builder.Services.AddDbContextFactory<MailDbContext>(options =>
             options.UseSqlite($"Data Source={mailDbPath}"));
 
-        // Register Core Services
+        // ── Register Services ─────────────────────────────────────────
+        builder.Services.AddScoped<AttendanceService>();
+        builder.Services.AddScoped<IAttendanceRegistration<Meeting>>(sp => sp.GetRequiredService<AttendanceService>());
+        builder.Services.AddScoped<IAttendanceRegistration<Position>>(sp => sp.GetRequiredService<AttendanceService>());
+
         builder.Services.AddScoped<DataService>();
         builder.Services.AddScoped<SerializationService>();
         builder.Services.AddMemoryCache();
         builder.Services.AddSingleton<CacheService>();
 
-        builder.Services.AddScoped<IMeetingRepository, MeetingRepository>();
-        builder.Services.AddScoped<IPositionRepository, PositionRepository>();
-        
         builder.Services.AddScoped<IPopupNotification, PopupNotificationService>();
 
         // Register Email Templates
@@ -76,15 +100,13 @@ public static class MauiProgram
             return new EmailTemplateService(Assembly.GetExecutingAssembly(), "Templates");
         });
 
-        // Register the mail service with configuration
+        // Register the mail service
         builder.Services.AddSingleton<IMailService>(provider =>
         {
             var dbContextFactory = provider.GetRequiredService<IDbContextFactory<MailDbContext>>();
             var configService = provider.GetRequiredService<IConfigurationService>();
 
-            // Ensure database is created
             using var context = dbContextFactory.CreateDbContext();
-
             context.Database.EnsureCreated();
 
             var smtpConfig = configService.GetSmtpConfiguration();
@@ -99,18 +121,11 @@ public static class MauiProgram
             );
         });
 
-        // Register Unity API service (creates client on demand from config)
-        builder.Services.AddScoped<IUnityApiService, UnityApiService>();
-
-        // ADDED: offline queue — singleton so it survives scope boundaries and can
-        // subscribe to Connectivity.ConnectivityChanged for the app's lifetime.
+        // Offline queue
         builder.Services.AddSingleton<IApiQueueService, ApiQueueService>();
-
-        // ADDED: decorator that adds offline/retry queuing to Unity write operations
-        // (RegisterGroupAsync, RegisterOfficer, UpdateMember, and their Unregister twins).
         builder.Services.AddScoped<QueueingUnityApiService>();
 
-        // Views
+        // ── Views ─────────────────────────────────────────────────────
         builder.Services.AddTransient<MailSettingsPage>();
         builder.Services.AddTransient<MainPage>();
         builder.Services.AddTransient<GroupEditPage>();
@@ -125,11 +140,10 @@ public static class MauiProgram
         builder.Services.AddTransient<DatabaseBackupPage>();
         builder.Services.AddTransient<EmailStatusPage>();
         builder.Services.AddTransient<SettingsPage>();
-
         builder.Services.AddTransient<UnitySettingsPage>();
         builder.Services.AddTransient<AdminPage>();
 
-        // ViewModels        
+        // ── ViewModels ────────────────────────────────────────────────
         builder.Services.AddTransient<MailSettingsViewModel>();
         builder.Services.AddTransient<MainPageViewModel>();
         builder.Services.AddTransient<MeetingSelectionViewModel>();
@@ -154,23 +168,20 @@ public static class MauiProgram
 
         var mauiapp = builder.Build();
 
-        // Force database creation and load data synchronously
+        // Ensure databases are created
         using (var scope = mauiapp.Services.CreateScope())
         {
-            var context = scope.ServiceProvider.GetRequiredService<RegisterContext>();
+            var unityDb = scope.ServiceProvider.GetRequiredService<UnityDbContext>();
+            unityDb.Database.EnsureCreated();
 
-            // Ensure database is created (also creates QueuedApiCalls table on first run)
-            context.Database.EnsureCreated();
+            var queueFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<QueueDbContext>>();
+            using var queueDb = queueFactory.CreateDbContext();
+            queueDb.Database.EnsureCreated();
 
-            // Load all data synchronously
-            var meetings = context.Meetings.ToList();
-            var positions = context.Positions.ToList();
-
-            System.Diagnostics.Debug.WriteLine($"Loaded {meetings.Count} meetings and {positions.Count} positions.");
+            System.Diagnostics.Debug.WriteLine("Unity and Queue databases initialized.");
         }
 
-        // ADDED: start the queue service — subscribes to connectivity changes and
-        // does an initial flush of any calls that were queued before the last app close.
+        // Start the queue service
         var queueService = mauiapp.Services.GetRequiredService<IApiQueueService>() as ApiQueueService;
         queueService?.Start();
 
@@ -179,12 +190,9 @@ public static class MauiProgram
 
     private static void SetupSerilog(MauiAppBuilder builder)
     {
-        // Load appsettings.json
-
         var logPath = Path.Combine(FileSystem.AppDataDirectory, "logs");
         Directory.CreateDirectory(logPath);
 
-        // Get app configuration
         var appName = builder.Configuration["App:Name"] ?? "Badi";
         var environment = builder.Configuration["App:Environment"] ?? "Development";
 
@@ -208,19 +216,15 @@ public static class MauiProgram
             .WriteTo.Console()
             .WriteTo.Debug();
 #else
-        config.WriteTo.File(Path.Combine(logPath, $"{appName.ToLower()}-.log"), 
+        config.WriteTo.File(Path.Combine(logPath, $"{appName.ToLower()}-.log"),
             rollingInterval: RollingInterval.Day,
             retainedFileCountLimit: 7,
             restrictedToMinimumLevel: LogEventLevel.Information);
-
-        //ConfigureLoki(config, builder.Configuration, appName, environment);
 #endif
 
         Log.Logger = config.CreateLogger();
 
-        // Log startup info
         Log.Information("Application {AppName} v{Version} starting on {Platform}",
             appName, AppInfo.VersionString, DeviceInfo.Platform);
-
     }
 }

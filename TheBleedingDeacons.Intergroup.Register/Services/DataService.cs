@@ -1,82 +1,62 @@
-using Microsoft.EntityFrameworkCore;
 using OfficeOpenXml;
 using Serilog;
-using TheBleedingDeacons.Intergroup.Register.Data;
-using TheBleedingDeacons.Intergroup.Register.Models;
-using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Support;
-using TheBleedingDeacons.Intergroup.Register.Utilities;
+using TheBleedingDeacons.Unity.Data.Entities;
+using TheBleedingDeacons.Unity.Data.Repositories.Interfaces;
+using TheBleedingDeacons.Unity.Data.Services;
 
 namespace TheBleedingDeacons.Intergroup.Register.Services;
 
 /// <summary>
-/// Handles Excel import/export and search operations.
-/// For standard CRUD, use IMeetingRepository and IPositionRepository directly.
+/// Handles Unity sync, Excel export, and search operations.
+/// All domain data access goes through Unity.Data repositories.
 /// </summary>
 public class DataService
 {
     private static readonly ILogger Logger = AppLogger.ForContext<DataService>();
 
-    private readonly RegisterContext _context;
+    private readonly UnitySyncService _syncService;
     private readonly IMeetingRepository _meetingRepository;
     private readonly IPositionRepository _positionRepository;
 
-    public DataService(RegisterContext context, IMeetingRepository meetingRepository, IPositionRepository positionRepository)
+    public DataService(
+        UnitySyncService syncService,
+        IMeetingRepository meetingRepository,
+        IPositionRepository positionRepository)
     {
-        _context = context;
+        _syncService = syncService;
         _meetingRepository = meetingRepository;
         _positionRepository = positionRepository;
     }
 
     // ====================================================================
-    // Import Methods
+    // Import (Sync) Methods
     // ====================================================================
 
-    public async Task<(int Meetings, int Positions, int Members, int Groups, int IntergroupMeetings)> ImportFromUnityAsync(IUnityApiService unityApiService, CancellationToken cancellationToken = default)
+    public async Task<(int Meetings, int Positions, int Members, int Groups, int IntergroupMeetings)> ImportFromUnityAsync(
+        CancellationToken cancellationToken = default)
     {
         try
         {
-            Logger.Information("Starting import from Unity API");
+            Logger.Information("Starting sync from Unity API");
 
-            var data = await unityApiService.GetRegisterDataAsync(cancellationToken);
-
-            // Delete in FK order: dependents first, then principals.
-            // ExecuteDeleteAsync bypasses the change tracker, so we clear it afterward
-            // to prevent identity-conflict errors when AddRangeAsync tracks the new entities.
-            await _context.Members.ExecuteDeleteAsync(cancellationToken);
-            await _context.Meetings.ExecuteDeleteAsync(cancellationToken);
-            await _context.Groups.ExecuteDeleteAsync(cancellationToken);
-            await _context.Positions.ExecuteDeleteAsync(cancellationToken);
-            await _context.IntergroupMeetings.ExecuteDeleteAsync(cancellationToken);
-
-            _context.ChangeTracker.Clear();
-
-            // Insert Groups only — Meetings and Members are attached as nav properties
-            // so EF resolves all FKs and inserts them in the correct order automatically
-            await _context.Groups.AddRangeAsync(data.Groups, cancellationToken);
-            await _context.Positions.AddRangeAsync(data.Positions, cancellationToken);
-            await _context.IntergroupMeetings.AddRangeAsync(data.IntergroupMeetings, cancellationToken);
-
-            await _context.SaveChangesAsync(cancellationToken);
-
-            await _meetingRepository.InvalidateAllMeetingsCacheAsync();
-            await _positionRepository.InvalidateAllPositionsCacheAsync();
+            var result = await _syncService.SyncAsync(cancellationToken);
 
             Logger.Information(
-                "Unity import complete: {Groups} groups, {Meetings} meetings, {Members} GSR members, {Positions} positions, {IntergroupMeetings} intergroup meetings",
-                data.Groups.Count, data.Meetings.Count, data.Members.Count, data.Positions.Count, data.IntergroupMeetings.Count);
+                "Unity sync complete: {Groups} groups, {Meetings} meetings, {Members} members, {Positions} positions, {IntergroupMeetings} intergroup meetings",
+                result.Groups, result.Meetings, result.Members, result.Positions, result.IntergroupMeetings);
 
-            return (data.Meetings.Count, data.Positions.Count, data.Members.Count, data.Groups.Count, data.IntergroupMeetings.Count);
+            return (result.Meetings, result.Positions, result.Members, result.Groups, result.IntergroupMeetings);
         }
         catch (Exception ex)
         {
-            Logger.Error(ex, "Import from Unity API failed");
+            Logger.Error(ex, "Sync from Unity API failed");
             throw;
         }
     }
 
     // ====================================================================
-    // Import/Export Methods
+    // Export Methods
     // ====================================================================
 
     public async Task<byte[]?> ExportToExcel()
@@ -86,12 +66,12 @@ public class DataService
             ExcelPackage.License.SetNonCommercialOrganization("AABristol");
             using var package = new ExcelPackage();
 
-            // Sort By Day Start on Monday
-            var meetings = await _meetingRepository.GetAllMeetingsAsync();
+            var meetings = await _meetingRepository.GetAllAsync();
 
+            // Sort by Day, start on Monday
             meetings = meetings.OrderBy(m =>
             {
-                if (Enum.TryParse<DayOfWeek>(m.Day, out var dayOfWeek))
+                if (Enum.TryParse<DayOfWeek>(m.DayOfWeek, out var dayOfWeek))
                     return dayOfWeek == DayOfWeek.Sunday ? 6 : (int)dayOfWeek - 1;
                 else
                     return int.MaxValue;
@@ -99,108 +79,75 @@ public class DataService
 
             if (meetings.Count > 0)
             {
-                var meetingsWorksheet = package.Workbook.Worksheets.Add("Meetings");
+                var ws = package.Workbook.Worksheets.Add("Meetings");
 
-                // Add headers for Meetings
-                meetingsWorksheet.Cells[1, 1].Value = "ID";
-                meetingsWorksheet.Cells[1, 2].Value = "Day";
-                meetingsWorksheet.Cells[1, 3].Value = "Time";
-                meetingsWorksheet.Cells[1, 4].Value = "End Time";
-                meetingsWorksheet.Cells[1, 5].Value = "Name";
-                meetingsWorksheet.Cells[1, 6].Value = "Gsr Name";
-                meetingsWorksheet.Cells[1, 7].Value = "Gsr Email Personal";
-                meetingsWorksheet.Cells[1, 8].Value = "Gsr Phone";
-                meetingsWorksheet.Cells[1, 9].Value = "Meeting Generic Email";
-                meetingsWorksheet.Cells[1, 10].Value = "Using Generic";
-                meetingsWorksheet.Cells[1, 11].Value = "Location";
-                meetingsWorksheet.Cells[1, 12].Value = "Address";
-                meetingsWorksheet.Cells[1, 13].Value = "Contact 1 Name";
-                meetingsWorksheet.Cells[1, 14].Value = "Contact 1 Email";
-                meetingsWorksheet.Cells[1, 15].Value = "Contact 1 Phone";
-                meetingsWorksheet.Cells[1, 16].Value = "Contact 2 Name";
-                meetingsWorksheet.Cells[1, 17].Value = "Contact 2 Email";
-                meetingsWorksheet.Cells[1, 18].Value = "Contact 2 Phone";
-                meetingsWorksheet.Cells[1, 19].Value = "Contact 3 Name";
-                meetingsWorksheet.Cells[1, 20].Value = "Contact 3 Email";
-                meetingsWorksheet.Cells[1, 21].Value = "Contact 3 Phone";
-                meetingsWorksheet.Cells[1, 22].Value = "Updated";
-                meetingsWorksheet.Cells[1, 23].Value = "Attended";
-                meetingsWorksheet.Cells[1, 24].Value = "Proxy Attended";
-                meetingsWorksheet.Cells[1, 25].Value = "Proxy Name";
-                meetingsWorksheet.Cells[1, 26].Value = "Proxy Email";
+                ws.Cells[1, 1].Value = "ID";
+                ws.Cells[1, 2].Value = "Day";
+                ws.Cells[1, 3].Value = "Time";
+                ws.Cells[1, 4].Value = "End Time";
+                ws.Cells[1, 5].Value = "Name";
+                ws.Cells[1, 6].Value = "GSR Name";
+                ws.Cells[1, 7].Value = "GSR Email";
+                ws.Cells[1, 8].Value = "GSR Phone";
+                ws.Cells[1, 9].Value = "Location";
+                ws.Cells[1, 10].Value = "Address";
+                ws.Cells[1, 11].Value = "Types";
+                ws.Cells[1, 12].Value = "Online";
 
                 for (int i = 0; i < meetings.Count; i++)
                 {
                     int row = i + 2;
-                    var meeting = meetings[i];
+                    var m = meetings[i];
+                    var gsrs = m.Group?.Members.Where(mb => mb.IsGsr).ToList() ?? [];
 
-                    meetingsWorksheet.Cells[row, 1].Value = meeting.ID;
-                    meetingsWorksheet.Cells[row, 2].Value = meeting.Day;
-                    meetingsWorksheet.Cells[row, 3].Value = meeting.Time;
-                    meetingsWorksheet.Cells[row, 4].Value = meeting.EndTime;
-                    meetingsWorksheet.Cells[row, 5].Value = meeting.Name;
-                    // Export all GSRs as a semicolon-separated list per cell
-                    meetingsWorksheet.Cells[row, 6].Value = string.Join("; ", meeting.Group?.Gsrs.Select(g => g.Name ?? "") ?? []);
-                    meetingsWorksheet.Cells[row, 7].Value = string.Join("; ", meeting.Group?.Gsrs.Select(g => g.EmailPersonal ?? "") ?? []);
-                    meetingsWorksheet.Cells[row, 8].Value = string.Join("; ", meeting.Group?.Gsrs.Select(g => g.Phone ?? "") ?? []);
-                    meetingsWorksheet.Cells[row, 9].Value = meeting.MeetingGenericEmail;
-                    meetingsWorksheet.Cells[row, 10].Value = meeting.UsingGeneric;
-                    meetingsWorksheet.Cells[row, 11].Value = meeting.Location;
-                    meetingsWorksheet.Cells[row, 12].Value = meeting.Address;
-                    meetingsWorksheet.Cells[row, 13].Value = meeting.Contact1Name;
-                    meetingsWorksheet.Cells[row, 14].Value = meeting.Contact1Email;
-                    meetingsWorksheet.Cells[row, 15].Value = meeting.Contact1Phone;
-                    meetingsWorksheet.Cells[row, 16].Value = meeting.Contact2Name;
-                    meetingsWorksheet.Cells[row, 17].Value = meeting.Contact2Email;
-                    meetingsWorksheet.Cells[row, 18].Value = meeting.Contact2Phone;
-                    meetingsWorksheet.Cells[row, 19].Value = meeting.Contact3Name;
-                    meetingsWorksheet.Cells[row, 20].Value = meeting.Contact3Email;
-                    meetingsWorksheet.Cells[row, 21].Value = meeting.Contact3Phone;
-                    meetingsWorksheet.Cells[row, 22].Value = meeting.Updated?.ToString("yyyy-MM-dd HH:mm:ss");
-                    meetingsWorksheet.Cells[row, 23].Value = meeting.Attended;
-                    meetingsWorksheet.Cells[row, 24].Value = meeting.ProxyAttendance;
-                    meetingsWorksheet.Cells[row, 25].Value = meeting.ProxyName;
-                    meetingsWorksheet.Cells[row, 26].Value = meeting.ProxyEmail;
+                    ws.Cells[row, 1].Value = m.Id;
+                    ws.Cells[row, 2].Value = m.DayOfWeek;
+                    ws.Cells[row, 3].Value = m.Time;
+                    ws.Cells[row, 4].Value = m.EndTime;
+                    ws.Cells[row, 5].Value = m.Name;
+                    ws.Cells[row, 6].Value = string.Join("; ", gsrs.Select(g => g.AnonymousName));
+                    ws.Cells[row, 7].Value = string.Join("; ", gsrs.Select(g => g.PersonalEmail ?? ""));
+                    ws.Cells[row, 8].Value = string.Join("; ", gsrs.Select(g => g.MobileNumber ?? ""));
+                    ws.Cells[row, 9].Value = m.LocationName;
+                    ws.Cells[row, 10].Value = m.Address;
+                    ws.Cells[row, 11].Value = m.Types;
+                    ws.Cells[row, 12].Value = m.IsOnline;
                 }
 
-                meetingsWorksheet.Cells.AutoFitColumns();
+                ws.Cells.AutoFitColumns();
             }
 
-            // Export Positions
-            var positions = await _positionRepository.GetAllPositionsAsync();
+            var positions = await _positionRepository.GetAllAsync();
             if (positions.Count > 0)
             {
-                var positionsWorksheet = package.Workbook.Worksheets.Add("Positions");
+                var ws = package.Workbook.Worksheets.Add("Positions");
 
-                positionsWorksheet.Cells[1, 1].Value = "ID";
-                positionsWorksheet.Cells[1, 2].Value = "Position Name";
-                positionsWorksheet.Cells[1, 3].Value = "Position Long Name";
-                positionsWorksheet.Cells[1, 4].Value = "Position Generic Email";
-                positionsWorksheet.Cells[1, 5].Value = "Member Anonymous Name";
-                positionsWorksheet.Cells[1, 6].Value = "Member Personal Email";
-                positionsWorksheet.Cells[1, 7].Value = "Member Mobile";
-                positionsWorksheet.Cells[1, 8].Value = "Position Duration";
-                positionsWorksheet.Cells[1, 9].Value = "Started Service";
-                positionsWorksheet.Cells[1, 10].Value = "Attended";
+                ws.Cells[1, 1].Value = "ID";
+                ws.Cells[1, 2].Value = "Position Name";
+                ws.Cells[1, 3].Value = "Long Name";
+                ws.Cells[1, 4].Value = "Email";
+                ws.Cells[1, 5].Value = "Holder";
+                ws.Cells[1, 6].Value = "Holder Email";
+                ws.Cells[1, 7].Value = "Holder Mobile";
+                ws.Cells[1, 8].Value = "Term Years";
 
                 for (int i = 0; i < positions.Count; i++)
                 {
                     int row = i + 2;
-                    var position = positions[i];
+                    var p = positions[i];
+                    var holder = p.Holders.FirstOrDefault();
 
-                    positionsWorksheet.Cells[row, 1].Value = position.ID;
-                    positionsWorksheet.Cells[row, 2].Value = position.PositionName;
-                    positionsWorksheet.Cells[row, 3].Value = position.PositionLongName;
-                    positionsWorksheet.Cells[row, 4].Value = position.PositionGenericEmail;
-                    positionsWorksheet.Cells[row, 5].Value = position.MemberAnonymousName;
-                    positionsWorksheet.Cells[row, 6].Value = position.MemberPersonalEmail;
-                    positionsWorksheet.Cells[row, 7].Value = position.MemberMobile;
-                    positionsWorksheet.Cells[row, 8].Value = position.PositionDuration;
-                    positionsWorksheet.Cells[row, 9].Value = position.StartedService?.ToString("yyyy-MM-dd");
-                    positionsWorksheet.Cells[row, 10].Value = position.Attended;
+                    ws.Cells[row, 1].Value = p.Id;
+                    ws.Cells[row, 2].Value = p.ShortDescription;
+                    ws.Cells[row, 3].Value = p.LongName;
+                    ws.Cells[row, 4].Value = p.Email;
+                    ws.Cells[row, 5].Value = holder?.AnonymousName;
+                    ws.Cells[row, 6].Value = holder?.PersonalEmail;
+                    ws.Cells[row, 7].Value = holder?.MobileNumber;
+                    ws.Cells[row, 8].Value = p.TermYears;
                 }
 
-                positionsWorksheet.Cells.AutoFitColumns();
+                ws.Cells.AutoFitColumns();
             }
 
             return await package.GetAsByteArrayAsync();
@@ -213,29 +160,12 @@ public class DataService
     }
 
     // ====================================================================
-    // Search Methods (kept here as they span the DbContext directly)
+    // Search Methods
     // ====================================================================
 
-    public async Task<List<Meeting>> SearchMeetings(string searchTerm)
-    {
-        return await _context.Meetings
-            .Where(m => (m.Name ?? "").Contains(searchTerm) ||
-                       (m.Day ?? "").Contains(searchTerm) ||
-                       (m.Contact1Name ?? "").Contains(searchTerm) ||
-                       (m.Contact2Name ?? "").Contains(searchTerm) ||
-                       (m.Contact3Name ?? "").Contains(searchTerm))
-            .OrderBy(m => m.Day)
-            .ThenBy(m => m.Name)
-            .ToListAsync();
-    }
+    public async Task<List<Meeting>> SearchMeetings(string searchTerm) =>
+        await _meetingRepository.SearchAsync(searchTerm);
 
-    public async Task<List<Position>> SearchPositions(string searchTerm)
-    {
-        return await _context.Positions
-            .Where(p => (p.PositionName ?? "").Contains(searchTerm) ||
-                       (p.PositionLongName ?? "").Contains(searchTerm) ||
-                       (p.MemberAnonymousName ?? "").Contains(searchTerm))
-            .OrderBy(p => p.PositionName)
-            .ToListAsync();
-    }
+    public async Task<List<Position>> SearchPositions(string searchTerm) =>
+        await _positionRepository.SearchAsync(searchTerm);
 }

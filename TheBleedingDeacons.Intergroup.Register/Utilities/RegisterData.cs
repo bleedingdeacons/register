@@ -1,7 +1,11 @@
-using TheBleedingDeacons.Intergroup.Register.Models;
+using TheBleedingDeacons.Unity.Data.Entities;
 
 namespace TheBleedingDeacons.Intergroup.Register.Utilities;
 
+/// <summary>
+/// Container for the full set of data held in the local Unity database.
+/// All types are from <see cref="TheBleedingDeacons.Unity.Data.Entities"/>.
+/// </summary>
 public class RegisterData
 {
     public List<Group> Groups { get; set; } = new();
@@ -18,21 +22,13 @@ public class RegisterData
 
     public RegisterData() { }
 
-    public RegisterData(List<Meeting> meetings, List<Position> positions)
-        : this(new List<Group>(), meetings, positions, new List<Member>(), new List<IntergroupMeeting>()) { }
-
-    public RegisterData(List<Meeting> meetings, List<Position> positions, List<Member> members)
-        : this(new List<Group>(), meetings, positions, members, new List<IntergroupMeeting>()) { }
-
-    public RegisterData(List<Group> groups, List<Meeting> meetings, List<Position> positions, List<Member> members)
-        : this(groups, meetings, positions, members, new List<IntergroupMeeting>()) { }
-
-    public RegisterData(List<Group> groups, List<Meeting> meetings, List<Position> positions, List<Member> members, List<IntergroupMeeting> intergroupMeetings)
+    public RegisterData(List<Group> groups, List<Meeting> meetings, List<Position> positions,
+        List<Member> members, List<IntergroupMeeting> intergroupMeetings)
     {
-        Groups = groups ?? new List<Group>();
-        Meetings = meetings ?? new List<Meeting>();
-        Positions = positions ?? new List<Position>();
-        Members = members ?? new List<Member>();
-        IntergroupMeetings = intergroupMeetings ?? new List<IntergroupMeeting>();
+        Groups = groups ?? new();
+        Meetings = meetings ?? new();
+        Positions = positions ?? new();
+        Members = members ?? new();
+        IntergroupMeetings = intergroupMeetings ?? new();
     }
 }

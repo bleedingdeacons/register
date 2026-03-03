@@ -1,4 +1,5 @@
 using TheBleedingDeacons.Intergroup.Register.Models;
+using TheBleedingDeacons.Unity.Data.Entities;
 
 namespace TheBleedingDeacons.Intergroup.Register.Extensions
 {
@@ -11,70 +12,32 @@ namespace TheBleedingDeacons.Intergroup.Register.Extensions
             if (meeting == null)
                 throw new ArgumentNullException(nameof(meeting));
 
-            return !string.IsNullOrEmpty(meeting.Types) && meeting.Types.ToLower().Contains(ONLINE_TAG);
-        }
-
-        public static bool HasAll(this Meeting meeting)
-        {
-            if (meeting == null)
-                throw new ArgumentNullException(nameof(meeting));
-
-            // At least one GSR must have all required fields
-            var gsrs = meeting.Group?.Gsrs;
-            return gsrs != null
-                && gsrs.Any(g => !string.IsNullOrEmpty(g.Name)
-                              && !string.IsNullOrEmpty(g.Phone)
-                              && !string.IsNullOrEmpty(g.EmailPersonal));
+            return meeting.IsOnline ||
+                   (!string.IsNullOrEmpty(meeting.Types) &&
+                    meeting.Types.ToLowerInvariant().Contains(ONLINE_TAG));
         }
 
         public static List<MeetingContact> GetContacts(this Meeting meeting)
         {
-            var contacts = new List<MeetingContact>();
-
-            if (meeting == null)
-                return contacts;
-
-            if (!string.IsNullOrEmpty(meeting.Contact1Name))
-            {
-                contacts.Add(new MeetingContact
-                {
-                    Name = meeting.Contact1Name,
-                    Email = meeting.Contact1Email ?? string.Empty,
-                    Mobile = meeting.Contact1Phone ?? string.Empty
-                });
-            }
-
-            if (!string.IsNullOrEmpty(meeting.Contact2Name))
-            {
-                contacts.Add(new MeetingContact
-                {
-                    Name = meeting.Contact2Name,
-                    Email = meeting.Contact2Email ?? string.Empty,
-                    Mobile = meeting.Contact2Phone ?? string.Empty
-                });
-            }
-
-            if (!string.IsNullOrEmpty(meeting.Contact3Name))
-            {
-                contacts.Add(new MeetingContact
-                {
-                    Name = meeting.Contact3Name,
-                    Email = meeting.Contact3Email ?? string.Empty,
-                    Mobile = meeting.Contact3Phone ?? string.Empty
-                });
-            }
-
-            return contacts;
+            // Unity.Data.Entities.Meeting doesn't carry contacts directly.
+            // Contacts live on the Unity.Models.Meeting / Group level.
+            // This is a placeholder — the register may need to resolve contacts
+            // from the group or from cached API data.
+            return new List<MeetingContact>();
         }
 
-        public static string GetFirstName(this Meeting meeting)
+        /// <summary>
+        /// Gets the first name from the first GSR member of the meeting's group,
+        /// or from a proxy name if provided.
+        /// </summary>
+        public static string GetFirstName(this Meeting meeting, string? proxyName = null)
         {
             string name;
 
-            if (!string.IsNullOrWhiteSpace(meeting.ProxyName))
-                name = meeting.ProxyName;
+            if (!string.IsNullOrWhiteSpace(proxyName))
+                name = proxyName;
             else
-                name = meeting.Group?.Gsrs.FirstOrDefault()?.Name ?? string.Empty;
+                name = meeting.Group?.Members.FirstOrDefault(m => m.IsGsr)?.AnonymousName ?? string.Empty;
 
             return name.Split(' ').First();
         }

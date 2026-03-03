@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using TheBleedingDeacons.Intergroup.Register.Models;
 
@@ -28,7 +28,6 @@ public class QueuedApiCallConfiguration : IEntityTypeConfiguration<QueuedApiCall
         builder.Property(q => q.LastError)
                .HasMaxLength(1000);
 
-        // Useful index for the flush loop: pending calls ordered by creation time
         builder.HasIndex(q => new { q.IsFailed, q.CreatedUtc });
     }
 }
