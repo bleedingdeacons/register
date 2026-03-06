@@ -13,6 +13,11 @@ public class Member
     public string? MobileNumber { get; set; }
     public bool IsGsr { get; set; }
 
+    /// <summary>
+    /// UTC timestamp of the last local persistence of changes to this entity.
+    /// </summary>
+    public DateTime? Updated { get; set; }
+
     // FK to the member's home group (nullable — some members may not have a home group)
     public int? HomeGroupId { get; set; }
     public Group? HomeGroup { get; set; }

@@ -31,6 +31,8 @@ public class MemberConfiguration : IEntityTypeConfiguration<Member>
         builder.Property(m => m.MobileNumber)
             .HasMaxLength(60);
 
+        builder.Property(m => m.Updated);
+
         // HomeGroup FK is configured from GroupConfiguration (WithOne → HasForeignKey)
 
         // Many-to-one: multiple members can hold the same position

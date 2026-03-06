@@ -10,6 +10,11 @@ public class Contact
     public string? Email { get; set; }
     public string? Phone { get; set; }
 
+    /// <summary>
+    /// UTC timestamp of the last local persistence of changes to this entity.
+    /// </summary>
+    public DateTime? Updated { get; set; }
+
     // FK to the parent group
     public int GroupId { get; set; }
     public Group? Group { get; set; }

@@ -5,7 +5,7 @@
 $projectPaths = @(
     "C:\Users\David\Local Sites\unity-dev\app\public\wp-content\plugins\integrity\sharp\TheBleedingDeacons.Unity.Models",
     "C:\Users\David\Local Sites\unity-dev\app\public\wp-content\plugins\integrity\sharp\TheBleedingDeacons.Unity.Client",
-	"C:\Data\dev\Register\TheBleedingDeacons.Unity.Data",
+	"C:\Data\dev\Register\TheBleedingDeacons.Unity.Intergroup",
     "C:\Data\dev\Register\TheBleedingDeacons.Intergroup.Register"
 )
 

@@ -35,6 +35,8 @@ public class GroupConfiguration : IEntityTypeConfiguration<Group>
         builder.Property(g => g.Registered)
             .HasDefaultValue(false);
 
+        builder.Property(g => g.Updated);
+
         // One-to-many: Group → Members (GSRs whose home group this is)
         builder.HasMany(g => g.Members)
             .WithOne(m => m.HomeGroup)

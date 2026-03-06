@@ -19,6 +19,11 @@ public class Group
     /// </summary>
     public bool Registered { get; set; }
 
+    /// <summary>
+    /// UTC timestamp of the last local persistence of changes to this entity.
+    /// </summary>
+    public DateTime? Updated { get; set; }
+
     // Navigation: a group can have multiple GSR members
     public List<Member> Members { get; set; } = [];
 

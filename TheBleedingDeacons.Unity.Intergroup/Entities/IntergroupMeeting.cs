@@ -28,4 +28,9 @@ public class IntergroupMeeting
     /// Comma-separated display names of officer attendees.
     /// </summary>
     public string? OfficerAttendeeNames { get; set; }
+
+    /// <summary>
+    /// UTC timestamp of the last local persistence of changes to this entity.
+    /// </summary>
+    public DateTime? Updated { get; set; }
 }

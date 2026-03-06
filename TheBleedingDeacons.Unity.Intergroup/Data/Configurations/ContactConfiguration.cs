@@ -27,6 +27,8 @@ public class ContactConfiguration : IEntityTypeConfiguration<Contact>
         builder.Property(c => c.Phone)
             .HasMaxLength(60);
 
+        builder.Property(c => c.Updated);
+
         builder.HasIndex(c => c.GroupId);
     }
 }

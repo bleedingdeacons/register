@@ -18,6 +18,11 @@ public class Position
     /// </summary>
     public bool Registered { get; set; }
 
+    /// <summary>
+    /// UTC timestamp of the last local persistence of changes to this entity.
+    /// </summary>
+    public DateTime? Updated { get; set; }
+
     // Navigation: members currently holding this position
     public List<Member> Holders { get; set; } = [];
 }
