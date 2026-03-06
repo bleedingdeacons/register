@@ -16,18 +16,15 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
         private static readonly ILogger Logger = AppLogger.ForContext<SettingsViewModel>();
 
         private readonly DataService _dataService;
-        private readonly IUnityApiService _unityApiService;
         private readonly IConfigurationService _configService;
         private readonly IApiQueueService _apiQueueService;
 
         public SettingsViewModel(
             DataService dataService,
-            IUnityApiService unityApiService,
             IConfigurationService configService,
             IApiQueueService apiQueueService)
         {
             _dataService = dataService;
-            _unityApiService = unityApiService;
             _configService = configService;
             _apiQueueService = apiQueueService;
         }
@@ -85,10 +82,10 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 
                 ShowSyncStatus("Syncing from Unity API...", false);
 
-                var (meetings, positions, members, groups, intergroupMeetings) = await _dataService.ImportFromUnityAsync(_unityApiService);
+                var (meetings, positions, members, groups, contacts, intergroupMeetings) = await _dataService.ImportFromUnityAsync();
 
-                ShowSyncStatus($"Sync complete: {groups} groups, {meetings} meetings, {members} members, {positions} positions, {intergroupMeetings} intergroup meetings imported.", false);
-                Logger.Information("Unity sync complete: {Groups} groups, {Meetings} meetings, {Members} members, {Positions} positions, {IntergroupMeetings} intergroup meetings", groups, meetings, members, positions, intergroupMeetings);
+                ShowSyncStatus($"Sync complete: {groups} groups, {meetings} meetings, {members} members, {positions} positions, {contacts} contacts, {intergroupMeetings} intergroup meetings imported.", false);
+                Logger.Information("Unity sync complete: {Groups} groups, {Meetings} meetings, {Members} members, {Positions} positions, {Contacts} contacts, {IntergroupMeetings} intergroup meetings", groups, meetings, members, positions, contacts, intergroupMeetings);
             }
             catch (Exception ex)
             {

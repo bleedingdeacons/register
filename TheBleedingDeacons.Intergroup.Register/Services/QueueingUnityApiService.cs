@@ -16,6 +16,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services;
 /// they should fall back to the local SQLite cache via the normal code paths.
 ///
 /// Queued write operations:
+///   • CreateMemberAsync       (create new GSR or position holder)
 ///   • RegisterGroupAsync      (intergroup meeting group registration)
 ///   • UnregisterGroupAsync
 ///   • RegisterOfficerAsync    (intergroup meeting officer registration)
@@ -56,7 +57,7 @@ public sealed class QueueingUnityApiService : IDisposable
     /// Registers a group/GSR as an attendee of an intergroup meeting.
     /// Enqueues the call if the device is offline or the request fails.
     /// </summary>
-    public async Task<ApiResponse<IntergroupMeetingRegistration>> RegisterGroupAsync(
+    public async Task<ApiResponse<IntergroupMeetingGroupRegistration>> RegisterGroupAsync(
         int intergroupMeetingId,
         int groupId,
         int memberId,
@@ -79,7 +80,7 @@ public sealed class QueueingUnityApiService : IDisposable
 
             Logger.Information("Device offline – queuing RegisterGroup for meeting {Id}", intergroupMeetingId);
             await _queue.EnqueueAsync("RegisterGroup", url, "POST", payload, cancellationToken);
-            return OfflineQueued<IntergroupMeetingRegistration>();
+            return OfflineQueued<IntergroupMeetingGroupRegistration>();
         }
 
         var client = await GetClientAsync();
@@ -109,7 +110,7 @@ public sealed class QueueingUnityApiService : IDisposable
     /// Unregisters a group/GSR from an intergroup meeting.
     /// Enqueues the call if the device is offline or the request fails.
     /// </summary>
-    public async Task<ApiResponse<IntergroupMeetingRegistration>> UnregisterGroupAsync(
+    public async Task<ApiResponse<IntergroupMeetingGroupRegistration>> UnregisterGroupAsync(
         int intergroupMeetingId,
         int groupId,
         CancellationToken cancellationToken = default)
@@ -121,7 +122,7 @@ public sealed class QueueingUnityApiService : IDisposable
 
             Logger.Information("Device offline – queuing UnregisterGroup for meeting {Id}", intergroupMeetingId);
             await _queue.EnqueueAsync("UnregisterGroup", url, "POST", payload, cancellationToken);
-            return OfflineQueued<IntergroupMeetingRegistration>();
+            return OfflineQueued<IntergroupMeetingGroupRegistration>();
         }
 
         var client = await GetClientAsync();
@@ -215,6 +216,39 @@ public sealed class QueueingUnityApiService : IDisposable
 
             Logger.Warning("UnregisterOfficer failed ({Code}) – queuing for retry", response.Error?.Code);
             await _queue.EnqueueAsync("UnregisterOfficer", url, "POST", payload, cancellationToken);
+        }
+
+        return response;
+    }
+
+    /// <summary>
+    /// Creates a new member (GSR or position holder).
+    /// Enqueues the call if the device is offline or the request fails.
+    /// </summary>
+    public async Task<ApiResponse<Member>> CreateMemberAsync(
+        CreateMemberRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (!IsOnline())
+        {
+            var url = BuildRelativePath("members/create");
+            var payload = Serialize(request);
+
+            Logger.Information("Device offline – queuing CreateMember for {Name}", request.AnonymousName);
+            await _queue.EnqueueAsync("CreateMember", url, "POST", payload, cancellationToken);
+            return OfflineQueued<Member>();
+        }
+
+        var client = await GetClientAsync();
+        var response = await client.CreateMemberAsync(request, cancellationToken);
+
+        if (!response.Success && IsTransientError(response))
+        {
+            var url = BuildRelativePath("members/create");
+            var payload = Serialize(request);
+
+            Logger.Warning("CreateMember failed ({Code}) – queuing for retry", response.Error?.Code);
+            await _queue.EnqueueAsync("CreateMember", url, "POST", payload, cancellationToken);
         }
 
         return response;

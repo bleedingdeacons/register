@@ -1,9 +1,9 @@
 using OfficeOpenXml;
 using Serilog;
 using TheBleedingDeacons.Intergroup.Register.Support;
-using TheBleedingDeacons.Unity.Data.Entities;
-using TheBleedingDeacons.Unity.Data.Repositories.Interfaces;
-using TheBleedingDeacons.Unity.Data.Services;
+using TheBleedingDeacons.Unity.Intergroup.Entities;
+using TheBleedingDeacons.Unity.Intergroup.Repositories.Interfaces;
+using TheBleedingDeacons.Unity.Intergroup.Services;
 
 namespace TheBleedingDeacons.Intergroup.Register.Services;
 
@@ -33,7 +33,7 @@ public class DataService
     // Import (Sync) Methods
     // ====================================================================
 
-    public async Task<(int Meetings, int Positions, int Members, int Groups, int IntergroupMeetings)> ImportFromUnityAsync(
+    public async Task<(int Meetings, int Positions, int Members, int Groups, int Contacts, int IntergroupMeetings)> ImportFromUnityAsync(
         CancellationToken cancellationToken = default)
     {
         try
@@ -43,10 +43,10 @@ public class DataService
             var result = await _syncService.SyncAsync(cancellationToken);
 
             Logger.Information(
-                "Unity sync complete: {Groups} groups, {Meetings} meetings, {Members} members, {Positions} positions, {IntergroupMeetings} intergroup meetings",
-                result.Groups, result.Meetings, result.Members, result.Positions, result.IntergroupMeetings);
+                "Unity sync complete: {Groups} groups, {Meetings} meetings, {Members} members, {Positions} positions, {Contacts} contacts, {IntergroupMeetings} intergroup meetings",
+                result.Groups, result.Meetings, result.Members, result.Positions, result.Contacts, result.IntergroupMeetings);
 
-            return (result.Meetings, result.Positions, result.Members, result.Groups, result.IntergroupMeetings);
+            return (result.Meetings, result.Positions, result.Members, result.Groups, result.Contacts, result.IntergroupMeetings);
         }
         catch (Exception ex)
         {

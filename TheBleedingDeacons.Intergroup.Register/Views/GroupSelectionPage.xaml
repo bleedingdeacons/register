@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage x:Class="TheBleedingDeacons.Intergroup.Register.Views.GroupSelectionPage"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
+             xmlns:entities="clr-namespace:TheBleedingDeacons.Unity.Intergroup.Entities;assembly=TheBleedingDeacons.Unity.Intergroup"
+             x:DataType="vm:GroupSelectionViewModel"
+             Title="{Binding Title}">
+
+    <Grid>
+        <!-- Main content - hidden while loading -->
+        <Grid RowDefinitions="Auto,Auto,*" IsVisible="{Binding IsDataLoaded}" Margin="10">
+
+            <!-- Header with selected day -->
+            <Border Grid.Row="0" 
+                    BackgroundColor="{StaticResource Primary}"
+                    Padding="20,15"
+                    Margin="0,0,0,10">
+                <StackLayout Orientation="Horizontal" 
+                            HorizontalOptions="CenterAndExpand"
+                            Spacing="10">
+                    <Label Text="👥" 
+                           FontSize="24" 
+                           VerticalOptions="Center" />
+                    <Label Text="{Binding Header}" 
+                           FontSize="20" 
+                           FontAttributes="Bold"
+                           TextColor="White" 
+                           VerticalOptions="Center" />
+                </StackLayout>
+            </Border>
+
+            <!-- Groups list -->
+            <CollectionView Grid.Row="2"
+                           ItemsSource="{Binding Groups}"                          
+                           SelectionMode="None">
+                <CollectionView.ItemsLayout>
+                    <LinearItemsLayout Orientation="Vertical" ItemSpacing="5" />
+                </CollectionView.ItemsLayout>
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="entities:Group">
+                        <Border BackgroundColor="White"
+                               StrokeShape="RoundRectangle 8"
+                               Stroke="{StaticResource Gray200}"
+                               StrokeThickness="1"
+                               Margin="15,5">
+
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type vm:GroupSelectionViewModel}}, Path=SelectGroupCommand}"
+                                                     CommandParameter="{Binding .}" />
+                            </Border.GestureRecognizers>
+
+                            <Grid Padding="15" 
+                                  RowDefinitions="Auto,Auto" 
+                                  ColumnDefinitions="Auto,*,Auto">
+
+                                <!-- Registered indicator -->
+                                <Label Grid.Row="0" Grid.RowSpan="2" Grid.Column="0"
+                                       Text="✓"
+                                       FontSize="28"
+                                       FontAttributes="Bold"
+                                       TextColor="#4CAF50"
+                                       VerticalOptions="Center"
+                                       Margin="0,0,12,0"
+                                       IsVisible="{Binding Registered}" />
+
+                                <!-- Group Name -->
+                                <Label Grid.Row="0" Grid.Column="1"
+                                       Text="{Binding Name}"
+                                       FontSize="24"
+                                       FontAttributes="Bold"
+                                       TextColor="{StaticResource Gray900}" />
+
+                                <!-- Registered status text -->
+                                <Label Grid.Row="1" Grid.Column="1"
+                                       Text="Registered"
+                                       FontSize="16"
+                                       TextColor="#4CAF50"
+                                       IsVisible="{Binding Registered}" />
+
+                                <!-- Arrow indicator -->
+                                <Label Grid.Row="0" Grid.RowSpan="2" Grid.Column="2"
+                                       Text="›"
+                                       FontSize="32"
+                                       TextColor="{StaticResource Primary}"
+                                       VerticalOptions="Center" />
+
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+
+                <!-- Empty state -->
+                <CollectionView.EmptyView>
+                    <StackLayout Padding="40"
+                                VerticalOptions="Center"
+                                HorizontalOptions="Center">
+                        <Label Text="No groups found for this day and type."
+                               FontSize="18"
+                               HorizontalOptions="Center"
+                               HorizontalTextAlignment="Center"
+                               TextColor="{StaticResource Gray500}" />
+                    </StackLayout>
+                </CollectionView.EmptyView>
+
+            </CollectionView>
+
+        </Grid>
+
+        <!-- Loading indicator - centered and visible while loading -->
+        <StackLayout IsVisible="{Binding IsLoading}"
+                     VerticalOptions="CenterAndExpand"
+                     HorizontalOptions="CenterAndExpand">
+            <ActivityIndicator IsRunning="{Binding IsLoading}"
+                              Color="{StaticResource Primary}"
+                              Scale="1.5" />
+            <Label Text="Finding groups..."
+                   HorizontalOptions="Center"
+                   Margin="0,20,0,0"
+                   FontSize="16"
+                   TextColor="{StaticResource Gray600}" />
+        </StackLayout>
+
+    </Grid>
+
+</ContentPage>

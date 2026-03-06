@@ -4,7 +4,7 @@
              xmlns:controls="clr-namespace:TheBleedingDeacons.Intergroup.Register.Controls"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:viewmodels="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
-             xmlns:models="clr-namespace:TheBleedingDeacons.Intergroup.Register.Models"
+             xmlns:entities="clr-namespace:TheBleedingDeacons.Unity.Intergroup.Entities;assembly=TheBleedingDeacons.Unity.Intergroup"
              xmlns:converters="clr-namespace:TheBleedingDeacons.Intergroup.Register.Converters"
              xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
              x:DataType="viewmodels:VerifyGroupViewModel"
@@ -83,25 +83,25 @@
                         <LinearItemsLayout Orientation="Vertical" ItemSpacing="5" />
                     </CollectionView.ItemsLayout>
                     <CollectionView.ItemTemplate>
-                        <DataTemplate x:DataType="models:Member">
+                        <DataTemplate x:DataType="entities:Member">
                             <Border Style="{StaticResource MemberCardStyle}">
                                 <StackLayout Spacing="4">
                                     <!-- Member Name -->
                                     <Label Text="Name"
                                            Style="{StaticResource FieldLabelStyle}"/>
-                                    <Label Text="{Binding Name}"
+                                    <Label Text="{Binding AnonymousName}"
                                            Style="{StaticResource ValueLabelStyle}"/>
 
                                     <!-- Member Email -->
                                     <Label Text="Personal Email"
                                            Style="{StaticResource FieldLabelStyle}"/>
-                                    <Label Text="{Binding EmailPersonal}"
+                                    <Label Text="{Binding PersonalEmail}"
                                            Style="{StaticResource ValueLabelStyle}"/>
 
                                     <!-- Member Phone (Obscured) -->
                                     <Label Text="Mobile Phone"
                                            Style="{StaticResource FieldLabelStyle}"/>
-                                    <Label Text="{Binding Phone, Converter={StaticResource ObscurePhoneNumber}}"
+                                    <Label Text="{Binding MobileNumber, Converter={StaticResource ObscurePhoneNumber}}"
                                            Style="{StaticResource ValueLabelStyle}"/>
                                 </StackLayout>
                             </Border>

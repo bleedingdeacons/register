@@ -21,7 +21,7 @@ public partial class ImportExportViewModel : BaseViewModel
 
     private string GetAppInfo()
     {        
-        string info = Path.Combine(FileSystem.AppDataDirectory, MauiProgram.APP_DATABASE_NAME);
+        string info = Path.Combine(FileSystem.AppDataDirectory, MauiProgram.UNITY_DATABASE_NAME);
         System.Diagnostics.Debug.WriteLine(info);
         return info;
     }

@@ -3,28 +3,34 @@ using System.ComponentModel.DataAnnotations;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Serilog;
-using TheBleedingDeacons.Intergroup.Register.Data;
-using TheBleedingDeacons.Intergroup.Register.Models;
+using TheBleedingDeacons.Intergroup.Register.Services;
 using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Support;
+using TheBleedingDeacons.Unity.Intergroup.Data;
+using TheBleedingDeacons.Unity.Models;
+using Group = TheBleedingDeacons.Unity.Intergroup.Entities.Group;
+using Member = TheBleedingDeacons.Unity.Intergroup.Entities.Member;
 
 namespace TheBleedingDeacons.Intergroup.Register.ViewModels;
 
 /// <summary>
 /// Handles the editable GSR information form for a group.
-/// Now member-centric: displays a list of ALL GSRs for the group, allows
-/// editing each one, adding new members, and marking members for deletion
-/// (with replacement).
+/// Member-centric: displays a list of ALL GSRs for the group, allows
+/// editing each one and adding new members.
+///
+/// Writes go to the local <see cref="UnityDbContext"/> and will persist until
+/// the next Unity sync replaces the data.
 ///
 /// Separated from the verify flow (see <see cref="VerifyGroupViewModel"/>)
-/// so each ViewModel handles a single responsibility (ARCH-002).
+/// so each ViewModel handles a single responsibility.
 /// </summary>
 public partial class EditGroupViewModel : BaseViewModel
 {
     private static readonly ILogger Logger = AppLogger.ForContext<EditGroupViewModel>();
 
-    private readonly RegisterContext _context;
+    private readonly UnityDbContext _context;
     private readonly IPopupNotification _popupService;
+    private readonly QueueingUnityApiService _apiService;
 
     // The group whose GSRs are being managed
     private Group? _group;
@@ -36,14 +42,9 @@ public partial class EditGroupViewModel : BaseViewModel
     private Member? selectedMember;
 
     /// <summary>
-    /// Observable list of active (non-deleted) members for the group.
+    /// Observable list of active members for the group.
     /// </summary>
     public ObservableCollection<Member> ActiveMembers { get; } = new();
-
-    /// <summary>
-    /// Members that have been marked for deletion during this session.
-    /// </summary>
-    public ObservableCollection<Member> DeletedMembers { get; } = new();
 
     // ── Editing fields (bound to the form when a member is selected) ──
 
@@ -80,9 +81,6 @@ public partial class EditGroupViewModel : BaseViewModel
     private bool hasActiveMembers;
 
     [ObservableProperty]
-    private bool hasDeletedMembers;
-
-    [ObservableProperty]
     private string memberCountText = string.Empty;
 
     // ── Validation Errors ──
@@ -106,11 +104,13 @@ public partial class EditGroupViewModel : BaseViewModel
     private bool hasEmailError;
 
     public EditGroupViewModel(
-        RegisterContext context,
-        IPopupNotification popupService)
+        UnityDbContext context,
+        IPopupNotification popupService,
+        QueueingUnityApiService apiService)
     {
         _context = context;
         _popupService = popupService;
+        _apiService = apiService;
 
         ValidateForm();
     }
@@ -124,8 +124,8 @@ public partial class EditGroupViewModel : BaseViewModel
         if (query.TryGetValue("group", out var groupObj) && groupObj is Group group)
         {
             _group = group;
-            Logger.Information("Edit mode: group {GroupName} with {GsrCount} GSRs",
-                group.Name, group.Gsrs.Count);
+            Logger.Information("Edit mode: group {GroupName} with {MemberCount} members",
+                group.Name, group.Members.Count);
 
             PopulateMemberLists();
             UpdateTitle();
@@ -194,15 +194,16 @@ public partial class EditGroupViewModel : BaseViewModel
         IsCreatingNew = false;
         IsEditing = true;
 
-        EditName = member.Name;
-        EditPhone = member.Phone;
-        EditEmail = member.EmailPersonal;
+        EditName = member.AnonymousName;
+        EditPhone = member.MobileNumber;
+        EditEmail = member.PersonalEmail;
 
         HasUnsavedChanges = false;
         ClearAllErrors();
         ValidateForm();
 
-        Logger.Information("Selected member {MemberName} (ID={MemberId}) for editing", member.Name, member.ID);
+        Logger.Information("Selected member {MemberName} (ID={MemberId}) for editing",
+            member.AnonymousName, member.Id);
     }
 
     /// <summary>
@@ -253,43 +254,65 @@ public partial class EditGroupViewModel : BaseViewModel
 
             if (IsCreatingNew)
             {
-                // Create a brand-new member for this group
+                // Create a brand-new GSR member for this group
                 var newMember = new Member
                 {
-                    GroupId = _group.ID,
-                    Name = EditName?.Trim(),
-                    Phone = EditPhone?.Trim() ?? string.Empty,
-                    EmailPersonal = EditEmail?.Trim() ?? string.Empty,
+                    HomeGroupId = _group.Id,
+                    AnonymousName = EditName?.Trim() ?? string.Empty,
+                    MobileNumber = EditPhone?.Trim(),
+                    PersonalEmail = EditEmail?.Trim(),
+                    IsGsr = true,
                 };
                 _context.Members.Add(newMember);
                 await _context.SaveChangesAsync();
 
                 // Add to the group's in-memory collection and our observable list
-                _group.Gsrs.Add(newMember);
+                _group.Members.Add(newMember);
                 ActiveMembers.Add(newMember);
 
+                // Push the new member to the Unity API (queued if offline)
+                var createRequest = new CreateMemberRequest
+                {
+                    AnonymousName = newMember.AnonymousName,
+                    PersonalEmail = newMember.PersonalEmail,
+                    MobileNumber = newMember.MobileNumber,
+                    HomeGroupId = newMember.HomeGroupId,
+                    IsGsr = true,
+                };
+                _ = _apiService.CreateMemberAsync(createRequest)
+                    .ContinueWith(t =>
+                    {
+                        if (t.IsFaulted)
+                            Logger.Error(t.Exception, "Failed to push new member {MemberName} to API", newMember.AnonymousName);
+                        else if (t.Result.Success)
+                            Logger.Information("Successfully pushed new member {MemberName} to API", newMember.AnonymousName);
+                        else
+                            Logger.Warning("CreateMember API returned {Code}: {Message}",
+                                t.Result.Error?.Code, t.Result.Error?.Message);
+                    }, TaskScheduler.Default);
+
                 Logger.Information("Created new member {MemberName} for group {GroupName}",
-                    newMember.Name, _group.Name);
+                    newMember.AnonymousName, _group.Name);
             }
-            else if (SelectedMember != null && SelectedMember.ID > 0)
+            else if (SelectedMember != null && SelectedMember.Id > 0)
             {
                 // Update an existing tracked member
-                var tracked = await _context.Members.FindAsync(SelectedMember.ID);
+                var tracked = await _context.Members.FindAsync(SelectedMember.Id);
                 if (tracked != null)
                 {
-                    tracked.Name = EditName?.Trim();
-                    tracked.Phone = EditPhone?.Trim() ?? string.Empty;
-                    tracked.EmailPersonal = EditEmail?.Trim() ?? string.Empty;
+                    tracked.AnonymousName = EditName?.Trim() ?? string.Empty;
+                    tracked.MobileNumber = EditPhone?.Trim();
+                    tracked.PersonalEmail = EditEmail?.Trim();
 
                     await _context.SaveChangesAsync();
 
                     // Reflect changes in the in-memory object for the list
-                    SelectedMember.Name = tracked.Name;
-                    SelectedMember.Phone = tracked.Phone;
-                    SelectedMember.EmailPersonal = tracked.EmailPersonal;
+                    SelectedMember.AnonymousName = tracked.AnonymousName;
+                    SelectedMember.MobileNumber = tracked.MobileNumber;
+                    SelectedMember.PersonalEmail = tracked.PersonalEmail;
 
                     Logger.Information("Updated member {MemberName} (ID={MemberId})",
-                        tracked.Name, tracked.ID);
+                        tracked.AnonymousName, tracked.Id);
                 }
             }
 
@@ -313,40 +336,36 @@ public partial class EditGroupViewModel : BaseViewModel
     }
 
     /// <summary>
-    /// Mark the selected member for deletion. If they are being replaced, the user
-    /// should add a new member first. The member stays in the DB but is flagged.
+    /// Remove the selected member from the local database.
+    /// Note: This is a local-only change. The next Unity sync will restore
+    /// the member if they still exist in the Unity API.
     /// </summary>
     [RelayCommand]
-    private async Task MarkForDeletion(Member member)
+    private async Task RemoveMember(Member member)
     {
         if (member == null) return;
 
         bool confirmed = await Shell.Current.DisplayAlert(
-            "Mark for Deletion",
-            $"Mark \"{member.Name}\" for deletion?\n\nThis member will be hidden and removed on the next sync. You can add a replacement member afterwards.",
-            "Mark for Deletion", "Cancel");
+            "Remove Member",
+            $"Remove \"{member.AnonymousName}\" from this group?\n\nThis is a local change and will be reverted on the next data sync.",
+            "Remove", "Cancel");
 
         if (!confirmed) return;
 
         try
         {
-            var tracked = await _context.Members.FindAsync(member.ID);
+            var tracked = await _context.Members.FindAsync(member.Id);
             if (tracked != null)
             {
-                tracked.IsMarkedForDeletion = true;
-                tracked.MarkedForDeletionDate = DateTime.UtcNow;
+                _context.Members.Remove(tracked);
                 await _context.SaveChangesAsync();
-
-                // Also update the in-memory object
-                member.IsMarkedForDeletion = true;
-                member.MarkedForDeletionDate = tracked.MarkedForDeletionDate;
             }
 
             ActiveMembers.Remove(member);
-            DeletedMembers.Add(member);
+            _group?.Members.Remove(member);
 
             // If we were editing this member, close the form
-            if (SelectedMember?.ID == member.ID)
+            if (SelectedMember?.Id == member.Id)
             {
                 IsEditing = false;
                 IsCreatingNew = false;
@@ -355,51 +374,14 @@ public partial class EditGroupViewModel : BaseViewModel
 
             RefreshMemberCountText();
             UpdateHasActiveMembers();
-            HasDeletedMembers = DeletedMembers.Count > 0;
 
-            Logger.Information("Marked member {MemberName} (ID={MemberId}) for deletion", member.Name, member.ID);
+            Logger.Information("Removed member {MemberName} (ID={MemberId}) from local database",
+                member.AnonymousName, member.Id);
         }
         catch (Exception ex)
         {
-            Logger.Error(ex, "Failed to mark member {MemberId} for deletion", member.ID);
-            await Shell.Current.DisplayAlert("Error", $"Failed to mark member for deletion: {ex.Message}", "OK");
-        }
-    }
-
-    /// <summary>
-    /// Restore a previously-deleted member.
-    /// </summary>
-    [RelayCommand]
-    private async Task RestoreMember(Member member)
-    {
-        if (member == null) return;
-
-        try
-        {
-            var tracked = await _context.Members.FindAsync(member.ID);
-            if (tracked != null)
-            {
-                tracked.IsMarkedForDeletion = false;
-                tracked.MarkedForDeletionDate = null;
-                await _context.SaveChangesAsync();
-
-                member.IsMarkedForDeletion = false;
-                member.MarkedForDeletionDate = null;
-            }
-
-            DeletedMembers.Remove(member);
-            ActiveMembers.Add(member);
-
-            RefreshMemberCountText();
-            UpdateHasActiveMembers();
-            HasDeletedMembers = DeletedMembers.Count > 0;
-
-            Logger.Information("Restored member {MemberName} (ID={MemberId})", member.Name, member.ID);
-        }
-        catch (Exception ex)
-        {
-            Logger.Error(ex, "Failed to restore member {MemberId}", member.ID);
-            await Shell.Current.DisplayAlert("Error", $"Failed to restore member: {ex.Message}", "OK");
+            Logger.Error(ex, "Failed to remove member {MemberId}", member.Id);
+            await Shell.Current.DisplayAlert("Error", $"Failed to remove member: {ex.Message}", "OK");
         }
     }
 
@@ -453,21 +435,16 @@ public partial class EditGroupViewModel : BaseViewModel
     private void PopulateMemberLists()
     {
         ActiveMembers.Clear();
-        DeletedMembers.Clear();
 
-        if (_group?.Gsrs != null)
+        if (_group?.Members != null)
         {
-            foreach (var gsr in _group.Gsrs)
+            foreach (var member in _group.Members.Where(m => m.IsGsr))
             {
-                if (gsr.IsMarkedForDeletion)
-                    DeletedMembers.Add(gsr);
-                else
-                    ActiveMembers.Add(gsr);
+                ActiveMembers.Add(member);
             }
         }
 
         UpdateHasActiveMembers();
-        HasDeletedMembers = DeletedMembers.Count > 0;
         RefreshMemberCountText();
     }
 
@@ -555,9 +532,9 @@ public partial class EditGroupViewModel : BaseViewModel
 
         if (SelectedMember == null) { HasUnsavedChanges = false; return; }
 
-        HasUnsavedChanges = SelectedMember.Name != EditName?.Trim() ||
-                            SelectedMember.Phone != EditPhone?.Trim() ||
-                            SelectedMember.EmailPersonal != EditEmail?.Trim();
+        HasUnsavedChanges = SelectedMember.AnonymousName != EditName?.Trim() ||
+                            SelectedMember.MobileNumber != EditPhone?.Trim() ||
+                            SelectedMember.PersonalEmail != EditEmail?.Trim();
     }
 
     private void ClearAllErrors()

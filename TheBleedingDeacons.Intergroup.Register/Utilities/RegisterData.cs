@@ -1,10 +1,10 @@
-using TheBleedingDeacons.Unity.Data.Entities;
+using TheBleedingDeacons.Unity.Intergroup.Entities;
 
 namespace TheBleedingDeacons.Intergroup.Register.Utilities;
 
 /// <summary>
 /// Container for the full set of data held in the local Unity database.
-/// All types are from <see cref="TheBleedingDeacons.Unity.Data.Entities"/>.
+/// All types are from <see cref="TheBleedingDeacons.Unity.Intergroup.Entities"/>.
 /// </summary>
 public class RegisterData
 {

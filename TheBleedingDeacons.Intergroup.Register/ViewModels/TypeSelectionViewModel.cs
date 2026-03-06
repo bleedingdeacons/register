@@ -45,7 +45,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
             var parameters = new Dictionary<string, object> { { "criteria", criteria } };            
 
             // Navigate to the next page
-            await Shell.Current.GoToAsync(nameof(MeetingSelectionPage), parameters);
+            await Shell.Current.GoToAsync(nameof(GroupSelectionPage), parameters);
         }
 
         [RelayCommand]

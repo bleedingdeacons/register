@@ -11,11 +11,11 @@ using TheBleedingDeacons.Intergroup.Register.Support;
 using TheBleedingDeacons.Intergroup.Register.ViewModels;
 using TheBleedingDeacons.Intergroup.Register.Views;
 using TheBleedingDeacons.Unity.Client;
-using TheBleedingDeacons.Unity.Data.Data;
-using TheBleedingDeacons.Unity.Data.Entities;
-using TheBleedingDeacons.Unity.Data.Repositories;
-using TheBleedingDeacons.Unity.Data.Repositories.Interfaces;
-using TheBleedingDeacons.Unity.Data.Services;
+using TheBleedingDeacons.Unity.Intergroup.Data;
+using TheBleedingDeacons.Unity.Intergroup.Entities;
+using TheBleedingDeacons.Unity.Intergroup.Repositories;
+using TheBleedingDeacons.Unity.Intergroup.Repositories.Interfaces;
+using TheBleedingDeacons.Unity.Intergroup.Services;
 using PopupNotificationService = TheBleedingDeacons.Intergroup.Register.Services.PopupNotificationService;
 
 namespace TheBleedingDeacons.Intergroup.Register;
@@ -84,7 +84,7 @@ public static class MauiProgram
 
         // ── Register Services ─────────────────────────────────────────
         builder.Services.AddScoped<AttendanceService>();
-        builder.Services.AddScoped<IAttendanceRegistration<Meeting>>(sp => sp.GetRequiredService<AttendanceService>());
+        builder.Services.AddScoped<IAttendanceRegistration<Group>>(sp => sp.GetRequiredService<AttendanceService>());
         builder.Services.AddScoped<IAttendanceRegistration<Position>>(sp => sp.GetRequiredService<AttendanceService>());
 
         builder.Services.AddScoped<DataService>();
@@ -132,9 +132,8 @@ public static class MauiProgram
         builder.Services.AddTransient<GroupVerifyPage>();
         builder.Services.AddTransient<DaySelectionPage>();
         builder.Services.AddTransient<TypeSelectionPage>();
-        builder.Services.AddTransient<MeetingSelectionPage>();
+        builder.Services.AddTransient<GroupSelectionPage>();
         builder.Services.AddTransient<ImportExportPage>();
-        builder.Services.AddTransient<MeetingEditPage>();
         builder.Services.AddTransient<PositionEditPage>();
         builder.Services.AddTransient<PositionSelectionPage>();
         builder.Services.AddTransient<DatabaseBackupPage>();
@@ -142,17 +141,17 @@ public static class MauiProgram
         builder.Services.AddTransient<SettingsPage>();
         builder.Services.AddTransient<UnitySettingsPage>();
         builder.Services.AddTransient<AdminPage>();
+        builder.Services.AddTransient<VerifyPositionViewModel>();
 
         // ── ViewModels ────────────────────────────────────────────────
         builder.Services.AddTransient<MailSettingsViewModel>();
         builder.Services.AddTransient<MainPageViewModel>();
-        builder.Services.AddTransient<MeetingSelectionViewModel>();
+        builder.Services.AddTransient<GroupSelectionViewModel>();
         builder.Services.AddTransient<EditGroupViewModel>();
         builder.Services.AddTransient<VerifyGroupViewModel>();
         builder.Services.AddTransient<TypeSelectionViewModel>();
         builder.Services.AddTransient<DaySelectionViewModel>();
         builder.Services.AddTransient<ImportExportViewModel>();
-        builder.Services.AddTransient<MeetingEditViewModel>();
         builder.Services.AddTransient<PositionSelectionViewModel>();
         builder.Services.AddTransient<PositionEditViewModel>();
         builder.Services.AddTransient<DatabaseBackupViewModel>();
@@ -160,6 +159,7 @@ public static class MauiProgram
         builder.Services.AddTransient<SettingsViewModel>();
         builder.Services.AddTransient<UnitySettingsViewModel>();
         builder.Services.AddTransient<AdminViewModel>();
+        builder.Services.AddTransient<PositionVerifyPage>();
 
 #if DEBUG
         builder.Services.AddLogging();

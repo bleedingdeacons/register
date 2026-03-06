@@ -1,273 +1,291 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+<ContentPage x:Class="TheBleedingDeacons.Intergroup.Register.Views.PositionEditPage"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:controls="clr-namespace:TheBleedingDeacons.Intergroup.Register.Controls"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:viewmodels="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
+             xmlns:entities="clr-namespace:TheBleedingDeacons.Unity.Intergroup.Entities;assembly=TheBleedingDeacons.Unity.Intergroup"
              xmlns:converters="clr-namespace:TheBleedingDeacons.Intergroup.Register.Converters"
-             x:Class="TheBleedingDeacons.Intergroup.Register.Views.PositionEditPage"
+             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
              x:DataType="viewmodels:PositionEditViewModel"
              Title="{Binding Title}">
+
     <ContentPage.Resources>
-        <converters:ObscurePhoneNumberConverter x:Key="ObscurePhoneNumber" />
+        <ResourceDictionary>
+            <Style x:Key="EditFieldLabelStyle" TargetType="Label">
+                <Setter Property="FontAttributes" Value="Bold"/>
+                <Setter Property="FontSize" Value="22"/>
+                <Setter Property="TextColor" Value="{AppThemeBinding Light=Black, Dark=White}"/>
+            </Style>
+
+            <Style x:Key="MemberCardStyle" TargetType="Border">
+                <Setter Property="Stroke" Value="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}"/>
+                <Setter Property="StrokeThickness" Value="1"/>
+                <Setter Property="StrokeShape" Value="RoundRectangle 10"/>
+                <Setter Property="Padding" Value="15"/>
+                <Setter Property="Margin" Value="0,0,0,8"/>
+                <Setter Property="BackgroundColor" Value="{AppThemeBinding Light=White, Dark={StaticResource Gray900}}"/>
+            </Style>
+
+            <toolkit:InvertedBoolConverter x:Key="InvertedBoolConverter" />
+        </ResourceDictionary>
     </ContentPage.Resources>
-    <ScrollView>
-        <Grid Padding="20"
-              RowSpacing="15">
 
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-            </Grid.RowDefinitions>
+    <ContentPage.Behaviors>
+        <toolkit:StatusBarBehavior StatusBarColor="{AppThemeBinding Light=White, Dark=Black}"
+                                   StatusBarStyle="{AppThemeBinding Light=DarkContent, Dark=LightContent}" />
+    </ContentPage.Behaviors>
 
-            <!-- Question Label at Top -->
-            <Label Grid.Row="0"
-                   Text="Is this information correct?"
-                   HorizontalOptions="Center"                    
-                   Style="{StaticResource Question}">
-                <Label.IsVisible>
-                    <MultiBinding Converter="{StaticResource QuestionVisibilityConverter}">
-                        <Binding Path="IsEditing" />
-                        <Binding Path="HasValidationErrors" />
-                    </MultiBinding>
-                </Label.IsVisible>
-            </Label>
+    <Grid>
+        <!-- Loading Indicator -->
+        <ActivityIndicator IsVisible="{Binding IsLoading}"
+                           IsRunning="{Binding IsLoading}"
+                           HorizontalOptions="Center"
+                           VerticalOptions="Center"
+                           Scale="1.5"
+                           Color="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"/>
 
-            <!-- Frame with Drop Shadow containing Member fields -->
-            <Frame Grid.Row="1"
-                   BackgroundColor="White"
-                   HasShadow="True"
-                   Style="{StaticResource GsrDetails}">
+        <!-- Main Content -->
+        <ScrollView IsVisible="{Binding IsLoading, Converter={StaticResource InvertedBoolConverter}}">
+            <StackLayout Padding="20" Spacing="15">
 
-                <Grid RowSpacing="15">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
+                <!-- Header with holder count and Add button -->
+                <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,5">
+                    <StackLayout Grid.Column="0" VerticalOptions="Center">
+                        <Label Text="{Binding Title}"
+                               FontSize="24"
+                               FontAttributes="Bold"/>
+                        <Label Text="{Binding HolderCountText}"
+                               FontSize="16"
+                               TextColor="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource Gray400}}"/>
+                    </StackLayout>
 
-                    <Grid Grid.Row="0">
-                        <Label Text="Position Member" 
-                               Style="{StaticResource HeaderLabelStyle}"/>
-                    </Grid>
-
-                    <!-- Member Name Field -->
-                    <Grid Grid.Row="1">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="120" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-
-                        <StackLayout Grid.Column="0" Orientation="Horizontal" VerticalOptions="Center">
-                            <Label Text="Name:"                                   
-                                   Style="{StaticResource FieldLabelStyle}" />
-                            <Label Text="*"
-                                   TextColor="Red"
-                                   FontAttributes="Bold" />
-                        </StackLayout>
-
-                        <Label Grid.Column="1"                               
-                               Text="{Binding DisplayMemberAnonymousName}"
-                               VerticalOptions="Center"
-                               IsVisible="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}" 
-                               Style="{StaticResource ValueLabelStyle}" />
-
-                        <controls:ClearableEntry x:Name="EditMemberNameEntry"
-                               Grid.Column="1"
-                               Text="{Binding EditMemberAnonymousName}"
-                               IsVisible="{Binding IsEditing}"
-                               Placeholder="Tap to enter your name.."/>
-                    </Grid>
-
-                    <!-- Member Email Field -->
-                    <Grid Grid.Row="2">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="120" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-
-                        <StackLayout Grid.Column="0" Orientation="Horizontal" VerticalOptions="Center">
-                            <Label Text="Email:"                                   
-                                   Style="{StaticResource FieldLabelStyle}" />
-                            <Label Text="*"
-                                   TextColor="Orange"
-                                   FontAttributes="Bold"
-                                   ToolTipProperties.Text="Either email or mobile required" />
-                        </StackLayout>
-
-                        <Label Grid.Column="1"
-                               Text="{Binding DisplayMemberPersonalEmail}"
-                               VerticalOptions="Center"
-                               Style="{StaticResource ValueLabelStyle}"
-                               IsVisible="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}" />
-
-                        <controls:ClearableEntry Grid.Column="1"
-                               Text="{Binding EditMemberPersonalEmail}"
-                               IsVisible="{Binding IsEditing}"
-                               Keyboard="Email"                               
-                               Placeholder="Tap to enter your email address.." 
-                               Style="{StaticResource EntryEdit}"/>
-                    </Grid>
-
-                    <!-- Member Mobile Field -->
-                    <Grid Grid.Row="3">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="120" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-
-                        <StackLayout Grid.Column="0" Orientation="Horizontal" VerticalOptions="Center">
-                            <Label Text="Mobile:"                                   
-                                   Style="{StaticResource FieldLabelStyle}" />
-                            <Label Text="*"
-                                   TextColor="Orange"
-                                   FontAttributes="Bold"
-                                   ToolTipProperties.Text="Either email or mobile required" />
-                        </StackLayout>
-
-                        <Label Grid.Column="1"
-                               Text="{Binding DisplayMemberMobile, Converter={StaticResource ObscurePhoneNumber}}"
-                               VerticalOptions="Center"
-                               IsVisible="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}" 
-                               Style="{StaticResource ValueLabelStyle}" />
-
-                        <controls:ClearableEntry Grid.Column="1"
-                               Text="{Binding EditMemberMobile}"
-                               IsVisible="{Binding IsEditing}"
-                               Keyboard="Telephone"                               
-                               Placeholder="Tap to enter your mobile number.."  />
-                    </Grid>
+                    <Button Grid.Column="1"
+                            Text="+ Add"
+                            Command="{Binding AddNewMemberCommand}"
+                            FontSize="16"
+                            FontAttributes="Bold"
+                            BackgroundColor="{StaticResource Primary}"
+                            TextColor="White"
+                            CornerRadius="20"
+                            Padding="15,8"
+                            HeightRequest="45"
+                            VerticalOptions="Center"
+                            IsVisible="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}"/>
                 </Grid>
-            </Frame>
 
-            <!-- Position Details Frame (Read-only) -->
-            <Frame Grid.Row="2"
-                   BackgroundColor="LightGray"
-                   HasShadow="False"
-                   Opacity="0.8">
-                <Grid RowSpacing="15">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
+                <!-- ═══════════════════════════════════════════════════════ -->
+                <!-- HOLDER LIST (visible when NOT editing a specific holder) -->
+                <!-- ═══════════════════════════════════════════════════════ -->
+                <StackLayout IsVisible="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}">
 
-                    <!-- Header -->
-                    <Grid Grid.Row="0">
-                        <Label Text="Position Details" Style="{StaticResource HeaderLabelStyle}"/>
-                    </Grid>
+                    <!-- Active Holders -->
+                    <CollectionView ItemsSource="{Binding ActiveHolders}"
+                                    SelectionMode="None">
+                        <CollectionView.ItemsLayout>
+                            <LinearItemsLayout Orientation="Vertical" ItemSpacing="4" />
+                        </CollectionView.ItemsLayout>
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="entities:Member">
+                                <Border Style="{StaticResource MemberCardStyle}">
+                                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto">
+                                        <!-- Name -->
+                                        <Label Grid.Row="0" Grid.Column="0"
+                                               Text="{Binding AnonymousName}"
+                                               FontSize="20"
+                                               FontAttributes="Bold"
+                                               TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"/>
 
-                    <!-- Position Name and Email Side by Side -->
-                    <Grid Grid.Row="1" ColumnSpacing="20">
+                                        <!-- Email -->
+                                        <Label Grid.Row="1" Grid.Column="0"
+                                               Text="{Binding PersonalEmail}"
+                                               FontSize="16"
+                                               TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}"
+                                               Margin="0,2,0,0"/>
+
+                                        <!-- Phone -->
+                                        <Label Grid.Row="2" Grid.Column="0"
+                                               Text="{Binding MobileNumber}"
+                                               FontSize="16"
+                                               TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}"
+                                               Margin="0,2,0,0"/>
+
+                                        <!-- Action buttons (vertical stack on right) -->
+                                        <StackLayout Grid.Row="0" Grid.RowSpan="3" Grid.Column="1"
+                                                     VerticalOptions="Center"
+                                                     Spacing="8">
+
+                                            <!-- Edit button -->
+                                            <Button Text="Edit"
+                                                    FontSize="14"
+                                                    BackgroundColor="{StaticResource Primary}"
+                                                    TextColor="White"
+                                                    CornerRadius="15"
+                                                    Padding="12,6"
+                                                    HeightRequest="36"
+                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:PositionEditViewModel}}, Path=SelectMemberCommand}"
+                                                    CommandParameter="{Binding .}"/>
+
+                                            <!-- Remove button -->
+                                            <Button Text="Remove"
+                                                    FontSize="14"
+                                                    BackgroundColor="#E57373"
+                                                    TextColor="White"
+                                                    CornerRadius="15"
+                                                    Padding="12,6"
+                                                    HeightRequest="36"
+                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:PositionEditViewModel}}, Path=RemoveMemberCommand}"
+                                                    CommandParameter="{Binding .}"/>
+                                        </StackLayout>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+
+                    <!-- Empty State -->
+                    <Border IsVisible="{Binding HasActiveHolders, Converter={StaticResource InvertedBoolConverter}}"
+                            Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}"
+                            StrokeThickness="1"
+                            StrokeShape="RoundRectangle 10"
+                            Padding="30"
+                            Margin="0,10,0,10"
+                            BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray900}}">
+                        <StackLayout HorizontalOptions="Center" Spacing="10">
+                            <Label Text="No Position Holders"
+                                   FontSize="20"
+                                   FontAttributes="Bold"
+                                   HorizontalOptions="Center"
+                                   TextColor="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource Gray400}}"/>
+                            <Label Text="Tap '+ Add' above to create a new position holder."
+                                   FontSize="16"
+                                   HorizontalOptions="Center"
+                                   HorizontalTextAlignment="Center"
+                                   TextColor="{AppThemeBinding Light={StaticResource Gray400}, Dark={StaticResource Gray500}}"/>
+                        </StackLayout>
+                    </Border>
+
+                    <!-- Done Button -->
+                    <Button Text="Done"
+                            Command="{Binding DoneCommand}"
+                            Style="{StaticResource PrimaryButtonStyle}"
+                            TextColor="White"
+                            HeightRequest="60"
+                            Margin="0,20,0,0"/>
+                </StackLayout>
+
+
+                <!-- ═══════════════════════════════════════════════════════ -->
+                <!-- EDIT/CREATE FORM (visible when editing a specific holder) -->
+                <!-- ═══════════════════════════════════════════════════════ -->
+                <StackLayout IsVisible="{Binding IsEditing}" Spacing="20">
+
+                    <Label Text="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:PositionEditViewModel}}, Path=IsCreatingNew, StringFormat='{0}'}"
+                           IsVisible="False" />
+
+                    <!-- Section header -->
+                    <Border Stroke="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
+                            StrokeThickness="2"
+                            StrokeShape="RoundRectangle 10"
+                            Padding="15"
+                            BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray900}}">
+                        <Label FontSize="20"
+                               FontAttributes="Bold"
+                               HorizontalOptions="Center"
+                               TextColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}">
+                            <Label.Triggers>
+                                <DataTrigger TargetType="Label"
+                                             Binding="{Binding IsCreatingNew}"
+                                             Value="True">
+                                    <Setter Property="Text" Value="New Holder"/>
+                                </DataTrigger>
+                                <DataTrigger TargetType="Label"
+                                             Binding="{Binding IsCreatingNew}"
+                                             Value="False">
+                                    <Setter Property="Text" Value="Edit Holder"/>
+                                </DataTrigger>
+                            </Label.Triggers>
+                        </Label>
+                    </Border>
+
+                    <!-- Name Field -->
+                    <StackLayout Spacing="5">
+                        <Label Text="Name"
+                               Style="{StaticResource EditFieldLabelStyle}" />
+                        <controls:ClearableEntry x:Name="EditNameEntry"
+                               Text="{Binding EditName, Mode=TwoWay}"
+                               Placeholder="Tap to enter name..."
+                               FontSize="22"
+                               BackgroundColor="{AppThemeBinding Light=White, Dark=#2D2D30}"
+                               TextColor="{AppThemeBinding Light=Black, Dark=White}"
+                               PlaceholderColor="{AppThemeBinding Light=Gray, Dark=LightGray}"/>
+                        <Label Text="{Binding NameError}"
+                               TextColor="Red"
+                               FontSize="14"
+                               IsVisible="{Binding HasNameError}" />
+                    </StackLayout>
+
+                    <!-- Phone Field -->
+                    <StackLayout Spacing="5">
+                        <Label Text="Mobile Phone"
+                               Style="{StaticResource EditFieldLabelStyle}" />
+                        <controls:ClearableEntry x:Name="EditPhoneEntry"
+                               Text="{Binding EditPhone, Mode=TwoWay}"
+                               FontSize="22"
+                               Placeholder="Tap to enter phone number..."
+                               Keyboard="Telephone"
+                               BackgroundColor="{AppThemeBinding Light=White, Dark=#2D2D30}"
+                               TextColor="{AppThemeBinding Light=Black, Dark=White}"
+                               PlaceholderColor="{AppThemeBinding Light=Gray, Dark=LightGray}" />
+                        <Label Text="{Binding PhoneError}"
+                               TextColor="Red"
+                               FontSize="14"
+                               IsVisible="{Binding HasPhoneError}" />
+                    </StackLayout>
+
+                    <!-- Email Field -->
+                    <StackLayout Spacing="5">
+                        <Label Text="Personal Email"
+                               Style="{StaticResource EditFieldLabelStyle}" />
+                        <controls:ClearableEntry x:Name="EditEmailEntry"
+                               Text="{Binding EditEmail, Mode=TwoWay}"
+                               Placeholder="Tap to enter email address..."
+                               FontSize="22"
+                               Keyboard="Email"
+                               BackgroundColor="{AppThemeBinding Light=White, Dark=#2D2D30}"
+                               TextColor="{AppThemeBinding Light=Black, Dark=White}"
+                               PlaceholderColor="{AppThemeBinding Light=Gray, Dark=LightGray}" />
+                        <Label Text="{Binding EmailError}"
+                               TextColor="Red"
+                               FontSize="14"
+                               IsVisible="{Binding HasEmailError}" />
+                    </StackLayout>
+
+                    <!-- Action Buttons -->
+                    <Grid ColumnSpacing="15" Margin="0,10,0,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
 
-                        <!-- Position Name -->
-                        <Grid Grid.Column="0">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
+                        <Button Grid.Column="0"
+                                Style="{StaticResource PrimaryButtonStyle}"
+                                Text="Cancel"
+                                BackgroundColor="{AppThemeBinding Light=#6C757D, Dark=#495057}"
+                                Command="{Binding CancelEditCommand}"
+                                HeightRequest="80" />
 
-                            <Label Grid.Row="0"
-                                   Text="Position:"
-                                   HorizontalOptions="Start"
-                                   Style="{StaticResource FieldLabelStyle}" />
-
-                            <Label Grid.Row="1"
-                                   Text="{Binding Position.PositionName}"
-                                   HorizontalOptions="Start"
-                                   Style="{StaticResource ValueLabelStyle}" />
-                        </Grid>
-
-                        <!-- Position Email -->
-                        <Grid Grid.Column="1">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-
-                            <Label Grid.Row="0"
-                                   Text="Position Email:"
-                                   HorizontalOptions="Start"
-                                   Style="{StaticResource FieldLabelStyle}" />
-
-                            <Label Grid.Row="1"
-                                   Text="{Binding Position.PositionGenericEmail}"
-                                   HorizontalOptions="Start"
-                                   Style="{StaticResource ValueLabelStyle}" />
-                        </Grid>
+                        <Button Grid.Column="1"
+                                Style="{StaticResource PrimaryButtonStyle}"
+                                Text="{Binding SaveButtonText}"
+                                Command="{Binding SaveMemberCommand}"
+                                HeightRequest="80" />
                     </Grid>
-                </Grid>
-            </Frame>
 
-            <!-- Validation Message (only visible when not editing and has errors) -->
-            <Label Grid.Row="3"
-                   Text="{Binding ValidationMessage}"
-                   FontSize="14"
-                   TextColor="Red"
-                   HorizontalOptions="Center"
-                   Margin="0,10,0,10">
-                <Label.IsVisible>
-                    <MultiBinding Converter="{StaticResource ValidationVisibilityConverter}">
-                        <Binding Path="IsEditing" />
-                        <Binding Path="HasValidationErrors" />
-                    </MultiBinding>
-                </Label.IsVisible>
-            </Label>
+                </StackLayout>
 
-            <!-- Spacer -->
-            <BoxView Grid.Row="4" />
+            </StackLayout>
+        </ScrollView>
+    </Grid>
 
-            <!-- Button Panel -->
-            <Grid Grid.Row="5"
-                  ColumnSpacing="10">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-
-                <!-- Yes Button (when not editing) -->
-                <Button Grid.Column="0"
-                        Text="Yes"
-                        Command="{Binding ConfirmCommand}"
-                        TextColor="White"
-                        IsEnabled="{Binding CanConfirm}"
-                        IsVisible="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}"
-                        Style="{StaticResource PrimaryButtonStyle}" />
-
-                <!-- Save Button (when editing) -->
-                <Button Grid.Column="0"
-                        Text="Save"
-                        Command="{Binding SaveCommand}"
-                        TextColor="White"
-                        IsEnabled="{Binding CanSave}"
-                        IsVisible="{Binding IsEditing}"
-                        Style="{StaticResource PrimaryButtonStyle}"/>
-
-                <!-- No Button (when not editing) -->
-                <Button Grid.Column="1"
-                        Text="No"
-                        Command="{Binding StartEditCommand}"
-                        BackgroundColor="Orange"
-                        TextColor="White"
-                        IsVisible="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}"
-                        Style="{StaticResource PrimaryButtonStyle}"/>
-
-                <!-- Cancel Button (when editing) -->
-                <Button Grid.Column="1"
-                        Text="Cancel"
-                        Command="{Binding CancelCommand}"
-                        BackgroundColor="Orange"
-                        TextColor="White"
-                        IsVisible="{Binding IsEditing}"
-                        Style="{StaticResource PrimaryButtonStyle}"/>
-            </Grid>
-        </Grid>
-    </ScrollView>
 </ContentPage>

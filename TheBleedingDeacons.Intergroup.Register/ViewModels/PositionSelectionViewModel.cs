@@ -4,8 +4,8 @@ using Serilog;
 using System.Collections.ObjectModel;
 using TheBleedingDeacons.Intergroup.Register.Support;
 using TheBleedingDeacons.Intergroup.Register.Views;
-using TheBleedingDeacons.Unity.Data.Entities;
-using TheBleedingDeacons.Unity.Data.Repositories.Interfaces;
+using TheBleedingDeacons.Unity.Intergroup.Entities;
+using TheBleedingDeacons.Unity.Intergroup.Repositories.Interfaces;
 
 namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 {
@@ -73,9 +73,9 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
             if (position == null) return;
 
             var parameters = new Dictionary<string, object> {
-                {"positionId", position.Id.ToString()} };
+        {"positionId", position.Id.ToString()} };
 
-            await Shell.Current.GoToAsync(nameof(PositionEditPage), parameters);
+            await Shell.Current.GoToAsync(nameof(PositionVerifyPage), parameters);
         }
     }
 }

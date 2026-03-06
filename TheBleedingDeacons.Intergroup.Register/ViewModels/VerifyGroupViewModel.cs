@@ -1,26 +1,24 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Microsoft.EntityFrameworkCore;
 using Serilog;
-using TheBleedingDeacons.Intergroup.Register.Data;
 using TheBleedingDeacons.Intergroup.Register.Extensions;
-using TheBleedingDeacons.Intergroup.Register.Models;
 using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Support;
 using TheBleedingDeacons.Intergroup.Register.Views;
+using TheBleedingDeacons.Unity.Intergroup.Entities;
+using TheBleedingDeacons.Unity.Intergroup.Repositories.Interfaces;
 
 namespace TheBleedingDeacons.Intergroup.Register.ViewModels;
 
 /// <summary>
-/// Handles the read-only verification and registration flow for a meeting group.
+/// Handles the read-only verification and registration flow for a group.
 /// The user confirms their GSR details are correct (Yes) or navigates to edit them (No).
 ///
-/// Displays ALL active GSRs for the group as a member-centric list, filtering out
-/// any members that have been marked for deletion.
+/// Displays ALL active GSRs for the group as a member-centric list.
 ///
-/// Receives a groupId from navigation and loads the Group (with Meetings + GSRs)
-/// directly, so verify/edit always operate on the group rather than a specific meeting.
+/// Receives a groupId from navigation and loads the Group (with Members)
+/// from <see cref="IGroupRepository"/>, so verify/edit always operate on the group.
 /// </summary>
 [QueryProperty(nameof(GroupId), "groupId")]
 [QueryProperty(nameof(Edited), "edited")]
@@ -28,8 +26,8 @@ public partial class VerifyGroupViewModel : BaseViewModel
 {
     private static readonly ILogger Logger = AppLogger.ForContext<VerifyGroupViewModel>();
 
-    private readonly IAttendanceRegistration<Meeting> _attendanceRegistration;
-    private readonly RegisterContext _context;
+    private readonly IAttendanceRegistration<Group> _attendanceRegistration;
+    private readonly IGroupRepository _groupRepository;
     private readonly IPopupNotification _popupService;
 
     [ObservableProperty]
@@ -60,7 +58,7 @@ public partial class VerifyGroupViewModel : BaseViewModel
     private bool isLoading;
 
     /// <summary>
-    /// Active (non-deleted) GSR members for the group, displayed as a list.
+    /// Active GSR members for the group, displayed as a list.
     /// </summary>
     public ObservableCollection<Member> ActiveGsrs { get; } = new();
 
@@ -77,12 +75,12 @@ public partial class VerifyGroupViewModel : BaseViewModel
     private string gsrCountText = string.Empty;
 
     public VerifyGroupViewModel(
-        IAttendanceRegistration<Meeting> attendanceRegistration,
-        RegisterContext context,
+        IAttendanceRegistration<Group> attendanceRegistration,
+        IGroupRepository groupRepository,
         IPopupNotification popupService)
     {
         _attendanceRegistration = attendanceRegistration;
-        _context = context;
+        _groupRepository = groupRepository;
         _popupService = popupService;
     }
 
@@ -171,7 +169,7 @@ public partial class VerifyGroupViewModel : BaseViewModel
     }
 
     /// <summary>
-    /// User confirms details are correct — register attendance using the group's first meeting.
+    /// User confirms details are correct — register attendance for the group.
     /// </summary>
     [RelayCommand]
     public async Task Yes()
@@ -182,29 +180,13 @@ public partial class VerifyGroupViewModel : BaseViewModel
             return;
         }
 
-        var meeting = Group.Meetings.FirstOrDefault();
-        if (meeting == null)
-        {
-            Logger.Warning("Cannot register - Group {GroupId} has no meetings", Group.ID);
-            var mainPage = Application.Current?.Windows?.FirstOrDefault()?.Page;
-            if (mainPage != null)
-                await mainPage.DisplayAlert("Error", "No meeting found for this group.", "OK");
-            return;
-        }
-
         try
         {
-            meeting.ProxyAttendance = StandingIn;
-            meeting.ProxyEmail = StandinEmail;
-            meeting.ProxyName = StandinName;
-
-            await _attendanceRegistration.Register(meeting);
-
-            string personalName = meeting.GetFirstName();
-
+            await _attendanceRegistration.Register(Group);
+           
             await _popupService.ShowCountdownPopupAsync(
                 "Finished",
-                $"Thanks for registering {personalName}.",
+                $"Thanks for registering {Group.Name}.",
                 async () => await Shell.Current.GoToAsync("//MainPage")
             );
         }
@@ -234,10 +216,7 @@ public partial class VerifyGroupViewModel : BaseViewModel
         {
             IsLoading = true;
 
-            var loadedGroup = await _context.Groups
-                .Include(g => g.Meetings)
-                .Include(g => g.Gsrs)
-                .FirstOrDefaultAsync(g => g.ID == groupId);
+            var loadedGroup = await _groupRepository.GetByIdWithMembersAsync(groupId);
 
             if (loadedGroup != null)
             {
@@ -277,17 +256,18 @@ public partial class VerifyGroupViewModel : BaseViewModel
     }
 
     /// <summary>
-    /// Rebuild the observable list of active (non-deleted) GSRs from the loaded Group.
+    /// Rebuild the observable list of active GSR members from the loaded Group.
+    /// Unity.Data.Entities.Member uses IsGsr flag to identify GSRs.
     /// </summary>
     private void RefreshActiveGsrs()
     {
         ActiveGsrs.Clear();
 
-        if (Group?.Gsrs != null)
+        if (Group?.Members != null)
         {
-            foreach (var gsr in Group.Gsrs.Where(g => !g.IsMarkedForDeletion))
+            foreach (var member in Group.Members.Where(m => m.IsGsr))
             {
-                ActiveGsrs.Add(gsr);
+                ActiveGsrs.Add(member);
             }
         }
 
@@ -309,11 +289,10 @@ public partial class VerifyGroupViewModel : BaseViewModel
 
     private void UpdateCanRegister()
     {
-        // At least one active GSR must have all required contact fields filled in
+        // At least one active GSR must have required contact fields
         CanRegister = ActiveGsrs.Any(g =>
-            !string.IsNullOrEmpty(g.Name) &&
-            !string.IsNullOrEmpty(g.Phone) &&
-            !string.IsNullOrEmpty(g.EmailPersonal));
+            !string.IsNullOrEmpty(g.AnonymousName) &&
+            (!string.IsNullOrEmpty(g.MobileNumber) || !string.IsNullOrEmpty(g.PersonalEmail)));
     }
 
     #endregion

@@ -5,7 +5,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Data;
 
 /// <summary>
 /// Lightweight DbContext that only manages the offline API-call outbox.
-/// Domain entities are now managed by <see cref="TheBleedingDeacons.Unity.Data.Data.UnityDbContext"/>.
+/// Domain entities are now managed by <see cref="TheBleedingDeacons.Unity.Intergroup.Data.UnityDbContext"/>.
 /// </summary>
 public class QueueDbContext : DbContext
 {

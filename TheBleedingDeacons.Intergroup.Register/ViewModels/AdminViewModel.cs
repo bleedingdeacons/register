@@ -1,11 +1,13 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.EntityFrameworkCore;
 using Serilog;
 using System.Collections.ObjectModel;
 using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Support;
-using TheBleedingDeacons.Unity.Data.Entities;
-using TheBleedingDeacons.Unity.Data.Repositories.Interfaces;
+using TheBleedingDeacons.Unity.Intergroup.Data;
+using TheBleedingDeacons.Unity.Intergroup.Entities;
+using TheBleedingDeacons.Unity.Intergroup.Repositories.Interfaces;
 
 namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 {
@@ -15,6 +17,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 
         private readonly IIntergroupMeetingRepository _intergroupMeetingRepository;
         private readonly IConfigurationService _configService;
+        private readonly UnityDbContext _dbContext;
 
         [ObservableProperty]
         private bool isLoading = false;
@@ -36,10 +39,14 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 
         public ObservableCollection<IntergroupMeeting> Meetings { get; } = new();
 
-        public AdminViewModel(IIntergroupMeetingRepository intergroupMeetingRepository, IConfigurationService configService)
+        public AdminViewModel(
+            IIntergroupMeetingRepository intergroupMeetingRepository,
+            IConfigurationService configService,
+            UnityDbContext dbContext)
         {
             _intergroupMeetingRepository = intergroupMeetingRepository;
             _configService = configService;
+            _dbContext = dbContext;
         }
 
         [RelayCommand]
@@ -95,6 +102,9 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 
             await _configService.SaveActiveIntergroupMeetingAsync(meeting.Id);
 
+            // Reset all registered flags when switching to a new meeting
+            await ResetAllRegisteredStateAsync();
+
             ActiveMeetingId = meeting.Id;
             UpdateActiveMeetingDate();
 
@@ -106,6 +116,26 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
                 "Meeting Selected",
                 $"Active meeting set to {label}. Attendance will be recorded against this meeting.",
                 "OK");
+        }
+
+        private async Task ResetAllRegisteredStateAsync()
+        {
+            try
+            {
+                await _dbContext.Groups
+                    .Where(g => g.Registered)
+                    .ExecuteUpdateAsync(s => s.SetProperty(g => g.Registered, false));
+
+                await _dbContext.Positions
+                    .Where(p => p.Registered)
+                    .ExecuteUpdateAsync(s => s.SetProperty(p => p.Registered, false));
+
+                Logger.Information("Reset all Registered flags for new meeting session");
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning(ex, "Failed to reset Registered flags");
+            }
         }
 
         private void UpdateActiveMeetingDate()

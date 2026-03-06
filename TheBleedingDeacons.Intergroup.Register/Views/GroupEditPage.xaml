@@ -4,7 +4,7 @@
              xmlns:controls="clr-namespace:TheBleedingDeacons.Intergroup.Register.Controls"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:viewmodels="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
-             xmlns:models="clr-namespace:TheBleedingDeacons.Intergroup.Register.Models"
+             xmlns:entities="clr-namespace:TheBleedingDeacons.Unity.Intergroup.Entities;assembly=TheBleedingDeacons.Unity.Intergroup"
              xmlns:converters="clr-namespace:TheBleedingDeacons.Intergroup.Register.Converters"
              xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
              x:DataType="viewmodels:EditGroupViewModel"
@@ -96,26 +96,26 @@
                             <LinearItemsLayout Orientation="Vertical" ItemSpacing="4" />
                         </CollectionView.ItemsLayout>
                         <CollectionView.ItemTemplate>
-                            <DataTemplate x:DataType="models:Member">
+                            <DataTemplate x:DataType="entities:Member">
                                 <Border Style="{StaticResource MemberCardStyle}">
                                     <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto">
                                         <!-- Name -->
                                         <Label Grid.Row="0" Grid.Column="0"
-                                               Text="{Binding Name}"
+                                               Text="{Binding AnonymousName}"
                                                FontSize="20"
                                                FontAttributes="Bold"
                                                TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"/>
 
                                         <!-- Email -->
                                         <Label Grid.Row="1" Grid.Column="0"
-                                               Text="{Binding EmailPersonal}"
+                                               Text="{Binding PersonalEmail}"
                                                FontSize="16"
                                                TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}"
                                                Margin="0,2,0,0"/>
 
                                         <!-- Phone -->
                                         <Label Grid.Row="2" Grid.Column="0"
-                                               Text="{Binding Phone}"
+                                               Text="{Binding MobileNumber}"
                                                FontSize="16"
                                                TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}"
                                                Margin="0,2,0,0"/>
@@ -136,15 +136,15 @@
                                                     Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:EditGroupViewModel}}, Path=SelectMemberCommand}"
                                                     CommandParameter="{Binding .}"/>
 
-                                            <!-- Delete button -->
-                                            <Button Text="Delete"
+                                            <!-- Remove button -->
+                                            <Button Text="Remove"
                                                     FontSize="14"
                                                     BackgroundColor="#E57373"
                                                     TextColor="White"
                                                     CornerRadius="15"
                                                     Padding="12,6"
                                                     HeightRequest="36"
-                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:EditGroupViewModel}}, Path=MarkForDeletionCommand}"
+                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:EditGroupViewModel}}, Path=RemoveMemberCommand}"
                                                     CommandParameter="{Binding .}"/>
                                         </StackLayout>
                                     </Grid>
@@ -174,53 +174,6 @@
                                    TextColor="{AppThemeBinding Light={StaticResource Gray400}, Dark={StaticResource Gray500}}"/>
                         </StackLayout>
                     </Border>
-
-                    <!-- Deleted Members Section -->
-                    <StackLayout IsVisible="{Binding HasDeletedMembers}"
-                                 Margin="0,15,0,0">
-                        <Label Text="Marked for Deletion"
-                               FontSize="18"
-                               FontAttributes="Bold"
-                               TextColor="#E57373"
-                               Margin="0,0,0,8"/>
-
-                        <CollectionView ItemsSource="{Binding DeletedMembers}"
-                                        SelectionMode="None">
-                            <CollectionView.ItemsLayout>
-                                <LinearItemsLayout Orientation="Vertical" ItemSpacing="4" />
-                            </CollectionView.ItemsLayout>
-                            <CollectionView.ItemTemplate>
-                                <DataTemplate x:DataType="models:Member">
-                                    <Border Style="{StaticResource DeletedCardStyle}">
-                                        <Grid ColumnDefinitions="*,Auto">
-                                            <StackLayout Grid.Column="0" VerticalOptions="Center">
-                                                <Label Text="{Binding Name}"
-                                                       FontSize="18"
-                                                       TextDecorations="Strikethrough"
-                                                       TextColor="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource Gray400}}"/>
-                                                <Label Text="{Binding EmailPersonal}"
-                                                       FontSize="14"
-                                                       TextColor="{AppThemeBinding Light={StaticResource Gray400}, Dark={StaticResource Gray500}}"
-                                                       Margin="0,2,0,0"/>
-                                            </StackLayout>
-
-                                            <Button Grid.Column="1"
-                                                    Text="Restore"
-                                                    FontSize="14"
-                                                    BackgroundColor="{AppThemeBinding Light=#66BB6A, Dark=#43A047}"
-                                                    TextColor="White"
-                                                    CornerRadius="15"
-                                                    Padding="12,6"
-                                                    HeightRequest="36"
-                                                    VerticalOptions="Center"
-                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:EditGroupViewModel}}, Path=RestoreMemberCommand}"
-                                                    CommandParameter="{Binding .}"/>
-                                        </Grid>
-                                    </Border>
-                                </DataTemplate>
-                            </CollectionView.ItemTemplate>
-                        </CollectionView>
-                    </StackLayout>
 
                     <!-- Done Button -->
                     <Button Text="Done"

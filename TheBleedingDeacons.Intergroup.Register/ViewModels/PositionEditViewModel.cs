@@ -1,58 +1,141 @@
+using System.Collections.ObjectModel;
+using System.ComponentModel.DataAnnotations;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Serilog;
+using TheBleedingDeacons.Intergroup.Register.Services;
 using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Support;
-using TheBleedingDeacons.Unity.Data.Entities;
-using TheBleedingDeacons.Unity.Data.Repositories.Interfaces;
+using TheBleedingDeacons.Unity.Intergroup.Data;
+using TheBleedingDeacons.Unity.Intergroup.Entities;
+using TheBleedingDeacons.Unity.Intergroup.Repositories.Interfaces;
+using TheBleedingDeacons.Unity.Models;
+using Member = TheBleedingDeacons.Unity.Intergroup.Entities.Member;
+using Position = TheBleedingDeacons.Unity.Intergroup.Entities.Position;
 
 namespace TheBleedingDeacons.Intergroup.Register.ViewModels;
 
+/// <summary>
+/// Handles the editable position-holder information form.
+/// Member-centric: displays a list of ALL holders for the position, allows
+/// editing each one and adding new members.
+///
+/// Writes go to the local <see cref="UnityDbContext"/> and will persist until
+/// the next Unity sync replaces the data.
+///
+/// Separated from the verify flow (see <see cref="VerifyPositionViewModel"/>)
+/// so each ViewModel handles a single responsibility.
+///
+/// Mirrors the <see cref="EditGroupViewModel"/> pattern for consistency.
+/// </summary>
 public partial class PositionEditViewModel : BaseViewModel
 {
     private static readonly ILogger Logger = AppLogger.ForContext<PositionEditViewModel>();
 
     private readonly IPositionRepository _positionRepository;
+    private readonly UnityDbContext _context;
+    private readonly IPopupNotification _popupService;
+    private readonly QueueingUnityApiService _apiService;
 
-    [ObservableProperty]
+    // The position whose holders are being managed
     private Position? _position;
 
+    /// <summary>
+    /// The currently selected member being edited (null when not editing).
+    /// </summary>
     [ObservableProperty]
-    private bool _canConfirm;
+    private Member? selectedMember;
+
+    /// <summary>
+    /// Observable list of active holders for the position.
+    /// </summary>
+    public ObservableCollection<Member> ActiveHolders { get; } = new();
+
+    // ── Editing fields (bound to the form when a member is selected) ──
 
     [ObservableProperty]
-    private string? _displayMemberAnonymousName;
+    private string? editName;
 
     [ObservableProperty]
-    private string? _displayMemberPersonalEmail;
+    private string? editPhone;
 
     [ObservableProperty]
-    private string? _displayMemberMobile;
+    private string? editEmail;
+
+    // ── UI State ──
 
     [ObservableProperty]
-    private bool _hasValidationErrors;
+    private bool isLoading;
 
     [ObservableProperty]
-    private string? _validationMessage;
+    private bool isEditing;
 
-    private readonly IPopupNotification _popupService;
-    private readonly IAttendanceRegistration<Position> _attendanceRegistration;
+    [ObservableProperty]
+    private bool isCreatingNew;
+
+    [ObservableProperty]
+    private bool hasUnsavedChanges;
+
+    [ObservableProperty]
+    private bool isFormValid;
+
+    [ObservableProperty]
+    private string saveButtonText = "Save";
+
+    [ObservableProperty]
+    private bool hasActiveHolders;
+
+    [ObservableProperty]
+    private string holderCountText = string.Empty;
+
+    // ── Validation Errors ──
+
+    [ObservableProperty]
+    private string? nameError;
+
+    [ObservableProperty]
+    private string? phoneError;
+
+    [ObservableProperty]
+    private string? emailError;
+
+    [ObservableProperty]
+    private bool hasNameError;
+
+    [ObservableProperty]
+    private bool hasPhoneError;
+
+    [ObservableProperty]
+    private bool hasEmailError;
 
     public PositionEditViewModel(
         IPositionRepository positionRepository,
+        UnityDbContext context,
         IPopupNotification popupService,
-        IAttendanceRegistration<Position> attendanceRegistration)
+        QueueingUnityApiService apiService)
     {
         _positionRepository = positionRepository ?? throw new ArgumentNullException(nameof(positionRepository));
-        _attendanceRegistration = attendanceRegistration ?? throw new ArgumentNullException(nameof(attendanceRegistration));
+        _context = context ?? throw new ArgumentNullException(nameof(context));
         _popupService = popupService;
+        _apiService = apiService;
+
+        ValidateForm();
     }
+
+    #region Query Attributes Handling
 
     public override void ApplyQueryAttributes(IDictionary<string, object> query)
     {
+        Logger.Information("PositionEditViewModel.ApplyQueryAttributes called with {Count} parameters", query.Count);
+
         if (query.TryGetValue("position", out var positionObj) && positionObj is Position position)
         {
-            Initialize(position);
+            _position = position;
+            Logger.Information("Edit mode: position {PositionName} with {HolderCount} holders",
+                position.ShortDescription, position.Holders.Count);
+
+            PopulateHolderList();
+            UpdateTitle();
         }
         else if (query.TryGetValue("positionId", out var positionIdObj) &&
                  positionIdObj is string positionIdStr &&
@@ -62,6 +145,10 @@ public partial class PositionEditViewModel : BaseViewModel
         }
     }
 
+    #endregion
+
+    #region Initialization
+
     private async Task LoadPositionByIdAsync(int positionId)
     {
         try
@@ -69,7 +156,9 @@ public partial class PositionEditViewModel : BaseViewModel
             var position = await _positionRepository.GetByIdWithHoldersAsync(positionId);
             if (position != null)
             {
-                Initialize(position);
+                _position = position;
+                PopulateHolderList();
+                UpdateTitle();
             }
             else
             {
@@ -79,73 +168,443 @@ public partial class PositionEditViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
+            Logger.Error(ex, "Failed to load position {PositionId}", positionId);
             await Shell.Current.DisplayAlert("Error", $"Failed to load position: {ex.Message}", "OK");
             await Shell.Current.GoToAsync("//MainPage");
         }
     }
 
-    public void Initialize(Position position)
+    #endregion
+
+    #region Property Change Handlers
+
+    partial void OnEditNameChanged(string? value)
     {
-        Position = position;
-        UpdateDisplayProperties();
-        UpdateCanConfirm();
+        ValidateName();
+        CheckForUnsavedChanges();
+        ValidateForm();
     }
 
-    partial void OnPositionChanged(Position? value)
+    partial void OnEditPhoneChanged(string? value)
     {
-        UpdateDisplayProperties();
-        UpdateCanConfirm();
+        ValidatePhone();
+        CheckForUnsavedChanges();
+        ValidateForm();
     }
 
-    private void UpdateDisplayProperties()
+    partial void OnEditEmailChanged(string? value)
     {
-        if (Position == null) return;
-        var holder = Position.Holders.FirstOrDefault();
-        DisplayMemberAnonymousName = holder?.AnonymousName;
-        DisplayMemberPersonalEmail = holder?.PersonalEmail;
-        DisplayMemberMobile = holder?.MobileNumber;
-        Title = Position.ShortDescription ?? "Position";
+        ValidateEmail();
+        CheckForUnsavedChanges();
+        ValidateForm();
     }
 
-    private void UpdateCanConfirm()
+    partial void OnIsLoadingChanged(bool value)
     {
-        bool hasMemberName = !string.IsNullOrWhiteSpace(DisplayMemberAnonymousName);
-        bool hasMemberContact = !string.IsNullOrWhiteSpace(DisplayMemberMobile) ||
-                               !string.IsNullOrWhiteSpace(DisplayMemberPersonalEmail);
-
-        CanConfirm = hasMemberName && hasMemberContact;
-
-        var errors = new List<string>();
-        if (!hasMemberName) errors.Add("Member Name is required");
-        if (!hasMemberContact) errors.Add("Either Member Email or Member Mobile is required");
-
-        HasValidationErrors = errors.Count > 0;
-        ValidationMessage = errors.Count > 0 ? string.Join(", ", errors) : null;
+        SaveButtonText = value ? "Saving..." : "Save";
+        SaveMemberCommand.NotifyCanExecuteChanged();
     }
 
+    partial void OnIsEditingChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsEditing));
+    }
+
+    partial void OnHasUnsavedChangesChanged(bool value)
+    {
+        UpdateTitle();
+    }
+
+    partial void OnIsFormValidChanged(bool value)
+    {
+        SaveMemberCommand.NotifyCanExecuteChanged();
+    }
+
+    #endregion
+
+    #region Commands
+
+    /// <summary>
+    /// Select a member from the list to begin editing their details.
+    /// </summary>
     [RelayCommand]
-    private async Task Confirm()
+    private void SelectMember(Member member)
     {
-        if (!CanConfirm) return;
+        if (member == null) return;
+
+        SelectedMember = member;
+        IsCreatingNew = false;
+        IsEditing = true;
+
+        EditName = member.AnonymousName;
+        EditPhone = member.MobileNumber;
+        EditEmail = member.PersonalEmail;
+
+        HasUnsavedChanges = false;
+        ClearAllErrors();
+        ValidateForm();
+
+        Logger.Information("Selected holder {MemberName} (ID={MemberId}) for editing",
+            member.AnonymousName, member.Id);
+    }
+
+    /// <summary>
+    /// Begin creating a new holder for this position.
+    /// </summary>
+    [RelayCommand]
+    private void AddNewMember()
+    {
+        SelectedMember = null;
+        IsCreatingNew = true;
+        IsEditing = true;
+
+        EditName = string.Empty;
+        EditPhone = string.Empty;
+        EditEmail = string.Empty;
+
+        HasUnsavedChanges = false;
+        ClearAllErrors();
+        ValidateForm();
+
+        Logger.Information("Starting new holder creation for position {PositionName}", _position?.ShortDescription);
+    }
+
+    /// <summary>
+    /// Save the currently-edited or newly-created holder.
+    /// </summary>
+    [RelayCommand]
+    private async Task SaveMember()
+    {
+        if (!IsFormValid)
+        {
+            ValidateName();
+            ValidatePhone();
+            ValidateEmail();
+            await Shell.Current.DisplayAlert("Validation Error", "Please fix the form errors before saving.", "OK");
+            return;
+        }
+
+        if (_position == null)
+        {
+            Logger.Warning("SaveMember called but _position is null");
+            return;
+        }
 
         try
         {
-            if (Position != null)
+            IsLoading = true;
+
+            if (IsCreatingNew)
             {
-                await _attendanceRegistration.Register(Position);
+                // Create a brand-new holder member for this position
+                var newMember = new Member
+                {
+                    IntergroupPositionId = _position.Id,
+                    AnonymousName = EditName?.Trim() ?? string.Empty,
+                    MobileNumber = EditPhone?.Trim(),
+                    PersonalEmail = EditEmail?.Trim(),
+                };
+                _context.Members.Add(newMember);
+                await _context.SaveChangesAsync();
 
-                string memberName = Position.Holders.FirstOrDefault()?.AnonymousName ?? "Officer";
+                // Add to the position's in-memory collection and our observable list
+                _position.Holders.Add(newMember);
+                ActiveHolders.Add(newMember);
 
-                await _popupService.ShowCountdownPopupAsync(
-                    "Finished",
-                    $"Thanks for registering {memberName}.",
-                    async () => await Shell.Current.GoToAsync("//MainPage")
-                );
+                // Push the new member to the Unity API (queued if offline)
+                var createRequest = new CreateMemberRequest
+                {
+                    AnonymousName = newMember.AnonymousName,
+                    PersonalEmail = newMember.PersonalEmail,
+                    MobileNumber = newMember.MobileNumber,
+                    IntergroupPositionId = newMember.IntergroupPositionId,
+                };
+                _ = _apiService.CreateMemberAsync(createRequest)
+                    .ContinueWith(t =>
+                    {
+                        if (t.IsFaulted)
+                            Logger.Error(t.Exception, "Failed to push new holder {MemberName} to API", newMember.AnonymousName);
+                        else if (t.Result.Success)
+                            Logger.Information("Successfully pushed new holder {MemberName} to API", newMember.AnonymousName);
+                        else
+                            Logger.Warning("CreateMember API returned {Code}: {Message}",
+                                t.Result.Error?.Code, t.Result.Error?.Message);
+                    }, TaskScheduler.Default);
+
+                Logger.Information("Created new holder {MemberName} for position {PositionName}",
+                    newMember.AnonymousName, _position.ShortDescription);
             }
+            else if (SelectedMember != null && SelectedMember.Id > 0)
+            {
+                // Update an existing tracked member
+                var tracked = await _context.Members.FindAsync(SelectedMember.Id);
+                if (tracked != null)
+                {
+                    tracked.AnonymousName = EditName?.Trim() ?? string.Empty;
+                    tracked.MobileNumber = EditPhone?.Trim();
+                    tracked.PersonalEmail = EditEmail?.Trim();
+
+                    await _context.SaveChangesAsync();
+
+                    // Reflect changes in the in-memory object for the list
+                    SelectedMember.AnonymousName = tracked.AnonymousName;
+                    SelectedMember.MobileNumber = tracked.MobileNumber;
+                    SelectedMember.PersonalEmail = tracked.PersonalEmail;
+
+                    Logger.Information("Updated holder {MemberName} (ID={MemberId})",
+                        tracked.AnonymousName, tracked.Id);
+                }
+            }
+
+            HasUnsavedChanges = false;
+            IsEditing = false;
+            IsCreatingNew = false;
+            SelectedMember = null;
+
+            RefreshHolderCountText();
+            UpdateHasActiveHolders();
         }
         catch (Exception ex)
         {
-            await Shell.Current.DisplayAlert("Error", $"Failed to confirm position: {ex.Message}", "OK");
+            Logger.Error(ex, "Failed to save holder");
+            await Shell.Current.DisplayAlert("Error", $"Failed to save holder: {ex.Message}", "OK");
+        }
+        finally
+        {
+            IsLoading = false;
         }
     }
+
+    /// <summary>
+    /// Remove the selected holder from the local database.
+    /// Note: This is a local-only change. The next Unity sync will restore
+    /// the member if they still exist in the Unity API.
+    /// </summary>
+    [RelayCommand]
+    private async Task RemoveMember(Member member)
+    {
+        if (member == null) return;
+
+        bool confirmed = await Shell.Current.DisplayAlert(
+            "Remove Holder",
+            $"Remove \"{member.AnonymousName}\" from this position?\n\nThis is a local change and will be reverted on the next data sync.",
+            "Remove", "Cancel");
+
+        if (!confirmed) return;
+
+        try
+        {
+            var tracked = await _context.Members.FindAsync(member.Id);
+            if (tracked != null)
+            {
+                _context.Members.Remove(tracked);
+                await _context.SaveChangesAsync();
+            }
+
+            ActiveHolders.Remove(member);
+            _position?.Holders.Remove(member);
+
+            // If we were editing this member, close the form
+            if (SelectedMember?.Id == member.Id)
+            {
+                IsEditing = false;
+                IsCreatingNew = false;
+                SelectedMember = null;
+            }
+
+            RefreshHolderCountText();
+            UpdateHasActiveHolders();
+
+            Logger.Information("Removed holder {MemberName} (ID={MemberId}) from local database",
+                member.AnonymousName, member.Id);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Failed to remove holder {MemberId}", member.Id);
+            await Shell.Current.DisplayAlert("Error", $"Failed to remove holder: {ex.Message}", "OK");
+        }
+    }
+
+    /// <summary>
+    /// Cancel the current edit without saving.
+    /// </summary>
+    [RelayCommand]
+    private async Task CancelEdit()
+    {
+        if (IsLoading) return;
+
+        if (HasUnsavedChanges)
+        {
+            bool shouldCancel = await Shell.Current.DisplayAlert(
+                "Unsaved Changes",
+                "You have unsaved changes. Are you sure you want to cancel?",
+                "Yes", "No");
+
+            if (!shouldCancel) return;
+        }
+
+        IsEditing = false;
+        IsCreatingNew = false;
+        SelectedMember = null;
+        ClearAllErrors();
+    }
+
+    /// <summary>
+    /// Done editing — navigate back to verify page.
+    /// </summary>
+    [RelayCommand]
+    private async Task Done()
+    {
+        if (IsEditing && HasUnsavedChanges)
+        {
+            bool shouldLeave = await Shell.Current.DisplayAlert(
+                "Unsaved Changes",
+                "You have unsaved changes on the current holder. Discard and go back?",
+                "Discard", "Keep Editing");
+
+            if (!shouldLeave) return;
+        }
+
+        await Shell.Current.GoToAsync($"..?edited=true");
+    }
+
+    #endregion
+
+    #region Private Methods
+
+    private void PopulateHolderList()
+    {
+        ActiveHolders.Clear();
+
+        if (_position?.Holders != null)
+        {
+            foreach (var holder in _position.Holders)
+            {
+                ActiveHolders.Add(holder);
+            }
+        }
+
+        UpdateHasActiveHolders();
+        RefreshHolderCountText();
+    }
+
+    private void UpdateHasActiveHolders()
+    {
+        HasActiveHolders = ActiveHolders.Count > 0;
+    }
+
+    private void RefreshHolderCountText()
+    {
+        var count = ActiveHolders.Count;
+        HolderCountText = count switch
+        {
+            0 => "No holders — tap + to add one",
+            1 => "1 holder",
+            _ => $"{count} holders"
+        };
+    }
+
+    private void UpdateTitle()
+    {
+        var baseName = !string.IsNullOrEmpty(_position?.ShortDescription)
+            ? _position!.ShortDescription
+            : "Edit Holders";
+        Title = HasUnsavedChanges ? $"{baseName} *" : baseName;
+    }
+
+    #endregion
+
+    #region Validation Methods
+
+    private void ValidateName()
+    {
+        ClearNameError();
+
+        if (string.IsNullOrWhiteSpace(EditName))
+            SetNameError("Name is required.");
+        else if (EditName.Trim().Length > 255)
+            SetNameError("Name cannot exceed 255 characters.");
+    }
+
+    private void ValidatePhone()
+    {
+        ClearPhoneError();
+
+        if (!string.IsNullOrWhiteSpace(EditPhone))
+        {
+            if (EditPhone.Trim().Length > 20)
+                SetPhoneError("Phone number cannot exceed 20 characters.");
+            else if (!IsValidPhoneFormat(EditPhone.Trim()))
+                SetPhoneError("Please check the phone number is valid.");
+        }
+    }
+
+    private void ValidateEmail()
+    {
+        ClearEmailError();
+
+        if (!string.IsNullOrWhiteSpace(EditEmail))
+        {
+            if (EditEmail.Trim().Length > 255)
+                SetEmailError("Email address cannot exceed 255 characters.");
+            else if (!IsValidEmail(EditEmail.Trim()))
+                SetEmailError("Please check the email address is correct.");
+        }
+    }
+
+    private void ValidateForm()
+    {
+        IsFormValid = !HasNameError &&
+                     !HasPhoneError &&
+                     !HasEmailError &&
+                     !string.IsNullOrWhiteSpace(EditName) &&
+                     !string.IsNullOrWhiteSpace(EditPhone) &&
+                     !string.IsNullOrWhiteSpace(EditEmail);
+    }
+
+    private void CheckForUnsavedChanges()
+    {
+        if (IsCreatingNew)
+        {
+            HasUnsavedChanges = !string.IsNullOrWhiteSpace(EditName) ||
+                                !string.IsNullOrWhiteSpace(EditPhone) ||
+                                !string.IsNullOrWhiteSpace(EditEmail);
+            return;
+        }
+
+        if (SelectedMember == null) { HasUnsavedChanges = false; return; }
+
+        HasUnsavedChanges = SelectedMember.AnonymousName != EditName?.Trim() ||
+                            SelectedMember.MobileNumber != EditPhone?.Trim() ||
+                            SelectedMember.PersonalEmail != EditEmail?.Trim();
+    }
+
+    private void ClearAllErrors()
+    {
+        ClearNameError();
+        ClearPhoneError();
+        ClearEmailError();
+    }
+
+    private void SetNameError(string error) { NameError = error; HasNameError = true; }
+    private void ClearNameError() { NameError = null; HasNameError = false; }
+    private void SetPhoneError(string error) { PhoneError = error; HasPhoneError = true; }
+    private void ClearPhoneError() { PhoneError = null; HasPhoneError = false; }
+    private void SetEmailError(string error) { EmailError = error; HasEmailError = true; }
+    private void ClearEmailError() { EmailError = null; HasEmailError = false; }
+
+    private static bool IsValidEmail(string email)
+    {
+        try { return new EmailAddressAttribute().IsValid(email); }
+        catch { return false; }
+    }
+
+    private static bool IsValidPhoneFormat(string phone)
+    {
+        if (string.IsNullOrWhiteSpace(phone)) return false;
+        var digits = new string(phone.Where(char.IsDigit).ToArray());
+        return digits.Length >= 7 && digits.Length <= 15;
+    }
+
+    #endregion
 }
