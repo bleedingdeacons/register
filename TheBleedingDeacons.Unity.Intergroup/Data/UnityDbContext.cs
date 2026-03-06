@@ -13,6 +13,14 @@ public class UnityDbContext : DbContext
     public DbSet<Contact> Contacts => Set<Contact>();
     public DbSet<IntergroupMeeting> IntergroupMeetings => Set<IntergroupMeeting>();
 
+    /// <summary>
+    /// When <c>true</c>, <see cref="SaveChangesAsync"/> and <see cref="SaveChanges"/>
+    /// will not automatically set the <c>Updated</c> timestamp on tracked entities.
+    /// Use this during bulk-sync operations where the data comes straight from Unity
+    /// and no local change tracking is desired.
+    /// </summary>
+    public bool SuppressUpdatedStamp { get; set; }
+
     public UnityDbContext(DbContextOptions<UnityDbContext> options) : base(options) { }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
@@ -30,13 +38,13 @@ public class UnityDbContext : DbContext
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
-        StampUpdated();
+        if (!SuppressUpdatedStamp) StampUpdated();
         return base.SaveChangesAsync(cancellationToken);
     }
 
     public override int SaveChanges()
     {
-        StampUpdated();
+        if (!SuppressUpdatedStamp) StampUpdated();
         return base.SaveChanges();
     }
 

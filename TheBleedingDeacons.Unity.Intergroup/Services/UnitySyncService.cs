@@ -66,6 +66,9 @@ public class UnitySyncService
 
         _db.ChangeTracker.Clear();
 
+        // Sync data comes directly from Unity — don't stamp Updated timestamps.
+        _db.SuppressUpdatedStamp = true;
+
         await _db.Groups.AddRangeAsync(groups, ct);
         await _db.Members.AddRangeAsync(members, ct);
         await _db.Meetings.AddRangeAsync(meetings, ct);
@@ -74,6 +77,8 @@ public class UnitySyncService
         await _db.IntergroupMeetings.AddRangeAsync(intergroupMeetings, ct);
 
         await _db.SaveChangesAsync(ct);
+
+        _db.SuppressUpdatedStamp = false;
 
         return new SyncResult(groups.Count, meetings.Count, positions.Count, members.Count, contacts.Count, intergroupMeetings.Count);
     }
