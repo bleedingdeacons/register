@@ -62,7 +62,22 @@ public partial class PositionEditViewModel : BaseViewModel
     [ObservableProperty]
     private string? editEmail;
 
-    // ── UI State ──
+    /// <summary>
+    /// The rotation date for the position holder. Required when creating a new holder.
+    /// Bound to a DatePicker on the form.
+    /// </summary>
+    [ObservableProperty]
+    private DateTime editRotationDate = DateTime.Today;
+
+    /// <summary>
+    /// Tracks whether the user has explicitly chosen a rotation date.
+    /// The DatePicker always has a value, so we need a separate flag to
+    /// know if the user has interacted with it vs. just seeing the default.
+    /// Set to <c>true</c> when loading an existing member's date or when
+    /// the user changes the picker.
+    /// </summary>
+    [ObservableProperty]
+    private bool rotationDateSelected;
 
     [ObservableProperty]
     private bool isLoading;
@@ -107,6 +122,12 @@ public partial class PositionEditViewModel : BaseViewModel
 
     [ObservableProperty]
     private bool hasEmailError;
+
+    [ObservableProperty]
+    private string? rotationDateError;
+
+    [ObservableProperty]
+    private bool hasRotationDateError;
 
     public PositionEditViewModel(
         IPositionRepository positionRepository,
@@ -199,6 +220,14 @@ public partial class PositionEditViewModel : BaseViewModel
         ValidateForm();
     }
 
+    partial void OnEditRotationDateChanged(DateTime value)
+    {
+        RotationDateSelected = true;
+        ValidateRotationDate();
+        CheckForUnsavedChanges();
+        ValidateForm();
+    }
+
     partial void OnIsLoadingChanged(bool value)
     {
         SaveButtonText = value ? "Saving..." : "Save";
@@ -240,6 +269,18 @@ public partial class PositionEditViewModel : BaseViewModel
         EditPhone = member.MobileNumber;
         EditEmail = member.PersonalEmail;
 
+        // Parse the stored rotation string back to a DateTime for the DatePicker
+        if (DateTime.TryParse(member.IntergroupPositionRotation, out var parsed))
+        {
+            EditRotationDate = parsed;
+            RotationDateSelected = true;
+        }
+        else
+        {
+            EditRotationDate = DateTime.Today;
+            RotationDateSelected = false;
+        }
+
         HasUnsavedChanges = false;
         ClearAllErrors();
         ValidateForm();
@@ -261,6 +302,8 @@ public partial class PositionEditViewModel : BaseViewModel
         EditName = string.Empty;
         EditPhone = string.Empty;
         EditEmail = string.Empty;
+        EditRotationDate = DateTime.Today;
+        RotationDateSelected = false;
 
         HasUnsavedChanges = false;
         ClearAllErrors();
@@ -280,6 +323,7 @@ public partial class PositionEditViewModel : BaseViewModel
             ValidateName();
             ValidatePhone();
             ValidateEmail();
+            ValidateRotationDate();
             await Shell.Current.DisplayAlert("Validation Error", "Please fix the form errors before saving.", "OK");
             return;
         }
@@ -296,13 +340,20 @@ public partial class PositionEditViewModel : BaseViewModel
 
             if (IsCreatingNew)
             {
-                // Create a brand-new holder member for this position
+                // Create a brand-new holder member for this position.
+                // Assign a negative temporary ID so that:
+                //  1. It cannot collide with Unity's positive WordPress post IDs.
+                //  2. Multiple Register apps running simultaneously get different IDs.
+                //  3. Any code can check member.IsTemporary (Id < 0) to know a
+                //     CreateMember API call is required.
                 var newMember = new Member
                 {
+                    Id = TemporaryIdGenerator.Next(),
                     IntergroupPositionId = _position.Id,
                     AnonymousName = EditName?.Trim() ?? string.Empty,
                     MobileNumber = EditPhone?.Trim(),
                     PersonalEmail = EditEmail?.Trim(),
+                    IntergroupPositionRotation = EditRotationDate.ToString("yyyy-MM-dd"),
                 };
                 _context.Members.Add(newMember);
                 await _context.SaveChangesAsync();
@@ -318,6 +369,7 @@ public partial class PositionEditViewModel : BaseViewModel
                     PersonalEmail = newMember.PersonalEmail,
                     MobileNumber = newMember.MobileNumber,
                     IntergroupPositionId = newMember.IntergroupPositionId,
+                    IntergroupPositionRotation = newMember.IntergroupPositionRotation,
                 };
                 _ = _apiService.CreateMemberAsync(createRequest)
                     .ContinueWith(t =>
@@ -334,7 +386,7 @@ public partial class PositionEditViewModel : BaseViewModel
                 Logger.Information("Created new holder {MemberName} for position {PositionName}",
                     newMember.AnonymousName, _position.ShortDescription);
             }
-            else if (SelectedMember != null && SelectedMember.Id > 0)
+            else if (SelectedMember != null && SelectedMember.Id != 0)
             {
                 // Update an existing tracked member
                 var tracked = await _context.Members.FindAsync(SelectedMember.Id);
@@ -343,6 +395,7 @@ public partial class PositionEditViewModel : BaseViewModel
                     tracked.AnonymousName = EditName?.Trim() ?? string.Empty;
                     tracked.MobileNumber = EditPhone?.Trim();
                     tracked.PersonalEmail = EditEmail?.Trim();
+                    tracked.IntergroupPositionRotation = EditRotationDate.ToString("yyyy-MM-dd");
 
                     await _context.SaveChangesAsync();
 
@@ -350,6 +403,7 @@ public partial class PositionEditViewModel : BaseViewModel
                     SelectedMember.AnonymousName = tracked.AnonymousName;
                     SelectedMember.MobileNumber = tracked.MobileNumber;
                     SelectedMember.PersonalEmail = tracked.PersonalEmail;
+                    SelectedMember.IntergroupPositionRotation = tracked.IntergroupPositionRotation;
 
                     Logger.Information("Updated holder {MemberName} (ID={MemberId})",
                         tracked.AnonymousName, tracked.Id);
@@ -557,9 +611,11 @@ public partial class PositionEditViewModel : BaseViewModel
         IsFormValid = !HasNameError &&
                      !HasPhoneError &&
                      !HasEmailError &&
+                     !HasRotationDateError &&
                      !string.IsNullOrWhiteSpace(EditName) &&
                      !string.IsNullOrWhiteSpace(EditPhone) &&
-                     !string.IsNullOrWhiteSpace(EditEmail);
+                     !string.IsNullOrWhiteSpace(EditEmail) &&
+                     RotationDateSelected;
     }
 
     private void CheckForUnsavedChanges()
@@ -568,15 +624,22 @@ public partial class PositionEditViewModel : BaseViewModel
         {
             HasUnsavedChanges = !string.IsNullOrWhiteSpace(EditName) ||
                                 !string.IsNullOrWhiteSpace(EditPhone) ||
-                                !string.IsNullOrWhiteSpace(EditEmail);
+                                !string.IsNullOrWhiteSpace(EditEmail) ||
+                                RotationDateSelected;
             return;
         }
 
         if (SelectedMember == null) { HasUnsavedChanges = false; return; }
 
+        // Parse the member's stored rotation string for comparison
+        var existingRotation = DateTime.TryParse(SelectedMember.IntergroupPositionRotation, out var parsed)
+            ? (DateTime?)parsed.Date
+            : null;
+
         HasUnsavedChanges = SelectedMember.AnonymousName != EditName?.Trim() ||
                             SelectedMember.MobileNumber != EditPhone?.Trim() ||
-                            SelectedMember.PersonalEmail != EditEmail?.Trim();
+                            SelectedMember.PersonalEmail != EditEmail?.Trim() ||
+                            existingRotation?.Date != EditRotationDate.Date;
     }
 
     private void ClearAllErrors()
@@ -584,6 +647,7 @@ public partial class PositionEditViewModel : BaseViewModel
         ClearNameError();
         ClearPhoneError();
         ClearEmailError();
+        ClearRotationDateError();
     }
 
     private void SetNameError(string error) { NameError = error; HasNameError = true; }
@@ -592,6 +656,16 @@ public partial class PositionEditViewModel : BaseViewModel
     private void ClearPhoneError() { PhoneError = null; HasPhoneError = false; }
     private void SetEmailError(string error) { EmailError = error; HasEmailError = true; }
     private void ClearEmailError() { EmailError = null; HasEmailError = false; }
+    private void SetRotationDateError(string error) { RotationDateError = error; HasRotationDateError = true; }
+    private void ClearRotationDateError() { RotationDateError = null; HasRotationDateError = false; }
+
+    private void ValidateRotationDate()
+    {
+        ClearRotationDateError();
+
+        if (!RotationDateSelected)
+            SetRotationDateError("Rotation date is required.");
+    }
 
     private static bool IsValidEmail(string email)
     {

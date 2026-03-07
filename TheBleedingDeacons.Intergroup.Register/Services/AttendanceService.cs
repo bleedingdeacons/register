@@ -46,7 +46,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
             if (config.ActiveIntergroupMeetingId.HasValue && config.IsValid())
             {
                 var holder = entity.Holders.FirstOrDefault();
-                if (holder == null || holder.Id == 0)
+                if (holder == null || holder.IsTemporary)
                 {
                     Logger.Warning("Position {PositionName} has no associated member — skipping Unity API registration",
                         entity.ShortDescription);

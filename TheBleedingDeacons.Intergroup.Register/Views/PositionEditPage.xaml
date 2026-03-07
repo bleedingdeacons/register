@@ -261,7 +261,28 @@
                                IsVisible="{Binding HasEmailError}" />
                     </StackLayout>
 
-                    <!-- Action Buttons -->
+                    <!-- Rotation Date Field -->
+                    <StackLayout Spacing="5">
+                        <Label Text="Rotation Date"
+                               Style="{StaticResource EditFieldLabelStyle}" />
+                        <Label Text="Please select a rotation date"
+                               FontSize="16"
+                               TextColor="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource Gray400}}"
+                               IsVisible="{Binding RotationDateSelected, Converter={StaticResource InvertedBoolConverter}}"
+                               Margin="0,0,0,4" />
+                        <DatePicker x:Name="EditRotationDatePicker"
+                                    Date="{Binding EditRotationDate, Mode=TwoWay}"
+                                    Format="yyyy-MM-dd"
+                                    FontSize="22"
+                                    MinimumDate="2020-01-01"
+                                    MaximumDate="2040-12-31"
+                                    BackgroundColor="{AppThemeBinding Light=White, Dark=#2D2D30}"
+                                    TextColor="{AppThemeBinding Light=Black, Dark=White}" />
+                        <Label Text="{Binding RotationDateError}"
+                               TextColor="Red"
+                               FontSize="14"
+                               IsVisible="{Binding HasRotationDateError}" />
+                    </StackLayout>
                     <Grid ColumnSpacing="15" Margin="0,10,0,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />

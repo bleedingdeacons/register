@@ -141,6 +141,7 @@ public class UnitySyncService
             IsGsr = m.IsGsr,
             HomeGroupId = m.HomeGroupId,
             IntergroupPositionId = m.IntergroupPositionId,
+            IntergroupPositionRotation = string.IsNullOrWhiteSpace(m.IntergroupPositionRotation) ? null : m.IntergroupPositionRotation,
         }).ToList();
 
     private static List<Entities.Position> MapPositions(

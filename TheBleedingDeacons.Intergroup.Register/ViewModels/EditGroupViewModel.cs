@@ -254,9 +254,15 @@ public partial class EditGroupViewModel : BaseViewModel
 
             if (IsCreatingNew)
             {
-                // Create a brand-new GSR member for this group
+                // Create a brand-new GSR member for this group.
+                // Assign a negative temporary ID so that:
+                //  1. It cannot collide with Unity's positive WordPress post IDs.
+                //  2. Multiple Register apps running simultaneously get different IDs.
+                //  3. Any code can check member.IsTemporary (Id < 0) to know a
+                //     CreateMember API call is required.
                 var newMember = new Member
                 {
+                    Id = TemporaryIdGenerator.Next(),
                     HomeGroupId = _group.Id,
                     AnonymousName = EditName?.Trim() ?? string.Empty,
                     MobileNumber = EditPhone?.Trim(),
@@ -294,7 +300,7 @@ public partial class EditGroupViewModel : BaseViewModel
                 Logger.Information("Created new member {MemberName} for group {GroupName}",
                     newMember.AnonymousName, _group.Name);
             }
-            else if (SelectedMember != null && SelectedMember.Id > 0)
+            else if (SelectedMember != null && SelectedMember.Id != 0)
             {
                 // Update an existing tracked member
                 var tracked = await _context.Members.FindAsync(SelectedMember.Id);
