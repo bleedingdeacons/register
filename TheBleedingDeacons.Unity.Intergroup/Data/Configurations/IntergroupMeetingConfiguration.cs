@@ -33,6 +33,7 @@ public class IntergroupMeetingConfiguration : IEntityTypeConfiguration<Intergrou
         builder.Property(m => m.OfficerAttendeeNames)
             .HasMaxLength(2000);
 
-        builder.Property(m => m.Updated);
+        builder.Property(m => m.Updated)
+            .HasPrecision(3);
     }
 }

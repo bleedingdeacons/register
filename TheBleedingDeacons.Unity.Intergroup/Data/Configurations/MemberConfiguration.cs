@@ -34,7 +34,8 @@ public class MemberConfiguration : IEntityTypeConfiguration<Member>
         builder.Property(m => m.IntergroupPositionRotation)
             .HasMaxLength(20);
 
-        builder.Property(m => m.Updated);
+        builder.Property(m => m.Updated)
+            .HasPrecision(3);
 
         // HomeGroup FK is configured from GroupConfiguration (WithOne → HasForeignKey)
 

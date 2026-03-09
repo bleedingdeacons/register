@@ -28,7 +28,8 @@ public class PositionConfiguration : IEntityTypeConfiguration<Position>
         builder.Property(p => p.Registered)
             .HasDefaultValue(false);
 
-        builder.Property(p => p.Updated);
+        builder.Property(p => p.Updated)
+            .HasPrecision(3);
 
         // Holder FK is now on Member.IntergroupPositionId (configured in MemberConfiguration)
     }

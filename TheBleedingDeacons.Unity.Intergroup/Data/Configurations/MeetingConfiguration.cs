@@ -40,7 +40,8 @@ public class MeetingConfiguration : IEntityTypeConfiguration<Meeting>
         builder.Property(m => m.Types)
             .HasMaxLength(500);
 
-        builder.Property(m => m.Updated);
+        builder.Property(m => m.Updated)
+            .HasPrecision(3);
 
         // Many-to-one: Meeting → Group
         builder.HasOne(m => m.Group)
