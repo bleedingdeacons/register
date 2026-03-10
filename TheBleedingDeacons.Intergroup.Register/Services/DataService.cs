@@ -16,15 +16,21 @@ public class DataService
     private static readonly ILogger Logger = AppLogger.ForContext<DataService>();
 
     private readonly UnitySyncService _syncService;
+    private readonly SnapshotService _snapshotService;
+    private readonly ReconciliationService _reconciliationService;
     private readonly IMeetingRepository _meetingRepository;
     private readonly IPositionRepository _positionRepository;
 
     public DataService(
         UnitySyncService syncService,
+        SnapshotService snapshotService,
+        ReconciliationService reconciliationService,
         IMeetingRepository meetingRepository,
         IPositionRepository positionRepository)
     {
         _syncService = syncService;
+        _snapshotService = snapshotService;
+        _reconciliationService = reconciliationService;
         _meetingRepository = meetingRepository;
         _positionRepository = positionRepository;
     }
@@ -51,6 +57,76 @@ public class DataService
         catch (Exception ex)
         {
             Logger.Error(ex, "Sync from Unity API failed");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Performs the initial Unity sync and captures a baseline snapshot.
+    /// Call this at the start of a session (e.g. app launch or before an
+    /// intergroup meeting) to establish the "clean" state.
+    ///
+    /// Flow: Sync all data from Unity → Snapshot the result.
+    /// </summary>
+    public async Task<(int Meetings, int Positions, int Members, int Groups, int Contacts, int IntergroupMeetings)> ImportWithSnapshotAsync(
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            Logger.Information("Starting Unity sync with snapshot capture");
+
+            var sync = await _syncService.SyncAsync(cancellationToken);
+            var snap = await _snapshotService.CaptureAsync(cancellationToken);
+
+            Logger.Information(
+                "Unity sync + snapshot complete: {Groups} groups, {Meetings} meetings, {Members} members, {Positions} positions, {Contacts} contacts, {IntergroupMeetings} IG meetings. " +
+                "Snapshot: {SnapGroups} groups, {SnapMembers} members, {SnapPositions} positions",
+                sync.Groups, sync.Meetings, sync.Members, sync.Positions, sync.Contacts, sync.IntergroupMeetings,
+                snap.Groups, snap.Members, snap.Positions);
+
+            return (sync.Meetings, sync.Positions, sync.Members, sync.Groups, sync.Contacts, sync.IntergroupMeetings);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Unity sync with snapshot failed");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Detects local changes, pushes them to the Unity API in the correct
+    /// dependency order, then re-syncs and re-snapshots.
+    ///
+    /// Flow: Detect → Push creates → Push updates → Push registrations → Re-sync → Re-snapshot.
+    /// </summary>
+    public async Task<(int Meetings, int Positions, int Members, int Groups, int Contacts, int IntergroupMeetings,
+                        int Created, int Modified, int Reinserted, int Patched)> ImportWithReconciliationAsync(
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            Logger.Information("Starting Unity reconciliation");
+
+            var result = await _reconciliationService.ReconcileAsync(cancellationToken);
+            var sync = result.Resync;
+
+            Logger.Information(
+                "Reconciliation complete: {Created} members created, {Modified} modified, " +
+                "{RegGroups} groups registered, {RegPos} positions registered, {Errors} errors. " +
+                "Re-synced {Groups} groups, {Meetings} meetings, {Members} members, {Positions} positions",
+                result.CreatedMembers, result.ModifiedMembers,
+                result.RegisteredGroups, result.RegisteredPositions, result.ApiErrors,
+                sync.Groups, sync.Meetings, sync.Members, sync.Positions);
+
+            return (sync.Meetings, sync.Positions, sync.Members, sync.Groups,
+                    sync.Contacts, sync.IntergroupMeetings,
+                    result.CreatedMembers, result.ModifiedMembers,
+                    result.RegisteredGroups + result.RegisteredPositions,
+                    result.ApiErrors);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Unity reconciliation failed");
             throw;
         }
     }

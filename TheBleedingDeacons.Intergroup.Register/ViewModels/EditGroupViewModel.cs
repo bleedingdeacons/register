@@ -1,13 +1,12 @@
-using System.Collections.ObjectModel;
-using System.ComponentModel.DataAnnotations;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Serilog;
+using System.Collections.ObjectModel;
+using System.ComponentModel.DataAnnotations;
 using TheBleedingDeacons.Intergroup.Register.Services;
 using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Support;
 using TheBleedingDeacons.Unity.Intergroup.Data;
-using TheBleedingDeacons.Unity.Models;
 using Group = TheBleedingDeacons.Unity.Intergroup.Entities.Group;
 using Member = TheBleedingDeacons.Unity.Intergroup.Entities.Member;
 
@@ -18,8 +17,12 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels;
 /// Member-centric: displays a list of ALL GSRs for the group, allows
 /// editing each one and adding new members.
 ///
-/// Writes go to the local <see cref="UnityDbContext"/> and will persist until
-/// the next Unity sync replaces the data.
+/// Writes go to the local <see cref="UnityDbContext"/> only. The
+/// <see cref="ReconciliationService"/> detects changes via snapshot
+/// diffing and pushes them to the Unity API at reconciliation time.
+///
+/// Member removals are staged locally and only committed when the user
+/// taps OK. Tapping Cancel reverts all pending removals.
 ///
 /// Separated from the verify flow (see <see cref="VerifyGroupViewModel"/>)
 /// so each ViewModel handles a single responsibility.
@@ -30,7 +33,6 @@ public partial class EditGroupViewModel : BaseViewModel
 
     private readonly UnityDbContext _context;
     private readonly IPopupNotification _popupService;
-    private readonly QueueingUnityApiService _apiService;
 
     // The group whose GSRs are being managed
     private Group? _group;
@@ -45,6 +47,13 @@ public partial class EditGroupViewModel : BaseViewModel
     /// Observable list of active members for the group.
     /// </summary>
     public ObservableCollection<Member> ActiveMembers { get; } = new();
+
+    /// <summary>
+    /// Members that have been removed in this session but not yet committed.
+    /// Displayed with a strikethrough / deleted card style so the user can
+    /// see what will be removed when they tap OK.
+    /// </summary>
+    public ObservableCollection<Member> PendingRemovals { get; } = new();
 
     // ── Editing fields (bound to the form when a member is selected) ──
 
@@ -83,6 +92,19 @@ public partial class EditGroupViewModel : BaseViewModel
     [ObservableProperty]
     private string memberCountText = string.Empty;
 
+    /// <summary>
+    /// True when there are pending removals that have not been committed.
+    /// </summary>
+    [ObservableProperty]
+    private bool hasPendingRemovals;
+
+    /// <summary>
+    /// True when the page has any uncommitted work (removals, new members, edits).
+    /// Used to decide whether navigating away requires confirmation.
+    /// </summary>
+    [ObservableProperty]
+    private bool hasPendingChanges;
+
     // ── Validation Errors ──
 
     [ObservableProperty]
@@ -105,12 +127,10 @@ public partial class EditGroupViewModel : BaseViewModel
 
     public EditGroupViewModel(
         UnityDbContext context,
-        IPopupNotification popupService,
-        QueueingUnityApiService apiService)
+        IPopupNotification popupService)
     {
         _context = context;
         _popupService = popupService;
-        _apiService = apiService;
 
         ValidateForm();
     }
@@ -127,6 +147,9 @@ public partial class EditGroupViewModel : BaseViewModel
             Logger.Information("Edit mode: group {GroupName} with {MemberCount} members",
                 group.Name, group.Members.Count);
 
+            PendingRemovals.Clear();
+            HasPendingChanges = false;
+            UpdateHasPendingRemovals();
             PopulateMemberLists();
             UpdateTitle();
         }
@@ -276,27 +299,6 @@ public partial class EditGroupViewModel : BaseViewModel
                 _group.Members.Add(newMember);
                 ActiveMembers.Add(newMember);
 
-                // Push the new member to the Unity API (queued if offline)
-                var createRequest = new CreateMemberRequest
-                {
-                    AnonymousName = newMember.AnonymousName,
-                    PersonalEmail = newMember.PersonalEmail,
-                    MobileNumber = newMember.MobileNumber,
-                    HomeGroupId = newMember.HomeGroupId,
-                    IsGsr = true,
-                };
-                _ = _apiService.CreateMemberAsync(createRequest)
-                    .ContinueWith(t =>
-                    {
-                        if (t.IsFaulted)
-                            Logger.Error(t.Exception, "Failed to push new member {MemberName} to API", newMember.AnonymousName);
-                        else if (t.Result.Success)
-                            Logger.Information("Successfully pushed new member {MemberName} to API", newMember.AnonymousName);
-                        else
-                            Logger.Warning("CreateMember API returned {Code}: {Message}",
-                                t.Result.Error?.Code, t.Result.Error?.Message);
-                    }, TaskScheduler.Default);
-
                 Logger.Information("Created new member {MemberName} for group {GroupName}",
                     newMember.AnonymousName, _group.Name);
             }
@@ -327,6 +329,7 @@ public partial class EditGroupViewModel : BaseViewModel
             IsCreatingNew = false;
             SelectedMember = null;
 
+            HasPendingChanges = true;
             RefreshMemberCountText();
             UpdateHasActiveMembers();
         }
@@ -342,57 +345,58 @@ public partial class EditGroupViewModel : BaseViewModel
     }
 
     /// <summary>
-    /// Remove the selected member from the local database.
-    /// Note: This is a local-only change. The next Unity sync will restore
-    /// the member if they still exist in the Unity API.
+    /// Stage a member for removal. The member is removed from the active list
+    /// and added to <see cref="PendingRemovals"/>. No database writes happen
+    /// until the user taps OK (<see cref="Done"/>). Cancel reverts all removals.
     /// </summary>
     [RelayCommand]
-    private async Task RemoveMember(Member member)
+    private void RemoveMember(Member member)
     {
         if (member == null) return;
 
-        bool confirmed = await Shell.Current.DisplayAlert(
-            "Remove Member",
-            $"Remove \"{member.AnonymousName}\" from this group?\n\nThis is a local change and will be reverted on the next data sync.",
-            "Remove", "Cancel");
+        ActiveMembers.Remove(member);
+        PendingRemovals.Add(member);
 
-        if (!confirmed) return;
-
-        try
+        // If we were editing this member, close the form
+        if (SelectedMember?.Id == member.Id)
         {
-            var tracked = await _context.Members.FindAsync(member.Id);
-            if (tracked != null)
-            {
-                _context.Members.Remove(tracked);
-                await _context.SaveChangesAsync();
-            }
-
-            ActiveMembers.Remove(member);
-            _group?.Members.Remove(member);
-
-            // If we were editing this member, close the form
-            if (SelectedMember?.Id == member.Id)
-            {
-                IsEditing = false;
-                IsCreatingNew = false;
-                SelectedMember = null;
-            }
-
-            RefreshMemberCountText();
-            UpdateHasActiveMembers();
-
-            Logger.Information("Removed member {MemberName} (ID={MemberId}) from local database",
-                member.AnonymousName, member.Id);
+            IsEditing = false;
+            IsCreatingNew = false;
+            SelectedMember = null;
         }
-        catch (Exception ex)
-        {
-            Logger.Error(ex, "Failed to remove member {MemberId}", member.Id);
-            await Shell.Current.DisplayAlert("Error", $"Failed to remove member: {ex.Message}", "OK");
-        }
+
+        UpdateHasPendingRemovals();
+        HasPendingChanges = true;
+        RefreshMemberCountText();
+        UpdateHasActiveMembers();
+
+        Logger.Information("Staged removal of member {MemberName} (ID={MemberId})",
+            member.AnonymousName, member.Id);
     }
 
     /// <summary>
-    /// Cancel the current edit without saving.
+    /// Undo a pending removal — move the member back from the pending list
+    /// to the active list.
+    /// </summary>
+    [RelayCommand]
+    private void UndoRemoveMember(Member member)
+    {
+        if (member == null) return;
+
+        PendingRemovals.Remove(member);
+        ActiveMembers.Add(member);
+
+        UpdateHasPendingRemovals();
+        HasPendingChanges = PendingRemovals.Count > 0;
+        RefreshMemberCountText();
+        UpdateHasActiveMembers();
+
+        Logger.Information("Undid removal of member {MemberName} (ID={MemberId})",
+            member.AnonymousName, member.Id);
+    }
+
+    /// <summary>
+    /// Cancel the current member edit form without saving.
     /// </summary>
     [RelayCommand]
     private async Task CancelEdit()
@@ -416,7 +420,7 @@ public partial class EditGroupViewModel : BaseViewModel
     }
 
     /// <summary>
-    /// Done editing — navigate back to verify page.
+    /// OK — commit all pending removals to the database and navigate back.
     /// </summary>
     [RelayCommand]
     private async Task Done()
@@ -431,7 +435,76 @@ public partial class EditGroupViewModel : BaseViewModel
             if (!shouldLeave) return;
         }
 
+        try
+        {
+            // Commit all pending removals to the database
+            foreach (var member in PendingRemovals)
+            {
+                var tracked = await _context.Members.FindAsync(member.Id);
+                if (tracked != null)
+                {
+                    if (member.IsTemporary)
+                    {
+                        _context.Members.Remove(tracked);
+                        _group?.Members.Remove(member);
+                        Logger.Information("Deleted temporary member {MemberName} (ID={MemberId}) from local database",
+                            member.AnonymousName, member.Id);
+                    }
+                    else
+                    {
+                        tracked.IsGsr = false;
+                        Logger.Information("Set IsGsr=false for member {MemberName} (ID={MemberId}) for sync",
+                            member.AnonymousName, member.Id);
+                    }
+                }
+            }
+
+            if (PendingRemovals.Count > 0)
+            {
+                await _context.SaveChangesAsync();
+            }
+
+            PendingRemovals.Clear();
+            UpdateHasPendingRemovals();
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Failed to commit pending removals");
+            await Shell.Current.DisplayAlert("Error", $"Failed to save changes: {ex.Message}", "OK");
+            return;
+        }
+
         await Shell.Current.GoToAsync($"..?edited=true");
+    }
+
+    /// <summary>
+    /// Cancel — revert all pending removals and navigate back without saving.
+    /// </summary>
+    [RelayCommand]
+    private async Task CancelPage()
+    {
+        if (HasPendingChanges || (IsEditing && HasUnsavedChanges))
+        {
+            bool shouldLeave = await Shell.Current.DisplayAlert(
+                "Discard Changes",
+                "You have unsaved changes. Discard and go back?",
+                "Discard", "Keep Editing");
+
+            if (!shouldLeave) return;
+        }
+
+        // Revert pending removals — move them back to ActiveMembers
+        foreach (var member in PendingRemovals)
+        {
+            ActiveMembers.Add(member);
+        }
+        PendingRemovals.Clear();
+        UpdateHasPendingRemovals();
+        HasPendingChanges = false;
+
+        Logger.Information("Cancelled edit page — reverted all pending removals");
+
+        await Shell.Current.GoToAsync("..");
     }
 
     #endregion
@@ -457,6 +530,11 @@ public partial class EditGroupViewModel : BaseViewModel
     private void UpdateHasActiveMembers()
     {
         HasActiveMembers = ActiveMembers.Count > 0;
+    }
+
+    private void UpdateHasPendingRemovals()
+    {
+        HasPendingRemovals = PendingRemovals.Count > 0;
     }
 
     private void RefreshMemberCountText()

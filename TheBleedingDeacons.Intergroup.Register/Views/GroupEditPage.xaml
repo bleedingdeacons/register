@@ -175,13 +175,88 @@
                         </StackLayout>
                     </Border>
 
-                    <!-- Done Button -->
-                    <Button Text="Done"
-                            Command="{Binding DoneCommand}"
-                            Style="{StaticResource PrimaryButtonStyle}"
-                            TextColor="White"
-                            HeightRequest="60"
-                            Margin="0,20,0,0"/>
+                    <!-- Pending Removals -->
+                    <StackLayout IsVisible="{Binding HasPendingRemovals}">
+                        <Label Text="Pending Removals"
+                               FontSize="18"
+                               FontAttributes="Bold"
+                               TextColor="#E57373"
+                               Margin="0,10,0,5"/>
+
+                        <CollectionView ItemsSource="{Binding PendingRemovals}"
+                                        SelectionMode="None">
+                            <CollectionView.ItemsLayout>
+                                <LinearItemsLayout Orientation="Vertical" ItemSpacing="4" />
+                            </CollectionView.ItemsLayout>
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="entities:Member">
+                                    <Border Style="{StaticResource DeletedCardStyle}">
+                                        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto">
+                                            <!-- Name with strikethrough -->
+                                            <Label Grid.Row="0" Grid.Column="0"
+                                                   Text="{Binding AnonymousName}"
+                                                   FontSize="20"
+                                                   FontAttributes="Bold"
+                                                   TextDecorations="Strikethrough"
+                                                   TextColor="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource Gray400}}"/>
+
+                                            <!-- Email -->
+                                            <Label Grid.Row="1" Grid.Column="0"
+                                                   Text="{Binding PersonalEmail}"
+                                                   FontSize="16"
+                                                   TextDecorations="Strikethrough"
+                                                   TextColor="{AppThemeBinding Light={StaticResource Gray400}, Dark={StaticResource Gray500}}"
+                                                   Margin="0,2,0,0"/>
+
+                                            <!-- Phone -->
+                                            <Label Grid.Row="2" Grid.Column="0"
+                                                   Text="{Binding MobileNumber}"
+                                                   FontSize="16"
+                                                   TextDecorations="Strikethrough"
+                                                   TextColor="{AppThemeBinding Light={StaticResource Gray400}, Dark={StaticResource Gray500}}"
+                                                   Margin="0,2,0,0"/>
+
+                                            <!-- Undo button -->
+                                            <Button Grid.Row="0" Grid.RowSpan="3" Grid.Column="1"
+                                                    Text="Undo"
+                                                    FontSize="14"
+                                                    BackgroundColor="{AppThemeBinding Light=#6C757D, Dark=#495057}"
+                                                    TextColor="White"
+                                                    CornerRadius="15"
+                                                    Padding="12,6"
+                                                    HeightRequest="36"
+                                                    VerticalOptions="Center"
+                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:EditGroupViewModel}}, Path=UndoRemoveMemberCommand}"
+                                                    CommandParameter="{Binding .}"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </StackLayout>
+
+                    <!-- OK / Cancel Buttons -->
+                    <Grid ColumnSpacing="15" Margin="0,20,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <Button Grid.Column="0"
+                                Text="Cancel"
+                                Command="{Binding CancelPageCommand}"
+                                Style="{StaticResource PrimaryButtonStyle}"
+                                BackgroundColor="{AppThemeBinding Light=#6C757D, Dark=#495057}"
+                                TextColor="White"
+                                HeightRequest="60"/>
+
+                        <Button Grid.Column="1"
+                                Text="OK"
+                                Command="{Binding DoneCommand}"
+                                Style="{StaticResource PrimaryButtonStyle}"
+                                TextColor="White"
+                                HeightRequest="60"/>
+                    </Grid>
                 </StackLayout>
 
 

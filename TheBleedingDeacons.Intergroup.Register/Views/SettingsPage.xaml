@@ -7,20 +7,6 @@
              x:DataType="vm:SettingsViewModel"
              Title="Settings">
 
-    <ContentPage.Resources>
-        <toolkit:BoolToObjectConverter x:Key="BoolToSyncColorConverter" TrueObject="Red" FalseObject="Green" />
-        <toolkit:BoolToObjectConverter x:Key="BoolToSyncButtonTextConverter" TrueObject="Syncing..." FalseObject="Sync from Unity" />
-        <toolkit:BoolToObjectConverter x:Key="BoolToOfflineColorConverter"
-                                       TrueObject="#D32F2F"
-                                       FalseObject="{AppThemeBinding Light=#F5F5F5, Dark=#2D2D30}" />
-        <toolkit:BoolToObjectConverter x:Key="BoolToOfflineLabelColorConverter"
-                                       TrueObject="White"
-                                       FalseObject="{AppThemeBinding Light=Black, Dark=White}" />
-        <toolkit:BoolToObjectConverter x:Key="BoolToOfflineSubLabelColorConverter"
-                                       TrueObject="#FFCDD2"
-                                       FalseObject="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}" />
-    </ContentPage.Resources>
-
     <ScrollView>
         <StackLayout Orientation="Vertical"
                      Spacing="20"
@@ -32,65 +18,6 @@
                    FontAttributes="Bold"
                    HorizontalOptions="Center"
                    Margin="0,0,0,30"/>
-
-            <!-- Offline Mode -->
-            <Frame BackgroundColor="{Binding IsOfflineModeEnabled, Converter={StaticResource BoolToOfflineColorConverter}}"
-                   Padding="15"
-                   CornerRadius="8">
-                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
-
-                    <Label Grid.Column="0" Grid.Row="0"
-                           Text="Offline Mode"
-                           FontSize="18"
-                           FontAttributes="Bold"
-                           TextColor="{Binding IsOfflineModeEnabled, Converter={StaticResource BoolToOfflineLabelColorConverter}}" />
-
-                    <Switch Grid.Column="1" Grid.Row="0" Grid.RowSpan="2"
-                            IsToggled="{Binding IsOfflineModeEnabled}"
-                            VerticalOptions="Center"
-                            OnColor="#FF6F00" />
-
-                    <Label Grid.Column="0" Grid.Row="1"
-                           FontSize="14"
-                           TextColor="{Binding IsOfflineModeEnabled, Converter={StaticResource BoolToOfflineSubLabelColorConverter}}"
-                           Text="{Binding IsOfflineModeEnabled, Converter={toolkit:BoolToObjectConverter TrueObject='API calls are being queued and will sync when turned off.', FalseObject='Force all API calls to queue — useful for poor connections.'}}"/>
-
-                </Grid>
-            </Frame>
-
-            <!-- Sync from Unity -->
-            <Frame BackgroundColor="{AppThemeBinding Light=#F5F5F5, Dark=#2D2D30}"
-                   Padding="15"
-                   CornerRadius="8">
-                <StackLayout Spacing="10">
-                    <Label Text="Unity Sync"
-                           FontSize="18"
-                           FontAttributes="Bold"/>
-                    <Label Text="Replace all local data with the latest from Unity."
-                           FontSize="14"
-                           TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}"/>
-
-                    <Button Text="{Binding IsSyncing, Converter={StaticResource BoolToSyncButtonTextConverter}}"
-                            FontSize="18"
-                            BackgroundColor="{AppThemeBinding Light=#FF6F00, Dark=#FFA726}"
-                            TextColor="White"
-                            CornerRadius="8"
-                            HeightRequest="60"
-                            Command="{Binding SyncFromUnityCommand}"
-                            IsEnabled="{Binding IsSyncing, Converter={toolkit:InvertedBoolConverter}}"/>
-
-                    <!-- Sync Status -->
-                    <Frame IsVisible="{Binding IsSyncStatusVisible}"
-                           BackgroundColor="{Binding IsSyncStatusError, Converter={StaticResource BoolToSyncColorConverter}}"
-                           BorderColor="Transparent"
-                           Padding="10"
-                           CornerRadius="5">
-                        <Label Text="{Binding SyncStatusMessage}"
-                               TextColor="White"
-                               FontAttributes="Bold"/>
-                    </Frame>
-                </StackLayout>
-            </Frame>
 
             <Button x:Name="ImportExportButton"
                     Text="Import/Export"

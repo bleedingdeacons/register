@@ -64,6 +64,10 @@ public class UnitySyncService
         await _db.Members.ExecuteDeleteAsync(ct);
         await _db.Groups.ExecuteDeleteAsync(ct);
 
+        // Also clear snapshot bookkeeping table so stale data
+        // doesn't confuse a subsequent reconciliation cycle.
+        await _db.EntitySnapshots.ExecuteDeleteAsync(ct);
+
         _db.ChangeTracker.Clear();
 
         // Sync data comes directly from Unity — don't stamp Updated timestamps.

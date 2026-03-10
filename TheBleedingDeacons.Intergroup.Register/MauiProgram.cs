@@ -1,8 +1,8 @@
 using CommunityToolkit.Maui;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Serilog.Events;
 using Serilog;
+using Serilog.Events;
 using System.Reflection;
 using TheBleedingDeacons.Intergroup.Register.Data;
 using TheBleedingDeacons.Intergroup.Register.Services;
@@ -23,7 +23,6 @@ namespace TheBleedingDeacons.Intergroup.Register;
 public static class MauiProgram
 {
     public const string UNITY_DATABASE_NAME = "unity.db";
-    public const string QUEUE_DATABASE_NAME = "queue.db";
     public const string MAIL_DATABASE_NAME = "emails.db";
 
     public static MauiApp CreateMauiApp()
@@ -70,12 +69,12 @@ public static class MauiProgram
         // UnitySyncService — fetches from API and replaces local SQLite data
         builder.Services.AddScoped<UnitySyncService>();
 
-        // ── Queue DB (offline API call outbox) ────────────────────────
-        var queueDbPath = Path.Combine(FileSystem.AppDataDirectory, QUEUE_DATABASE_NAME);
-        builder.Services.AddDbContextFactory<QueueDbContext>(options =>
-            options.UseSqlite($"Data Source={queueDbPath}"), ServiceLifetime.Scoped);
+        // Snapshot + Reconciliation — local replica change tracking
+        builder.Services.AddScoped<SnapshotService>();
+        builder.Services.AddScoped<ReconciliationService>();
 
-        Log.Logger.Information("Queue Db {databasePath}", queueDbPath);
+        // ── Reconciliation Service ─────────────────────────────────────
+        builder.Services.AddScoped<ReconciliationService>();
 
         // ── Mail Database ─────────────────────────────────────────────
         var mailDbPath = Path.Combine(FileSystem.AppDataDirectory, MAIL_DATABASE_NAME);
@@ -120,10 +119,6 @@ public static class MauiProgram
                 smtpConfig.EnableSsl
             );
         });
-
-        // Offline queue
-        builder.Services.AddSingleton<IApiQueueService, ApiQueueService>();
-        builder.Services.AddScoped<QueueingUnityApiService>();
 
         // ── Views ─────────────────────────────────────────────────────
         builder.Services.AddTransient<MailSettingsPage>();
@@ -174,16 +169,8 @@ public static class MauiProgram
             var unityDb = scope.ServiceProvider.GetRequiredService<UnityDbContext>();
             unityDb.Database.EnsureCreated();
 
-            var queueFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<QueueDbContext>>();
-            using var queueDb = queueFactory.CreateDbContext();
-            queueDb.Database.EnsureCreated();
-
-            System.Diagnostics.Debug.WriteLine("Unity and Queue databases initialized.");
+            System.Diagnostics.Debug.WriteLine("Unity database initialized.");
         }
-
-        // Start the queue service
-        var queueService = mauiapp.Services.GetRequiredService<IApiQueueService>() as ApiQueueService;
-        queueService?.Start();
 
         return mauiapp;
     }

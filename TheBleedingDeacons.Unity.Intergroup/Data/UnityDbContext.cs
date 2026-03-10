@@ -12,6 +12,7 @@ public class UnityDbContext : DbContext
     public DbSet<Meeting> Meetings => Set<Meeting>();
     public DbSet<Contact> Contacts => Set<Contact>();
     public DbSet<IntergroupMeeting> IntergroupMeetings => Set<IntergroupMeeting>();
+    public DbSet<EntitySnapshot> EntitySnapshots => Set<EntitySnapshot>();
 
     /// <summary>
     /// When <c>true</c>, <see cref="SaveChangesAsync"/> and <see cref="SaveChanges"/>

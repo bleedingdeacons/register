@@ -1,15 +1,14 @@
-using System.Collections.ObjectModel;
-using System.ComponentModel.DataAnnotations;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Serilog;
+using System.Collections.ObjectModel;
+using System.ComponentModel.DataAnnotations;
 using TheBleedingDeacons.Intergroup.Register.Services;
 using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Support;
 using TheBleedingDeacons.Unity.Intergroup.Data;
 using TheBleedingDeacons.Unity.Intergroup.Entities;
 using TheBleedingDeacons.Unity.Intergroup.Repositories.Interfaces;
-using TheBleedingDeacons.Unity.Models;
 using Member = TheBleedingDeacons.Unity.Intergroup.Entities.Member;
 using Position = TheBleedingDeacons.Unity.Intergroup.Entities.Position;
 
@@ -20,8 +19,12 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels;
 /// Member-centric: displays a list of ALL holders for the position, allows
 /// editing each one and adding new members.
 ///
-/// Writes go to the local <see cref="UnityDbContext"/> and will persist until
-/// the next Unity sync replaces the data.
+/// Writes go to the local <see cref="UnityDbContext"/> only. The
+/// <see cref="ReconciliationService"/> detects changes via snapshot
+/// diffing and pushes them to the Unity API at reconciliation time.
+///
+/// Holder removals are staged locally and only committed when the user
+/// taps OK. Tapping Cancel reverts all pending removals.
 ///
 /// Separated from the verify flow (see <see cref="VerifyPositionViewModel"/>)
 /// so each ViewModel handles a single responsibility.
@@ -35,7 +38,6 @@ public partial class PositionEditViewModel : BaseViewModel
     private readonly IPositionRepository _positionRepository;
     private readonly UnityDbContext _context;
     private readonly IPopupNotification _popupService;
-    private readonly QueueingUnityApiService _apiService;
 
     // The position whose holders are being managed
     private Position? _position;
@@ -50,6 +52,13 @@ public partial class PositionEditViewModel : BaseViewModel
     /// Observable list of active holders for the position.
     /// </summary>
     public ObservableCollection<Member> ActiveHolders { get; } = new();
+
+    /// <summary>
+    /// Holders that have been removed in this session but not yet committed.
+    /// Displayed with a strikethrough / deleted card style so the user can
+    /// see what will be removed when they tap OK.
+    /// </summary>
+    public ObservableCollection<Member> PendingRemovals { get; } = new();
 
     // ── Editing fields (bound to the form when a member is selected) ──
 
@@ -103,6 +112,19 @@ public partial class PositionEditViewModel : BaseViewModel
     [ObservableProperty]
     private string holderCountText = string.Empty;
 
+    /// <summary>
+    /// True when there are pending removals that have not been committed.
+    /// </summary>
+    [ObservableProperty]
+    private bool hasPendingRemovals;
+
+    /// <summary>
+    /// True when the page has any uncommitted work (removals, new holders, edits).
+    /// Used to decide whether navigating away requires confirmation.
+    /// </summary>
+    [ObservableProperty]
+    private bool hasPendingChanges;
+
     // ── Validation Errors ──
 
     [ObservableProperty]
@@ -132,13 +154,11 @@ public partial class PositionEditViewModel : BaseViewModel
     public PositionEditViewModel(
         IPositionRepository positionRepository,
         UnityDbContext context,
-        IPopupNotification popupService,
-        QueueingUnityApiService apiService)
+        IPopupNotification popupService)
     {
         _positionRepository = positionRepository ?? throw new ArgumentNullException(nameof(positionRepository));
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _popupService = popupService;
-        _apiService = apiService;
 
         ValidateForm();
     }
@@ -155,6 +175,9 @@ public partial class PositionEditViewModel : BaseViewModel
             Logger.Information("Edit mode: position {PositionName} with {HolderCount} holders",
                 position.ShortDescription, position.Holders.Count);
 
+            PendingRemovals.Clear();
+            HasPendingChanges = false;
+            UpdateHasPendingRemovals();
             PopulateHolderList();
             UpdateTitle();
         }
@@ -178,6 +201,9 @@ public partial class PositionEditViewModel : BaseViewModel
             if (position != null)
             {
                 _position = position;
+                PendingRemovals.Clear();
+                HasPendingChanges = false;
+                UpdateHasPendingRemovals();
                 PopulateHolderList();
                 UpdateTitle();
             }
@@ -362,27 +388,6 @@ public partial class PositionEditViewModel : BaseViewModel
                 _position.Holders.Add(newMember);
                 ActiveHolders.Add(newMember);
 
-                // Push the new member to the Unity API (queued if offline)
-                var createRequest = new CreateMemberRequest
-                {
-                    AnonymousName = newMember.AnonymousName,
-                    PersonalEmail = newMember.PersonalEmail,
-                    MobileNumber = newMember.MobileNumber,
-                    IntergroupPositionId = newMember.IntergroupPositionId,
-                    IntergroupPositionRotation = newMember.IntergroupPositionRotation,
-                };
-                _ = _apiService.CreateMemberAsync(createRequest)
-                    .ContinueWith(t =>
-                    {
-                        if (t.IsFaulted)
-                            Logger.Error(t.Exception, "Failed to push new holder {MemberName} to API", newMember.AnonymousName);
-                        else if (t.Result.Success)
-                            Logger.Information("Successfully pushed new holder {MemberName} to API", newMember.AnonymousName);
-                        else
-                            Logger.Warning("CreateMember API returned {Code}: {Message}",
-                                t.Result.Error?.Code, t.Result.Error?.Message);
-                    }, TaskScheduler.Default);
-
                 Logger.Information("Created new holder {MemberName} for position {PositionName}",
                     newMember.AnonymousName, _position.ShortDescription);
             }
@@ -415,6 +420,7 @@ public partial class PositionEditViewModel : BaseViewModel
             IsCreatingNew = false;
             SelectedMember = null;
 
+            HasPendingChanges = true;
             RefreshHolderCountText();
             UpdateHasActiveHolders();
         }
@@ -430,57 +436,58 @@ public partial class PositionEditViewModel : BaseViewModel
     }
 
     /// <summary>
-    /// Remove the selected holder from the local database.
-    /// Note: This is a local-only change. The next Unity sync will restore
-    /// the member if they still exist in the Unity API.
+    /// Stage a holder for removal. The member is removed from the active list
+    /// and added to <see cref="PendingRemovals"/>. No database writes happen
+    /// until the user taps OK (<see cref="Done"/>). Cancel reverts all removals.
     /// </summary>
     [RelayCommand]
-    private async Task RemoveMember(Member member)
+    private void RemoveMember(Member member)
     {
         if (member == null) return;
 
-        bool confirmed = await Shell.Current.DisplayAlert(
-            "Remove Holder",
-            $"Remove \"{member.AnonymousName}\" from this position?\n\nThis is a local change and will be reverted on the next data sync.",
-            "Remove", "Cancel");
+        ActiveHolders.Remove(member);
+        PendingRemovals.Add(member);
 
-        if (!confirmed) return;
-
-        try
+        // If we were editing this member, close the form
+        if (SelectedMember?.Id == member.Id)
         {
-            var tracked = await _context.Members.FindAsync(member.Id);
-            if (tracked != null)
-            {
-                _context.Members.Remove(tracked);
-                await _context.SaveChangesAsync();
-            }
-
-            ActiveHolders.Remove(member);
-            _position?.Holders.Remove(member);
-
-            // If we were editing this member, close the form
-            if (SelectedMember?.Id == member.Id)
-            {
-                IsEditing = false;
-                IsCreatingNew = false;
-                SelectedMember = null;
-            }
-
-            RefreshHolderCountText();
-            UpdateHasActiveHolders();
-
-            Logger.Information("Removed holder {MemberName} (ID={MemberId}) from local database",
-                member.AnonymousName, member.Id);
+            IsEditing = false;
+            IsCreatingNew = false;
+            SelectedMember = null;
         }
-        catch (Exception ex)
-        {
-            Logger.Error(ex, "Failed to remove holder {MemberId}", member.Id);
-            await Shell.Current.DisplayAlert("Error", $"Failed to remove holder: {ex.Message}", "OK");
-        }
+
+        UpdateHasPendingRemovals();
+        HasPendingChanges = true;
+        RefreshHolderCountText();
+        UpdateHasActiveHolders();
+
+        Logger.Information("Staged removal of holder {MemberName} (ID={MemberId})",
+            member.AnonymousName, member.Id);
     }
 
     /// <summary>
-    /// Cancel the current edit without saving.
+    /// Undo a pending removal — move the member back from the pending list
+    /// to the active list.
+    /// </summary>
+    [RelayCommand]
+    private void UndoRemoveMember(Member member)
+    {
+        if (member == null) return;
+
+        PendingRemovals.Remove(member);
+        ActiveHolders.Add(member);
+
+        UpdateHasPendingRemovals();
+        HasPendingChanges = PendingRemovals.Count > 0;
+        RefreshHolderCountText();
+        UpdateHasActiveHolders();
+
+        Logger.Information("Undid removal of holder {MemberName} (ID={MemberId})",
+            member.AnonymousName, member.Id);
+    }
+
+    /// <summary>
+    /// Cancel the current holder edit form without saving.
     /// </summary>
     [RelayCommand]
     private async Task CancelEdit()
@@ -504,7 +511,7 @@ public partial class PositionEditViewModel : BaseViewModel
     }
 
     /// <summary>
-    /// Done editing — navigate back to verify page.
+    /// OK — commit all pending removals to the database and navigate back.
     /// </summary>
     [RelayCommand]
     private async Task Done()
@@ -519,7 +526,77 @@ public partial class PositionEditViewModel : BaseViewModel
             if (!shouldLeave) return;
         }
 
+        try
+        {
+            // Commit all pending removals to the database
+            foreach (var member in PendingRemovals)
+            {
+                var tracked = await _context.Members.FindAsync(member.Id);
+                if (tracked != null)
+                {
+                    if (member.IsTemporary)
+                    {
+                        _context.Members.Remove(tracked);
+                        _position?.Holders.Remove(member);
+                        Logger.Information("Deleted temporary holder {MemberName} (ID={MemberId}) from local database",
+                            member.AnonymousName, member.Id);
+                    }
+                    else
+                    {
+                        tracked.IntergroupPositionId = null;
+                        tracked.IntergroupPositionRotation = null;
+                        Logger.Information("Cleared position association for holder {MemberName} (ID={MemberId}) for sync",
+                            member.AnonymousName, member.Id);
+                    }
+                }
+            }
+
+            if (PendingRemovals.Count > 0)
+            {
+                await _context.SaveChangesAsync();
+            }
+
+            PendingRemovals.Clear();
+            UpdateHasPendingRemovals();
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Failed to commit pending removals");
+            await Shell.Current.DisplayAlert("Error", $"Failed to save changes: {ex.Message}", "OK");
+            return;
+        }
+
         await Shell.Current.GoToAsync($"..?edited=true");
+    }
+
+    /// <summary>
+    /// Cancel — revert all pending removals and navigate back without saving.
+    /// </summary>
+    [RelayCommand]
+    private async Task CancelPage()
+    {
+        if (HasPendingChanges || (IsEditing && HasUnsavedChanges))
+        {
+            bool shouldLeave = await Shell.Current.DisplayAlert(
+                "Discard Changes",
+                "You have unsaved changes. Discard and go back?",
+                "Discard", "Keep Editing");
+
+            if (!shouldLeave) return;
+        }
+
+        // Revert pending removals — move them back to ActiveHolders
+        foreach (var member in PendingRemovals)
+        {
+            ActiveHolders.Add(member);
+        }
+        PendingRemovals.Clear();
+        UpdateHasPendingRemovals();
+        HasPendingChanges = false;
+
+        Logger.Information("Cancelled edit page — reverted all pending removals");
+
+        await Shell.Current.GoToAsync("..");
     }
 
     #endregion
@@ -545,6 +622,11 @@ public partial class PositionEditViewModel : BaseViewModel
     private void UpdateHasActiveHolders()
     {
         HasActiveHolders = ActiveHolders.Count > 0;
+    }
+
+    private void UpdateHasPendingRemovals()
+    {
+        HasPendingRemovals = PendingRemovals.Count > 0;
     }
 
     private void RefreshHolderCountText()

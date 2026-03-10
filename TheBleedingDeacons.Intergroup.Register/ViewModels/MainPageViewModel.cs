@@ -14,7 +14,6 @@ public partial class MainPageViewModel : BaseViewModel
 
     private const string BaseTitle = "Intergroup Registration";
 
-    private readonly IApiQueueService _apiQueueService;
     private readonly IConfigurationService _configService;
 
     [ObservableProperty]
@@ -26,21 +25,16 @@ public partial class MainPageViewModel : BaseViewModel
 
     public bool IsButtonsEnabled => IsMeetingSelected && !IsBusy;
 
-    public MainPageViewModel(IApiQueueService apiQueueService, IConfigurationService configService)
+    public MainPageViewModel(IConfigurationService configService)
     {
-        _apiQueueService = apiQueueService;
         _configService = configService;
-        UpdateTitle();
-
-        // Keep the title in sync whenever offline mode is toggled from Settings
-        _apiQueueService.PendingCountChanged += (_, _) => UpdateTitle();
+        Title = BaseTitle;
     }
 
-    // Called each time the page appears so title and meeting state refresh.
+    // Called each time the page appears so meeting state refreshes.
     public override void ApplyQueryAttributes(IDictionary<string, object> query)
     {
         base.ApplyQueryAttributes(query);
-        UpdateTitle();
     }
 
     public async Task RefreshMeetingStateAsync()
@@ -62,12 +56,4 @@ public partial class MainPageViewModel : BaseViewModel
         await Shell.Current.GoToAsync(nameof(PositionSelectionPage));
     }
 
-    // ------------------------------------------------------------------ private
-
-    private void UpdateTitle()
-    {
-        Title = _apiQueueService.IsOfflineModeEnabled
-            ? $"{BaseTitle} (Offline)"
-            : BaseTitle;
-    }
 }

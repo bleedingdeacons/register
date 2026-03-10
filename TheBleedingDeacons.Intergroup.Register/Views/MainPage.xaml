@@ -30,7 +30,7 @@
                     StrokeShape="RoundRectangle 8"
                     Padding="15,12"
                     IsVisible="{Binding IsMeetingSelected, Converter={StaticResource InvertedBoolConverter}}">
-                <StackLayout Orientation="Horizontal" Spacing="10">
+                <StackLayout Orientation="Horizontal" Spacing="10" HorizontalOptions="Center">
                     <Label Text="⚠️" FontSize="20" VerticalOptions="Center"/>
                     <Label Text="No meeting selected. Go to Admin to choose today's meeting."
                            FontSize="14"

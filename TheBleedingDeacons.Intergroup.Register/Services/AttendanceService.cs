@@ -6,14 +6,20 @@ using TheBleedingDeacons.Unity.Intergroup.Entities;
 
 namespace TheBleedingDeacons.Intergroup.Register.Services
 {
+    /// <summary>
+    /// Manages attendance registration state locally.
+    ///
+    /// All changes are written to the local <see cref="UnityDbContext"/> only.
+    /// The <see cref="ReconciliationService"/> is responsible for detecting
+    /// these changes (via snapshot diffing) and pushing them to the Unity API
+    /// in the correct dependency order at reconciliation time.
+    /// </summary>
     public class AttendanceService : IAttendanceRegistration<Position>, IAttendanceRegistration<Group>, IDisposable
     {
         private static readonly ILogger Logger = AppLogger.ForContext<AttendanceService>();
 
         private readonly IMailService _mailService;
         private readonly IEmailTemplateService _emailTemplate;
-        private readonly QueueingUnityApiService _unityApiService;
-        private readonly IConfigurationService _configService;
         private readonly UnityDbContext _dbContext;
 
         private readonly EventHandler<EmailSentEventArgs> _emailSentHandler;
@@ -23,14 +29,10 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
         public AttendanceService(
             IEmailTemplateService emailTemplate,
             IMailService mailService,
-            QueueingUnityApiService unityApiService,
-            IConfigurationService configService,
             UnityDbContext dbContext)
         {
             _mailService = mailService;
             _emailTemplate = emailTemplate;
-            _unityApiService = unityApiService;
-            _configService = configService;
             _dbContext = dbContext;
 
             _emailSentHandler = (s, e) => Logger.Information("Email sent to {Recipient}", e.Email.To);
@@ -42,124 +44,25 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 
         public async Task Register(Position entity)
         {
-            var config = await _configService.LoadUnityConfigurationAsync();
-            if (config.ActiveIntergroupMeetingId.HasValue && config.IsValid())
-            {
-                var holder = entity.Holders.FirstOrDefault();
-                if (holder == null || holder.IsTemporary)
-                {
-                    Logger.Warning("Position {PositionName} has no associated member — skipping Unity API registration",
-                        entity.ShortDescription);
-                }
-                else
-                {
-                    var officerName = holder.AnonymousName;
-                    var positionName = entity.ShortDescription ?? entity.LongName ?? string.Empty;
-
-                    var response = await _unityApiService.RegisterOfficerAsync(
-                        intergroupMeetingId: config.ActiveIntergroupMeetingId.Value,
-                        officerId: holder.Id,
-                        positionName: positionName,
-                        officerName: officerName);
-
-                    if (response.Success)
-                        Logger.Information("Position {PositionName} attendance registered with Unity API", positionName);
-                    else if (response.Error?.Code == "queued_offline")
-                        Logger.Information("Position {PositionName} Unity API registration queued (offline)", positionName);
-                    else
-                        Logger.Warning("Position {PositionName} Unity API registration returned: {Error}", positionName, response.Error?.Message);
-                }
-            }
-            else
-            {
-                Logger.Information(
-                    "Position {PositionName} attendance registered locally (Unity API not configured or no active meeting set)",
-                    entity.ShortDescription);
-            }
-
-            // Persist the registered state
+            Logger.Information("Position {PositionName} attendance registered locally", entity.ShortDescription);
             await SetPositionRegisteredAsync(entity.Id, true);
         }
 
         public async Task Register(Group entity)
         {
-            var config = await _configService.LoadUnityConfigurationAsync();
-            if (config.ActiveIntergroupMeetingId.HasValue && config.IsValid())
-            {
-                var isProxy = false; // TODO: proxy info needs to come from ViewModel context
-                var gsr = entity.Members.FirstOrDefault(m => m.IsGsr);
-                var gsrName = gsr?.AnonymousName ?? string.Empty;
-                var groupId = entity.Id;
-                var memberId = gsr?.Id ?? 0;
-
-                if (groupId > 0)
-                {
-                    var response = await _unityApiService.RegisterGroupAsync(
-                        intergroupMeetingId: config.ActiveIntergroupMeetingId.Value,
-                        groupId: groupId,
-                        memberId: memberId,
-                        gsrName: gsrName,
-                        gsrProxy: isProxy,
-                        gsrProxyName: null);
-
-                    if (response.Success)
-                        Logger.Information("Group {GroupName} attendance registered with Unity API", entity.Name);
-                    else if (response.Error?.Code == "queued_offline")
-                        Logger.Information("Group {GroupName} Unity API registration queued (offline)", entity.Name);
-                    else
-                        Logger.Warning("Group {GroupName} Unity API registration returned: {Error}", entity.Name, response.Error?.Message);
-                }
-                else
-                {
-                    Logger.Warning("Group {GroupName} has no group ID — skipping API registration", entity.Name);
-                }
-            }
-            else
-            {
-                Logger.Information(
-                    "Group {GroupName} attendance registered locally (Unity API not configured or no active meeting set)",
-                    entity.Name);
-            }
-
-            Logger.Information("Group {GroupName} attendance registered", entity.Name);
-
-            // Persist the registered state
+            Logger.Information("Group {GroupName} attendance registered locally", entity.Name);
             await SetGroupRegisteredAsync(entity.Id, true);
         }
 
         public async Task Unregister(Position entity)
         {
-            Logger.Information("Position {PositionName} attendance unregistered", entity.ShortDescription);
-
-            // Persist the unregistered state
+            Logger.Information("Position {PositionName} attendance unregistered locally", entity.ShortDescription);
             await SetPositionRegisteredAsync(entity.Id, false);
         }
 
         public async Task Unregister(Group entity)
         {
-            var config = await _configService.LoadUnityConfigurationAsync();
-            if (config.ActiveIntergroupMeetingId.HasValue && config.IsValid())
-            {
-                var groupId = entity.Id;
-
-                if (groupId > 0)
-                {
-                    var response = await _unityApiService.UnregisterGroupAsync(
-                        intergroupMeetingId: config.ActiveIntergroupMeetingId.Value,
-                        groupId: groupId);
-
-                    if (response.Success)
-                        Logger.Information("Group {GroupName} attendance unregistered with Unity API", entity.Name);
-                    else if (response.Error?.Code == "queued_offline")
-                        Logger.Information("Group {GroupName} Unity API unregistration queued (offline)", entity.Name);
-                    else
-                        Logger.Warning("Group {GroupName} Unity API unregistration returned: {Error}", entity.Name, response.Error?.Message);
-                }
-            }
-
-            Logger.Information("Group {GroupName} attendance unregistered", entity.Name);
-
-            // Persist the unregistered state
+            Logger.Information("Group {GroupName} attendance unregistered locally", entity.Name);
             await SetGroupRegisteredAsync(entity.Id, false);
         }
 
