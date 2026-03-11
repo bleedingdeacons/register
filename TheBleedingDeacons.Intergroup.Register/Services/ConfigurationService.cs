@@ -227,13 +227,13 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
             int? activeIntergroupMeetingId = null;
             try
             {
-                var raw = await SecureStorage.GetAsync(UNITY_ACTIVE_MEETING_KEY);
+                var raw = Preferences.Get(UNITY_ACTIVE_MEETING_KEY, string.Empty);
                 if (int.TryParse(raw, out var parsedId) && parsedId > 0)
                     activeIntergroupMeetingId = parsedId;
             }
             catch (Exception ex)
             {
-                Logger.Warning(ex, "SecureStorage unavailable for active intergroup meeting ID");
+                Logger.Warning(ex, "Failed to load active intergroup meeting ID from Preferences");
             }
 
             _cachedUnityConfig = new UnityConfiguration
@@ -251,13 +251,13 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
             try
             {
                 if (meetingId.HasValue && meetingId.Value > 0)
-                    await SecureStorage.SetAsync(UNITY_ACTIVE_MEETING_KEY, meetingId.Value.ToString());
+                    Preferences.Set(UNITY_ACTIVE_MEETING_KEY, meetingId.Value.ToString());
                 else
-                    SecureStorage.Remove(UNITY_ACTIVE_MEETING_KEY);
+                    Preferences.Remove(UNITY_ACTIVE_MEETING_KEY);
             }
             catch (Exception ex)
             {
-                Logger.Warning(ex, "SecureStorage unavailable for active intergroup meeting ID");
+                Logger.Warning(ex, "Failed to save active intergroup meeting ID to Preferences");
             }
 
             // Keep the in-memory cache consistent

@@ -11,6 +11,8 @@ public class Group
     public string? Phone { get; set; }
     public string? Website { get; set; }
     public string? Notes { get; set; }
+    public string? GroupEmail { get; set; }
+    public bool GroupEmailActive { get; set; }
     public int? DistrictId { get; set; }
 
     /// <summary>

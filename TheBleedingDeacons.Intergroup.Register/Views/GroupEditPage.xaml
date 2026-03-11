@@ -10,37 +10,6 @@
              x:DataType="viewmodels:EditGroupViewModel"
              Title="{Binding Title}">
 
-    <ContentPage.Resources>
-        <ResourceDictionary>
-            <Style x:Key="EditFieldLabelStyle" TargetType="Label">
-                <Setter Property="FontAttributes" Value="Bold"/>
-                <Setter Property="FontSize" Value="22"/>
-                <Setter Property="TextColor" Value="{AppThemeBinding Light=Black, Dark=White}"/>
-            </Style>
-
-            <Style x:Key="MemberCardStyle" TargetType="Border">
-                <Setter Property="Stroke" Value="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}"/>
-                <Setter Property="StrokeThickness" Value="1"/>
-                <Setter Property="StrokeShape" Value="RoundRectangle 10"/>
-                <Setter Property="Padding" Value="15"/>
-                <Setter Property="Margin" Value="0,0,0,8"/>
-                <Setter Property="BackgroundColor" Value="{AppThemeBinding Light=White, Dark={StaticResource Gray900}}"/>
-            </Style>
-
-            <Style x:Key="DeletedCardStyle" TargetType="Border">
-                <Setter Property="Stroke" Value="{AppThemeBinding Light=#E57373, Dark=#EF5350}"/>
-                <Setter Property="StrokeThickness" Value="1"/>
-                <Setter Property="StrokeShape" Value="RoundRectangle 10"/>
-                <Setter Property="Padding" Value="15"/>
-                <Setter Property="Margin" Value="0,0,0,8"/>
-                <Setter Property="BackgroundColor" Value="{AppThemeBinding Light=#FFF5F5, Dark=#3D1F1F}"/>
-                <Setter Property="Opacity" Value="0.7"/>
-            </Style>
-
-            <toolkit:InvertedBoolConverter x:Key="InvertedBoolConverter" />
-        </ResourceDictionary>
-    </ContentPage.Resources>
-
     <ContentPage.Behaviors>
         <toolkit:StatusBarBehavior StatusBarColor="{AppThemeBinding Light=White, Dark=Black}"
                                    StatusBarStyle="{AppThemeBinding Light=DarkContent, Dark=LightContent}" />

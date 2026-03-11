@@ -100,7 +100,7 @@ public class DataService
     /// Flow: Detect → Push creates → Push updates → Push registrations → Re-sync → Re-snapshot.
     /// </summary>
     public async Task<(int Meetings, int Positions, int Members, int Groups, int Contacts, int IntergroupMeetings,
-                        int Created, int Modified, int Reinserted, int Patched)> ImportWithReconciliationAsync(
+                        int Created, int Modified, int Registered, int ApiErrors, int ApiWarnings)> ImportWithReconciliationAsync(
         CancellationToken cancellationToken = default)
     {
         try
@@ -112,17 +112,17 @@ public class DataService
 
             Logger.Information(
                 "Reconciliation complete: {Created} members created, {Modified} modified, " +
-                "{RegGroups} groups registered, {RegPos} positions registered, {Errors} errors. " +
+                "{RegGroups} groups registered, {RegPos} positions registered, {Errors} errors, {Warnings} warnings. " +
                 "Re-synced {Groups} groups, {Meetings} meetings, {Members} members, {Positions} positions",
                 result.CreatedMembers, result.ModifiedMembers,
-                result.RegisteredGroups, result.RegisteredPositions, result.ApiErrors,
+                result.RegisteredGroups, result.RegisteredPositions, result.ApiErrors, result.ApiWarnings,
                 sync.Groups, sync.Meetings, sync.Members, sync.Positions);
 
             return (sync.Meetings, sync.Positions, sync.Members, sync.Groups,
                     sync.Contacts, sync.IntergroupMeetings,
                     result.CreatedMembers, result.ModifiedMembers,
                     result.RegisteredGroups + result.RegisteredPositions,
-                    result.ApiErrors);
+                    result.ApiErrors, result.ApiWarnings);
         }
         catch (Exception ex)
         {

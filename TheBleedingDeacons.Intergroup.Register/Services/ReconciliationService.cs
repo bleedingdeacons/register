@@ -67,6 +67,7 @@ public class ReconciliationService
         int RegisteredPositions,
         int UnregisteredPositions,
         int ApiErrors,
+        int ApiWarnings,
         UnitySyncService.SyncResult Resync,
         SnapshotService.SnapshotResult Snapshot);
 
@@ -91,7 +92,7 @@ public class ReconciliationService
             Logger.Warning("ReconcileAsync: no snapshot exists — performing plain sync + snapshot");
             var sync = await _syncService.SyncAsync(ct);
             var snap = await _snapshotService.CaptureAsync(ct);
-            return new ReconcileResult(0, 0, 0, 0, 0, 0, 0, sync, snap);
+            return new ReconcileResult(0, 0, 0, 0, 0, 0, 0, 0, sync, snap);
         }
 
         using var client = new UnityRestSharp(config.BaseUrl, config.ApiKey);
@@ -100,6 +101,7 @@ public class ReconciliationService
         int registeredGroups = 0, unregisteredGroups = 0;
         int registeredPositions = 0, unregisteredPositions = 0;
         int apiErrors = 0;
+        int apiWarnings = 0;
 
         // Maps old temporary (negative) member ID → real Unity ID
         var tempIdToRealId = new Dictionary<int, int>();
@@ -139,7 +141,7 @@ public class ReconciliationService
                 }
                 else
                 {
-                    apiErrors++;
+                    apiWarnings++;
                     Logger.Warning(
                         "Failed to create member {Name} on Unity: {Error}",
                         member.AnonymousName, response.Error?.Message);
@@ -182,7 +184,7 @@ public class ReconciliationService
                 }
                 else
                 {
-                    apiErrors++;
+                    apiWarnings++;
                     Logger.Warning("Failed to update member {Id} on Unity: {Error}", member.Id, response.Error?.Message);
                 }
             }
@@ -229,7 +231,7 @@ public class ReconciliationService
                         }
                         else
                         {
-                            apiErrors++;
+                            apiWarnings++;
                             Logger.Warning("Failed to register group {Id}: {Error}", group.Id, response.Error?.Message);
                         }
                     }
@@ -243,7 +245,7 @@ public class ReconciliationService
                         }
                         else
                         {
-                            apiErrors++;
+                            apiWarnings++;
                             Logger.Warning("Failed to unregister group {Id}: {Error}", group.Id, response.Error?.Message);
                         }
                     }
@@ -290,7 +292,7 @@ public class ReconciliationService
                         }
                         else
                         {
-                            apiErrors++;
+                            apiWarnings++;
                             Logger.Warning("Failed to register officer for position {Id}: {Error}",
                                 position.Id, response.Error?.Message);
                         }
@@ -309,7 +311,7 @@ public class ReconciliationService
                         }
                         else
                         {
-                            apiErrors++;
+                            apiWarnings++;
                             Logger.Warning("Failed to unregister officer {Id}: {Error}",
                                 officerId, response.Error?.Message);
                         }
@@ -338,17 +340,17 @@ public class ReconciliationService
             "Reconciliation complete: {Created} created, {Modified} modified, " +
             "{RegGroups} groups registered, {UnregGroups} unregistered, " +
             "{RegPos} positions registered, {UnregPos} unregistered, " +
-            "{Errors} API errors",
+            "{Errors} API errors, {Warnings} API warnings",
             createdMembers, modifiedMembers,
             registeredGroups, unregisteredGroups,
             registeredPositions, unregisteredPositions,
-            apiErrors);
+            apiErrors, apiWarnings);
 
         return new ReconcileResult(
             createdMembers, modifiedMembers,
             registeredGroups, unregisteredGroups,
             registeredPositions, unregisteredPositions,
-            apiErrors, syncResult, snapshotResult);
+            apiErrors, apiWarnings, syncResult, snapshotResult);
     }
 
     // =====================================================================

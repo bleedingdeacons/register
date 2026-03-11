@@ -32,6 +32,12 @@ public class GroupConfiguration : IEntityTypeConfiguration<Group>
         builder.Property(g => g.Notes)
             .HasMaxLength(2000);
 
+        builder.Property(g => g.GroupEmail)
+            .HasMaxLength(255);
+
+        builder.Property(g => g.GroupEmailActive)
+            .HasDefaultValue(false);
+
         builder.Property(g => g.Registered)
             .HasDefaultValue(false);
 

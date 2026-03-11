@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Support;
 using TheBleedingDeacons.Intergroup.Register.Views;
+using TheBleedingDeacons.Unity.Intergroup.Repositories.Interfaces;
 
 namespace TheBleedingDeacons.Intergroup.Register.ViewModels;
 
@@ -15,6 +16,7 @@ public partial class MainPageViewModel : BaseViewModel
     private const string BaseTitle = "Intergroup Registration";
 
     private readonly IConfigurationService _configService;
+    private readonly IIntergroupMeetingRepository _intergroupMeetingRepository;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsButtonsEnabled))]
@@ -25,9 +27,10 @@ public partial class MainPageViewModel : BaseViewModel
 
     public bool IsButtonsEnabled => IsMeetingSelected && !IsBusy;
 
-    public MainPageViewModel(IConfigurationService configService)
+    public MainPageViewModel(IConfigurationService configService, IIntergroupMeetingRepository intergroupMeetingRepository)
     {
         _configService = configService;
+        _intergroupMeetingRepository = intergroupMeetingRepository;
         Title = BaseTitle;
     }
 
@@ -40,8 +43,38 @@ public partial class MainPageViewModel : BaseViewModel
     public async Task RefreshMeetingStateAsync()
     {
         var config = await _configService.LoadUnityConfigurationAsync();
-        IsMeetingSelected = config.ActiveIntergroupMeetingId.HasValue;
+
+        if (config.ActiveIntergroupMeetingId.HasValue)
+        {
+            // Verify the meeting still exists in the database
+            var meeting = await _intergroupMeetingRepository
+                .GetByIdAsync(config.ActiveIntergroupMeetingId.Value);
+
+            if (meeting != null)
+            {
+                IsMeetingSelected = true;
+            }
+            else
+            {
+                // Meeting ID in SecureStorage is stale (DB was cleared) — clean up
+                await _configService.SaveActiveIntergroupMeetingAsync(null);
+                IsMeetingSelected = false;
+                Logger.Information("Cleared stale active meeting ID {Id} — meeting no longer in database",
+                    config.ActiveIntergroupMeetingId.Value);
+            }
+        }
+        else
+        {
+            IsMeetingSelected = false;
+        }
+
         OnPropertyChanged(nameof(IsButtonsEnabled));
+    }
+
+    [RelayCommand]
+    async Task GoToAdmin()
+    {
+        await Shell.Current.GoToAsync("//AdminPage");
     }
 
     [RelayCommand]

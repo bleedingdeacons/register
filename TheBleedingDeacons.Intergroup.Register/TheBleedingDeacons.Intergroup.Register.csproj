@@ -58,8 +58,8 @@
 		</PackageReference>
 		<PackageReference Include="EPPlus" Version="8.2.0" />
 		<PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="9.0.9" />
-		<PackageReference Include="Microsoft.Maui.Controls" Version="9.0.110" />
-		<PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="9.0.110" />
+		<PackageReference Include="Microsoft.Maui.Controls" Version="9.0.120" />
+		<PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="9.0.120" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.9" />
 		<PackageReference Include="CommunityToolkit.Maui" Version="12.2.0" />
 		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
@@ -114,7 +114,6 @@
 
 	<ItemGroup>
 		<Folder Include="Data\Configurations\" />
-		<Folder Include="Resources\Images\" />
 	</ItemGroup>
 
 	<ItemGroup>

@@ -77,6 +77,17 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
         [ObservableProperty]
         private bool isStatusVisible = false;
 
+        // ── Sync error state ─────────────────────────────────────────
+
+        [ObservableProperty]
+        private bool hasSyncError = false;
+
+        [ObservableProperty]
+        private bool hasSyncedSuccessfully = false;
+
+        [ObservableProperty]
+        private bool hasFinishSyncError = false;
+
         // ── Active meeting ───────────────────────────────────────────
 
         [ObservableProperty]
@@ -127,12 +138,14 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
             if (!config.IsValid())
             {
                 ShowStatus("Unity API not configured. Go to Settings → Unity API Settings first.", true);
+                HasSyncError = true;
                 return;
             }
 
             try
             {
                 Phase = MeetingPhase.Syncing;
+                HasSyncError = false;
                 ShowStatus("Syncing data from Unity...", false);
 
                 var (meetings, positions, members, groups, contacts, intergroupMeetings) =
@@ -147,6 +160,8 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
                     "Start Meeting sync complete: {Groups} groups, {Meetings} meetings, {Members} members",
                     groups, meetings, members);
 
+                HasSyncedSuccessfully = true;
+
                 // Load the intergroup meetings list for selection
                 await LoadMeetingsAsync();
 
@@ -156,8 +171,18 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
             {
                 Logger.Error(ex, "Start Meeting sync failed");
                 ShowStatus($"Sync failed: {ex.Message}", true);
+                HasSyncError = true;
                 Phase = MeetingPhase.NotStarted;
             }
+        }
+
+        /// <summary>
+        /// Retry sync after a previous failure.
+        /// </summary>
+        [RelayCommand]
+        private async Task RetrySync()
+        {
+            await StartMeeting();
         }
 
         /// <summary>
@@ -182,6 +207,9 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
             Logger.Information(
                 "Meeting started: ID {Id}, Title {Title}, Date {Date}",
                 meeting.Id, meeting.Title, meeting.Date);
+
+            // Navigate to the main page now that a meeting is active
+            await Shell.Current.GoToAsync("//MainPage");
         }
 
         // =============================================================
@@ -205,10 +233,11 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
             try
             {
                 Phase = MeetingPhase.Finishing;
+                HasFinishSyncError = false;
                 ShowStatus("Pushing changes to Unity...", false);
 
                 var (meetings, positions, members, groups, contacts, intergroupMeetings,
-                     created, modified, registered, errors) =
+                     created, modified, registered, errors, warnings) =
                     await _dataService.ImportWithReconciliationAsync();
 
                 // Clear the active meeting
@@ -225,31 +254,104 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
                     (errors > 0 ? $"  • {errors} API errors\n" : "") +
                     $"\nRe-synced: {groups} groups, {meetings} meetings, {members} members.";
 
+                if (warnings > 0)
+                    Logger.Warning("Meeting finished with {Warnings} API warnings (non-fatal)", warnings);
+
                 Phase = MeetingPhase.Completed;
                 HideStatus();
 
                 Logger.Information(
-                    "Meeting finished: {Created} created, {Modified} modified, {Registered} registered, {Errors} errors",
-                    created, modified, registered, errors);
+                    "Meeting finished: {Created} created, {Modified} modified, {Registered} registered, {Errors} errors, {Warnings} warnings",
+                    created, modified, registered, errors, warnings);
             }
             catch (Exception ex)
             {
                 Logger.Error(ex, "Finish Meeting reconciliation failed");
                 ShowStatus($"Reconciliation failed: {ex.Message}", true);
-                Phase = MeetingPhase.InProgress; // Allow retry
+                HasFinishSyncError = true;
+                // Remain at Finishing phase so the retry button is visible
             }
         }
 
         /// <summary>
-        /// Reset back to NotStarted so the user can begin a new session.
+        /// Retries the finish-meeting sync after a previous failure.
         /// </summary>
         [RelayCommand]
-        private void NewSession()
+        private async Task RetryFinish()
         {
-            Phase = MeetingPhase.NotStarted;
-            FinishSummary = string.Empty;
-            Meetings.Clear();
-            HideStatus();
+            try
+            {
+                HasFinishSyncError = false;
+                ShowStatus("Pushing changes to Unity...", false);
+
+                var (meetings, positions, members, groups, contacts, intergroupMeetings,
+                     created, modified, registered, errors, warnings) =
+                    await _dataService.ImportWithReconciliationAsync();
+
+                // Clear the active meeting
+                await _configService.SaveActiveIntergroupMeetingAsync(null);
+                ActiveMeetingId = null;
+                ActiveMeetingDate = string.Empty;
+                ActiveMeetingTitle = string.Empty;
+
+                FinishSummary =
+                    $"Pushed to Unity:\n" +
+                    $"  • {created} new members created\n" +
+                    $"  • {modified} members updated\n" +
+                    $"  • {registered} registrations recorded\n" +
+                    (errors > 0 ? $"  • {errors} API errors\n" : "") +
+                    $"\nRe-synced: {groups} groups, {meetings} meetings, {members} members.";
+
+                if (warnings > 0)
+                    Logger.Warning("Meeting finished (retry) with {Warnings} API warnings (non-fatal)", warnings);
+
+                Phase = MeetingPhase.Completed;
+                HideStatus();
+
+                Logger.Information(
+                    "Meeting finished (retry): {Created} created, {Modified} modified, {Registered} registered, {Errors} errors, {Warnings} warnings",
+                    created, modified, registered, errors, warnings);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Retry finish reconciliation failed");
+                ShowStatus($"Reconciliation failed: {ex.Message}", true);
+                HasFinishSyncError = true;
+            }
+        }
+
+        /// <summary>
+        /// Purges all data from the local database and resets the session.
+        /// </summary>
+        [RelayCommand]
+        private async Task PurgeDatabase()
+        {
+            bool confirmed = await Shell.Current.DisplayAlert(
+                "Purge Database",
+                "This will permanently delete ALL local data including groups, members, meetings, positions, and snapshots.\n\nThis action cannot be undone. Are you sure?",
+                "Yes, Purge Everything",
+                "No, Keep Data");
+
+            if (!confirmed) return;
+
+            try
+            {
+                ShowStatus("Purging database...", false);
+
+                await _dbContext.PurgeDatabaseAsync();
+
+                Phase = MeetingPhase.NotStarted;
+                FinishSummary = string.Empty;
+                Meetings.Clear();
+                HideStatus();
+
+                Logger.Information("Database purged successfully");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Database purge failed");
+                ShowStatus($"Purge failed: {ex.Message}", true);
+            }
         }
 
         // =============================================================

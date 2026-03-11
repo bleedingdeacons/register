@@ -6,6 +6,9 @@
 
     <!-- Note: For Android please see also Platforms\Android\Resources\values\colors.xml -->
 
+    <!-- ══════════════════════════════════════════════════════════════════
+         Brand
+         ══════════════════════════════════════════════════════════════════ -->
     <Color x:Key="Primary">#0072bc</Color>
     <Color x:Key="PrimaryDark">#ac99ea</Color>
     <Color x:Key="PrimaryDarkText">#242424</Color>
@@ -13,28 +16,105 @@
     <Color x:Key="SecondaryDarkText">#9880e5</Color>
     <Color x:Key="Tertiary">#2B0B98</Color>
 
+    <!-- ══════════════════════════════════════════════════════════════════
+         Base
+         ══════════════════════════════════════════════════════════════════ -->
     <Color x:Key="White">White</Color>
     <Color x:Key="Black">Black</Color>
     <Color x:Key="Magenta">#D600AA</Color>
     <Color x:Key="MidnightBlue">#190649</Color>
     <Color x:Key="OffBlack">#1f1f1f</Color>
-    <Color x:Key="Danger">#FF3333</Color>
 
+    <!-- ══════════════════════════════════════════════════════════════════
+         Grays
+         ══════════════════════════════════════════════════════════════════ -->
+    <Color x:Key="Gray50">#FAFAFA</Color>
     <Color x:Key="Gray100">#E1E1E1</Color>
     <Color x:Key="Gray200">#C8C8C8</Color>
     <Color x:Key="Gray300">#ACACAC</Color>
     <Color x:Key="Gray400">#919191</Color>
     <Color x:Key="Gray500">#6E6E6E</Color>
     <Color x:Key="Gray600">#404040</Color>
+    <Color x:Key="Gray700">#374151</Color>
+    <Color x:Key="Gray800">#1F2937</Color>
     <Color x:Key="Gray900">#212121</Color>
     <Color x:Key="Gray950">#141414</Color>
 
-    <Color x:Key="Gray50">#FAFAFA</Color>
-    <Color x:Key="Gray700">#374151</Color>
+    <!-- ══════════════════════════════════════════════════════════════════
+         Semantic
+         ══════════════════════════════════════════════════════════════════ -->
     <Color x:Key="Success">#10B981</Color>
     <Color x:Key="Warning">#F59E0B</Color>
     <Color x:Key="Info">#3B82F6</Color>
+    <Color x:Key="Danger">#FF3333</Color>
+    <Color x:Key="DangerLight">#E57373</Color>
+    <Color x:Key="DangerDark">#EF5350</Color>
 
+    <!-- ══════════════════════════════════════════════════════════════════
+         Surface
+         ══════════════════════════════════════════════════════════════════ -->
+    <Color x:Key="Surface">#FFFFFF</Color>
+    <Color x:Key="SurfaceDim">#2D2D30</Color>
+    <Color x:Key="PageBackground">#F5F5F5</Color>
+    <Color x:Key="PageBackgroundDim">#1E1E1E</Color>
+    <Color x:Key="CardBorder">#E0E0E0</Color>
+    <Color x:Key="CardBorderDim">#555555</Color>
+    <Color x:Key="DeletedSurface">#FFF5F5</Color>
+    <Color x:Key="DeletedSurfaceDim">#3D1F1F</Color>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         Text
+         ══════════════════════════════════════════════════════════════════ -->
+    <Color x:Key="TextSecondary">#666666</Color>
+    <Color x:Key="TextSecondaryDim">#CCCCCC</Color>
+    <Color x:Key="TextTertiary">#888888</Color>
+    <Color x:Key="TextTertiaryDim">#AAAAAA</Color>
+    <Color x:Key="TextBody">#333333</Color>
+    <Color x:Key="TextBodyDim">#DDDDDD</Color>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         Buttons
+         ══════════════════════════════════════════════════════════════════ -->
+    <Color x:Key="SecondaryButton">#6C757D</Color>
+    <Color x:Key="SecondaryButtonDim">#495057</Color>
+    <Color x:Key="SuccessButton">#4CAF50</Color>
+    <Color x:Key="SuccessButtonDim">#22C55E</Color>
+    <Color x:Key="InfoButton">#2196F3</Color>
+    <Color x:Key="InfoButtonDim">#3B82F6</Color>
+    <Color x:Key="WarningButton">#FF9800</Color>
+    <Color x:Key="WarningButtonDim">#FFA726</Color>
+    <Color x:Key="DangerButton">#FF5722</Color>
+    <Color x:Key="DangerButtonDim">#EF5350</Color>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         Status banners
+         ══════════════════════════════════════════════════════════════════ -->
+    <Color x:Key="InfoBanner">#E3F2FD</Color>
+    <Color x:Key="InfoBannerDim">#1E3A8A</Color>
+    <Color x:Key="SuccessBanner">#E8F5E9</Color>
+    <Color x:Key="SuccessBannerDim">#1B5E20</Color>
+    <Color x:Key="WarningBanner">#FFF8E1</Color>
+    <Color x:Key="WarningBannerDim">#4A3700</Color>
+    <Color x:Key="DangerBanner">#FFEBEE</Color>
+    <Color x:Key="DangerBannerDim">#4A0000</Color>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         Status text
+         ══════════════════════════════════════════════════════════════════ -->
+    <Color x:Key="SuccessText">#1B5E20</Color>
+    <Color x:Key="SuccessTextDim">#C8E6C9</Color>
+    <Color x:Key="SuccessAccent">#4CAF50</Color>
+    <Color x:Key="SuccessAccentDim">#66BB6A</Color>
+    <Color x:Key="InfoText">#1565C0</Color>
+    <Color x:Key="InfoTextDim">#93C5FD</Color>
+    <Color x:Key="LinkText">#1976D2</Color>
+    <Color x:Key="LinkTextDim">#60A5FA</Color>
+    <Color x:Key="Accent">#007ACC</Color>
+    <Color x:Key="AccentDim">#4FC3F7</Color>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         Brushes
+         ══════════════════════════════════════════════════════════════════ -->
     <SolidColorBrush x:Key="PrimaryBrush" Color="{StaticResource Primary}"/>
     <SolidColorBrush x:Key="SecondaryBrush" Color="{StaticResource Secondary}"/>
     <SolidColorBrush x:Key="TertiaryBrush" Color="{StaticResource Tertiary}"/>
@@ -49,4 +129,5 @@
     <SolidColorBrush x:Key="Gray600Brush" Color="{StaticResource Gray600}"/>
     <SolidColorBrush x:Key="Gray900Brush" Color="{StaticResource Gray900}"/>
     <SolidColorBrush x:Key="Gray950Brush" Color="{StaticResource Gray950}"/>
+
 </ResourceDictionary>

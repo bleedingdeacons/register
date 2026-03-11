@@ -37,6 +37,23 @@ public class UnityDbContext : DbContext
         base.OnModelCreating(modelBuilder);
     }
 
+    /// <summary>
+    /// Deletes all rows from every table and clears the change tracker.
+    /// Tables are deleted dependents-first to respect foreign-key constraints.
+    /// </summary>
+    public async Task PurgeDatabaseAsync(CancellationToken ct = default)
+    {
+        await Meetings.ExecuteDeleteAsync(ct);
+        await Contacts.ExecuteDeleteAsync(ct);
+        await IntergroupMeetings.ExecuteDeleteAsync(ct);
+        await Positions.ExecuteDeleteAsync(ct);
+        await Members.ExecuteDeleteAsync(ct);
+        await Groups.ExecuteDeleteAsync(ct);
+        await EntitySnapshots.ExecuteDeleteAsync(ct);
+
+        ChangeTracker.Clear();
+    }
+
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         if (!SuppressUpdatedStamp) StampUpdated();

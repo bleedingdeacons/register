@@ -10,11 +10,11 @@
                   ContentTemplate="{DataTemplate local:MainPage}"
                   Route="MainPage" />
 
-    <!--<ShellContent Title="Groups"
-                  Icon="groups.png"
-                  ContentTemplate="{DataTemplate local:GroupListPage}"
-                  Route="GroupListPage" />-->
-    
+    <ShellContent Title="Admin"
+          Icon="admin.png"
+          ContentTemplate="{DataTemplate local:AdminPage}"
+          Route="AdminPage" />
+
     <ShellContent Title="Settings"
               Icon="settings.png"
               ContentTemplate="{DataTemplate local:SettingsPage}"
@@ -44,10 +44,6 @@
       Route="EmailStatusPage" 
       IsVisible="False" />
 
-    <ShellContent Title="Admin"
-      Icon="settings.png"
-      ContentTemplate="{DataTemplate local:AdminPage}"
-      Route="AdminPage" />
 
-    
+
 </Shell>

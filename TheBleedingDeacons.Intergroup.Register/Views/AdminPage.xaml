@@ -8,41 +8,6 @@
              x:DataType="vm:AdminViewModel"
              Title="Meeting Admin">
 
-    <ContentPage.Resources>
-        <ResourceDictionary>
-            <Style x:Key="HeaderLabelStyle" TargetType="Label">
-                <Setter Property="FontSize" Value="24"/>
-                <Setter Property="FontAttributes" Value="Bold"/>
-                <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"/>
-                <Setter Property="Margin" Value="0,0,0,10"/>
-            </Style>
-
-            <Style x:Key="FieldLabelStyle" TargetType="Label">
-                <Setter Property="FontSize" Value="13"/>
-                <Setter Property="FontAttributes" Value="Bold"/>
-                <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}"/>
-                <Setter Property="Margin" Value="0,0,0,4"/>
-            </Style>
-
-            <Style x:Key="ValueLabelStyle" TargetType="Label">
-                <Setter Property="FontSize" Value="22"/>
-                <Setter Property="FontAttributes" Value="Bold"/>
-                <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Gray900}, Dark=White}"/>
-            </Style>
-
-            <Style x:Key="BigButtonStyle" TargetType="Button">
-                <Setter Property="FontSize" Value="20"/>
-                <Setter Property="FontAttributes" Value="Bold"/>
-                <Setter Property="TextColor" Value="White"/>
-                <Setter Property="CornerRadius" Value="12"/>
-                <Setter Property="HeightRequest" Value="70"/>
-                <Setter Property="Margin" Value="0,10,0,0"/>
-            </Style>
-
-            <toolkit:InvertedBoolConverter x:Key="InvertedBoolConverter" />
-        </ResourceDictionary>
-    </ContentPage.Resources>
-
     <ContentPage.Behaviors>
         <toolkit:StatusBarBehavior StatusBarColor="{AppThemeBinding Light=White, Dark=Black}"
                                    StatusBarStyle="{AppThemeBinding Light=DarkContent, Dark=LightContent}" />
@@ -108,7 +73,14 @@
                 <Button Text="Start Meeting"
                         Style="{StaticResource BigButtonStyle}"
                         BackgroundColor="{AppThemeBinding Light=#4CAF50, Dark=#388E3C}"
-                        Command="{Binding StartMeetingCommand}"/>
+                        Command="{Binding StartMeetingCommand}"
+                        IsVisible="{Binding HasSyncError, Converter={toolkit:InvertedBoolConverter}}"/>
+
+                <Button Text="Retry Sync"
+                        Style="{StaticResource BigButtonStyle}"
+                        BackgroundColor="{AppThemeBinding Light=#FF6F00, Dark=#FFA726}"
+                        Command="{Binding RetrySyncCommand}"
+                        IsVisible="{Binding HasSyncError}"/>
             </StackLayout>
 
 
@@ -258,7 +230,14 @@
                 <ActivityIndicator IsRunning="True"
                                    HorizontalOptions="Center"
                                    Scale="2"
-                                   Color="{AppThemeBinding Light=#FF6F00, Dark=#FFA726}"/>
+                                   Color="{AppThemeBinding Light=#FF6F00, Dark=#FFA726}"
+                                   IsVisible="{Binding HasFinishSyncError, Converter={toolkit:InvertedBoolConverter}}"/>
+
+                <Button Text="Retry Sync"
+                        Style="{StaticResource BigButtonStyle}"
+                        BackgroundColor="{AppThemeBinding Light=#FF6F00, Dark=#FFA726}"
+                        Command="{Binding RetryFinishCommand}"
+                        IsVisible="{Binding HasFinishSyncError}"/>
             </StackLayout>
 
 
@@ -287,10 +266,11 @@
                            LineBreakMode="WordWrap"/>
                 </Border>
 
-                <Button Text="New Session"
+                <Button Text="Purge Database"
                         Style="{StaticResource BigButtonStyle}"
-                        BackgroundColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
-                        Command="{Binding NewSessionCommand}"/>
+                        BackgroundColor="{AppThemeBinding Light=#D32F2F, Dark=#C62828}"
+                        TextColor="White"
+                        Command="{Binding PurgeDatabaseCommand}"/>
             </StackLayout>
 
         </StackLayout>
