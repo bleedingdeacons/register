@@ -98,8 +98,6 @@ public class UnitySyncService
             Phone = NullIfEmpty(g.Phone),
             Website = NullIfEmpty(g.Website),
             Notes = NullIfEmpty(g.Notes),
-            GroupEmail = NullIfEmpty(g.GroupEmail),
-            GroupEmailActive = g.GroupEmailActive,
             DistrictId = g.DistrictId,
         }).ToList();
 
