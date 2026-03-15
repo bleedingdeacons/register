@@ -13,12 +13,12 @@ namespace TheBleedingDeacons.Unity.Intergroup.Services;
 public class UnitySyncService
 {
     private readonly UnityDbContext _db;
-    private readonly UnityRestSharp _client;
+    private readonly Func<Task<UnityRestSharp>> _clientFactory;
 
-    public UnitySyncService(UnityDbContext db, UnityRestSharp client)
+    public UnitySyncService(UnityDbContext db, Func<Task<UnityRestSharp>> clientFactory)
     {
         _db = db;
-        _client = client;
+        _clientFactory = clientFactory;
     }
 
     public record SyncResult(int Groups, int Meetings, int Positions, int Members, int Contacts, int IntergroupMeetings);
@@ -28,21 +28,24 @@ public class UnitySyncService
     /// </summary>
     public async Task<SyncResult> SyncAsync(CancellationToken ct = default)
     {
+        // Create a fresh client each sync so we always use the latest credentials.
+        using var client = await _clientFactory();
+
         // ── Fetch from Unity API ──────────────────────────────────────
 
-        var groupsResponse = await _client.GetGroupsAsync(perPage: 500, expandMeetings: true, cancellationToken: ct);
+        var groupsResponse = await client.GetGroupsAsync(perPage: 500, expandMeetings: true, cancellationToken: ct);
         if (!groupsResponse.Success || groupsResponse.Data is null)
             throw new InvalidOperationException($"Failed to fetch groups: {groupsResponse.Error?.Message}");
 
-        var positionsResponse = await _client.GetPositionsAsync(perPage: 500, cancellationToken: ct);
+        var positionsResponse = await client.GetPositionsAsync(perPage: 500, cancellationToken: ct);
         if (!positionsResponse.Success || positionsResponse.Data is null)
             throw new InvalidOperationException($"Failed to fetch positions: {positionsResponse.Error?.Message}");
 
-        var membersResponse = await _client.GetMembersAsync(perPage: 500, cancellationToken: ct);
+        var membersResponse = await client.GetMembersAsync(perPage: 500, cancellationToken: ct);
         if (!membersResponse.Success || membersResponse.Data is null)
             throw new InvalidOperationException($"Failed to fetch members: {membersResponse.Error?.Message}");
 
-        var intergroupResponse = await _client.GetIntergroupMeetingsAsync(perPage: 500, cancellationToken: ct);
+        var intergroupResponse = await client.GetIntergroupMeetingsAsync(perPage: 500, cancellationToken: ct);
         if (!intergroupResponse.Success || intergroupResponse.Data is null)
             throw new InvalidOperationException($"Failed to fetch intergroup meetings: {intergroupResponse.Error?.Message}");
 

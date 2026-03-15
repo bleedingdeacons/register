@@ -56,14 +56,18 @@ public static class MauiProgram
         builder.Services.AddScoped<IPositionRepository, PositionRepository>();
         builder.Services.AddScoped<IIntergroupMeetingRepository, IntergroupMeetingRepository>();
 
-        // Unity REST client — created on demand from config
-        builder.Services.AddScoped<UnityRestSharp>(sp =>
+        // Unity REST client factory — always reads the latest credentials from config + SecureStorage.
+        // Used by UnitySyncService so each sync call gets a fresh client.
+        builder.Services.AddSingleton<Func<Task<UnityRestSharp>>>(sp =>
         {
             var configService = sp.GetRequiredService<IConfigurationService>();
-            var config = configService.GetUnityConfiguration();
-            if (!config.IsValid())
-                throw new InvalidOperationException("Unity API is not configured.");
-            return new UnityRestSharp(config.BaseUrl, config.ApiKey);
+            return async () =>
+            {
+                var config = await configService.LoadUnityConfigurationAsync();
+                if (!config.IsValid())
+                    throw new InvalidOperationException("Unity API is not configured.");
+                return new UnityRestSharp(config.BaseUrl, config.ApiKey);
+            };
         });
 
         // UnitySyncService — fetches from API and replaces local SQLite data
