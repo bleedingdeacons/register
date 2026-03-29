@@ -19,9 +19,15 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels;
 ///
 /// Receives a groupId from navigation and loads the Group (with Members)
 /// from <see cref="IGroupRepository"/>, so verify/edit always operate on the group.
+///
+/// NOTE: [QueryProperty] attributes are intentionally omitted here.
+/// Using [QueryProperty] alongside a manual ApplyQueryAttributes override causes
+/// OnGroupIdChanged to fire twice — once from the source-generated property setter
+/// (triggered by [QueryProperty] before ApplyQueryAttributes runs) and again when
+/// ApplyQueryAttributes manually sets GroupId. The second call hits the IsLoading
+/// guard and exits without loading, leaving the GSR list empty. All navigation
+/// parameter handling is done exclusively in ApplyQueryAttributes instead.
 /// </summary>
-[QueryProperty(nameof(GroupId), "groupId")]
-[QueryProperty(nameof(Edited), "edited")]
 public partial class VerifyGroupViewModel : BaseViewModel
 {
     private static readonly ILogger Logger = AppLogger.ForContext<VerifyGroupViewModel>();
@@ -92,6 +98,7 @@ public partial class VerifyGroupViewModel : BaseViewModel
 
         // Handle edited flag returning from Edit flow — reload from DB so updated
         // GSR values are reflected rather than the stale in-memory Group object.
+        // GroupId is already set from the original navigation, so reload directly.
         if (query.TryGetValue("edited", out var editedObj) &&
             editedObj?.ToString() == "true")
         {
@@ -100,9 +107,12 @@ public partial class VerifyGroupViewModel : BaseViewModel
                 if (GroupId > 0)
                     await LoadGroupAsync(GroupId);
             });
+            return;
         }
 
-        // Handle groupId passed from navigation
+        // Initial navigation: parse groupId and trigger a single load.
+        // We set GroupId for reference but call LoadGroupAsync directly rather
+        // than relying on OnGroupIdChanged, which would race with this method.
         if (query.TryGetValue("groupId", out var groupIdObj))
         {
             int parsedGroupId = 0;
@@ -113,7 +123,13 @@ public partial class VerifyGroupViewModel : BaseViewModel
                 parsedGroupId = intValue;
 
             if (parsedGroupId > 0)
+            {
                 GroupId = parsedGroupId;
+                MainThread.BeginInvokeOnMainThread(async () =>
+                {
+                    await LoadGroupAsync(parsedGroupId);
+                });
+            }
         }
     }
 
@@ -123,15 +139,9 @@ public partial class VerifyGroupViewModel : BaseViewModel
 
     partial void OnGroupIdChanged(int value)
     {
-        Logger.Information("OnGroupIdChanged triggered with value: {Value}", value);
-
-        if (value > 0)
-        {
-            MainThread.BeginInvokeOnMainThread(async () =>
-            {
-                await LoadGroupAsync(value);
-            });
-        }
+        // GroupId is set for reference only. Loading is triggered exclusively
+        // from ApplyQueryAttributes to prevent double-load races.
+        Logger.Information("OnGroupIdChanged: GroupId updated to {Value}", value);
     }
 
     partial void OnGroupChanged(Group? value)
@@ -183,7 +193,7 @@ public partial class VerifyGroupViewModel : BaseViewModel
         try
         {
             await _attendanceRegistration.Register(Group);
-           
+
             await _popupService.ShowCountdownPopupAsync(
                 "Finished",
                 $"Thanks for registering {Group.Name}.",

@@ -18,9 +18,15 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels;
 ///
 /// Receives a positionId from navigation and loads the Position (with Holders)
 /// from <see cref="IPositionRepository"/>, so verify/edit always operate on the position.
+///
+/// NOTE: [QueryProperty] attributes are intentionally omitted here.
+/// Using [QueryProperty] alongside a manual ApplyQueryAttributes override causes
+/// OnPositionIdChanged to fire twice — once from the source-generated setter
+/// (before ApplyQueryAttributes runs) and again when ApplyQueryAttributes sets
+/// PositionId. The second call hits the IsLoading guard and returns early,
+/// leaving the holders list empty. All navigation parameter handling is done
+/// exclusively in ApplyQueryAttributes instead.
 /// </summary>
-[QueryProperty(nameof(PositionId), "positionId")]
-[QueryProperty(nameof(Edited), "edited")]
 public partial class VerifyPositionViewModel : BaseViewModel
 {
     private static readonly ILogger Logger = AppLogger.ForContext<VerifyPositionViewModel>();
@@ -91,6 +97,7 @@ public partial class VerifyPositionViewModel : BaseViewModel
 
         // Handle edited flag returning from Edit flow — reload from DB so updated
         // holder values are reflected rather than the stale in-memory Position object.
+        // PositionId is already set from the original navigation, so reload directly.
         if (query.TryGetValue("edited", out var editedObj) &&
             editedObj?.ToString() == "true")
         {
@@ -99,9 +106,12 @@ public partial class VerifyPositionViewModel : BaseViewModel
                 if (PositionId > 0)
                     await LoadPositionAsync(PositionId);
             });
+            return;
         }
 
-        // Handle positionId passed from navigation
+        // Initial navigation: parse positionId and trigger a single load.
+        // We set PositionId for reference but call LoadPositionAsync directly rather
+        // than relying on OnPositionIdChanged, which would race with this method.
         if (query.TryGetValue("positionId", out var positionIdObj))
         {
             int parsedPositionId = 0;
@@ -112,7 +122,13 @@ public partial class VerifyPositionViewModel : BaseViewModel
                 parsedPositionId = intValue;
 
             if (parsedPositionId > 0)
+            {
                 PositionId = parsedPositionId;
+                MainThread.BeginInvokeOnMainThread(async () =>
+                {
+                    await LoadPositionAsync(parsedPositionId);
+                });
+            }
         }
     }
 
@@ -122,15 +138,9 @@ public partial class VerifyPositionViewModel : BaseViewModel
 
     partial void OnPositionIdChanged(int value)
     {
-        Logger.Information("OnPositionIdChanged triggered with value: {Value}", value);
-
-        if (value > 0)
-        {
-            MainThread.BeginInvokeOnMainThread(async () =>
-            {
-                await LoadPositionAsync(value);
-            });
-        }
+        // PositionId is set for reference only. Loading is triggered exclusively
+        // from ApplyQueryAttributes to prevent double-load races.
+        Logger.Information("OnPositionIdChanged: PositionId updated to {Value}", value);
     }
 
     partial void OnPositionChanged(Position? value)

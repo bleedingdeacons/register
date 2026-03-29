@@ -30,8 +30,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\..\Users\David\Local Sites\unity-dev\app\public\wp-content\plugins\integrity\sharp\TheBleedingDeacons.Unity.Client\TheBleedingDeacons.Unity.Client.csproj" />
-    <ProjectReference Include="..\..\..\..\Users\David\Local Sites\unity-dev\app\public\wp-content\plugins\integrity\sharp\TheBleedingDeacons.Unity.Models\TheBleedingDeacons.Unity.Models.csproj" />
+    <ProjectReference Include="..\..\..\..\Users\David\Local Sites\unity-dev\app\public\wp-content\plugins\integrity\client\sharp\TheBleedingDeacons.Unity.Client\TheBleedingDeacons.Unity.Client.csproj" />
+    <ProjectReference Include="..\..\..\..\Users\David\Local Sites\unity-dev\app\public\wp-content\plugins\integrity\client\sharp\TheBleedingDeacons.Unity.Models\TheBleedingDeacons.Unity.Models.csproj" />
   </ItemGroup>
 
   <ItemGroup>
