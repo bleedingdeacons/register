@@ -51,10 +51,10 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
         }
 
         [RelayCommand]
-        private async Task NavigateToImportExport()
+        private async Task NavigateToBetterStackSetting()
         {
             await ShowFeedback();
-            await Shell.Current.GoToAsync(nameof(ImportExportPage));
+            await Shell.Current.GoToAsync(nameof(BetterStackSettingsPage));
         }
 
         [RelayCommand]

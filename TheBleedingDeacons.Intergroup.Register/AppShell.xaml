@@ -20,12 +20,6 @@
               ContentTemplate="{DataTemplate local:SettingsPage}"
               Route="SettingsPage" />
 
-    <ShellContent Title="Import/Export"
-          Icon="settings.png"
-          ContentTemplate="{DataTemplate local:ImportExportPage}"
-          Route="ImportExportPage"
-          IsVisible="False" />
-
     <ShellContent Title="Mail"
           Icon="settings.png"
           ContentTemplate="{DataTemplate local:MailSettingsPage}"

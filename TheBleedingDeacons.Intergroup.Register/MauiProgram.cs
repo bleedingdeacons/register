@@ -7,6 +7,7 @@ using System.Reflection;
 using TheBleedingDeacons.Intergroup.Register.Data;
 using TheBleedingDeacons.Intergroup.Register.Services;
 using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
+using TheBleedingDeacons.Intergroup.Register.Models;
 using TheBleedingDeacons.Intergroup.Register.Support;
 using TheBleedingDeacons.Intergroup.Register.ViewModels;
 using TheBleedingDeacons.Intergroup.Register.Views;
@@ -39,6 +40,9 @@ public static class MauiProgram
 
         // Register logging service
         SetupSerilog(builder);
+
+        // Ensure Serilog is flushed on unhandled / fatal errors
+        RegisterGlobalExceptionHandlers();
 
         // Add configuration service
         builder.Services.AddSingleton<IConfigurationService, ConfigurationService>();
@@ -77,9 +81,6 @@ public static class MauiProgram
         builder.Services.AddScoped<SnapshotService>();
         builder.Services.AddScoped<ReconciliationService>();
 
-        // ── Reconciliation Service ─────────────────────────────────────
-        builder.Services.AddScoped<ReconciliationService>();
-
         // ── Mail Database ─────────────────────────────────────────────
         var mailDbPath = Path.Combine(FileSystem.AppDataDirectory, MAIL_DATABASE_NAME);
         builder.Services.AddDbContextFactory<MailDbContext>(options =>
@@ -91,7 +92,6 @@ public static class MauiProgram
         builder.Services.AddScoped<IAttendanceRegistration<Position>>(sp => sp.GetRequiredService<AttendanceService>());
 
         builder.Services.AddScoped<DataService>();
-        builder.Services.AddScoped<SerializationService>();
         builder.Services.AddMemoryCache();
         builder.Services.AddSingleton<CacheService>();
 
@@ -132,13 +132,13 @@ public static class MauiProgram
         builder.Services.AddTransient<DaySelectionPage>();
         builder.Services.AddTransient<TypeSelectionPage>();
         builder.Services.AddTransient<GroupSelectionPage>();
-        builder.Services.AddTransient<ImportExportPage>();
         builder.Services.AddTransient<PositionEditPage>();
         builder.Services.AddTransient<PositionSelectionPage>();
         builder.Services.AddTransient<DatabaseBackupPage>();
         builder.Services.AddTransient<EmailStatusPage>();
         builder.Services.AddTransient<SettingsPage>();
         builder.Services.AddTransient<UnitySettingsPage>();
+        builder.Services.AddTransient<BetterStackSettingsPage>();
         builder.Services.AddTransient<AdminPage>();
         builder.Services.AddTransient<VerifyPositionViewModel>();
 
@@ -150,13 +150,13 @@ public static class MauiProgram
         builder.Services.AddTransient<VerifyGroupViewModel>();
         builder.Services.AddTransient<TypeSelectionViewModel>();
         builder.Services.AddTransient<DaySelectionViewModel>();
-        builder.Services.AddTransient<ImportExportViewModel>();
         builder.Services.AddTransient<PositionSelectionViewModel>();
         builder.Services.AddTransient<PositionEditViewModel>();
         builder.Services.AddTransient<DatabaseBackupViewModel>();
         builder.Services.AddTransient<EmailStatusViewModel>();
         builder.Services.AddTransient<SettingsViewModel>();
         builder.Services.AddTransient<UnitySettingsViewModel>();
+        builder.Services.AddTransient<BetterStackSettingsViewModel>();
         builder.Services.AddTransient<AdminViewModel>();
         builder.Services.AddTransient<PositionVerifyPage>();
 
@@ -174,6 +174,17 @@ public static class MauiProgram
             unityDb.Database.EnsureCreated();
 
             System.Diagnostics.Debug.WriteLine("Unity database initialized.");
+        }
+
+        // ── Reconfigure Serilog with user-saved Better Stack settings ─
+        // SetupSerilog runs before DI is built, so it cannot read from
+        // ConfigurationService. We layer the BetterStack sink on here,
+        // once the container (and SecureStorage) are available.
+        using (var scope = mauiapp.Services.CreateScope())
+        {
+            var configService = scope.ServiceProvider.GetRequiredService<IConfigurationService>();
+            var betterStackConfig = configService.GetBetterStackConfiguration();
+            ReconfigureSerilogWithBetterStack(betterStackConfig);
         }
 
         return mauiapp;
@@ -195,6 +206,7 @@ public static class MauiProgram
             .Enrich.WithProperty("PlatformVersion", DeviceInfo.VersionString)
             .Enrich.WithProperty("AppVersion", AppInfo.VersionString)
             .Enrich.WithProperty("DeviceModel", DeviceInfo.Model)
+            .Enrich.WithProperty("DeviceName", DeviceInfo.Name)
             .Enrich.WithProperty("ProcessId", Environment.ProcessId)
             .Enrich.WithProperty("MachineName", Environment.MachineName)
             .Enrich.With<ExceptionEnricher>();
@@ -217,5 +229,72 @@ public static class MauiProgram
 
         Log.Information("Application {AppName} v{Version} starting on {Platform}",
             appName, AppInfo.VersionString, DeviceInfo.Platform);
+    }
+
+    private static void ReconfigureSerilogWithBetterStack(BetterStackConfiguration betterStackConfig)
+    {
+        //Serilog.Debugging.SelfLog.Enable(msg => Console.WriteLine($"SERILOG: {msg}"));
+
+        if (!betterStackConfig.IsValid())
+        {
+            Log.Information("Better Stack configuration is not set or invalid — skipping Better Stack sink");
+            return;
+        }
+
+        // Mirror the same values used in SetupSerilog.
+        var appName = "Badi";
+        var environment = "Development";
+
+        // Wrap the existing logger so file/console/debug sinks are preserved,
+        // then add the BetterStack sink alongside them.
+        Log.Logger = new LoggerConfiguration()
+            .Enrich.WithProperty("Application", appName)
+            .Enrich.WithProperty("Environment", environment)
+            .Enrich.WithProperty("Platform", DeviceInfo.Platform.ToString())
+            .Enrich.WithProperty("PlatformVersion", DeviceInfo.VersionString)
+            .Enrich.WithProperty("AppVersion", AppInfo.VersionString)
+            .Enrich.WithProperty("DeviceModel", DeviceInfo.Model)
+            .Enrich.WithProperty("DeviceName", DeviceInfo.Name)
+            .Enrich.WithProperty("ProcessId", Environment.ProcessId)
+            .Enrich.WithProperty("MachineName", Environment.MachineName)
+            .Enrich.With<ExceptionEnricher>()
+            .WriteTo.Logger(Log.Logger)
+            .WriteTo.BetterStack(
+                sourceToken: betterStackConfig.SourceToken,
+                betterStackEndpoint: betterStackConfig.Endpoint)
+            .CreateLogger();
+
+        Log.Information("Better Stack sink attached to {Endpoint}", betterStackConfig.ToLogSafe().Endpoint);
+
+        //Serilog.Debugging.SelfLog.Enable(Console.Error);
+    }
+
+    private static void RegisterGlobalExceptionHandlers()
+    {
+        // .NET unhandled exceptions — background threads, async void, etc.
+        AppDomain.CurrentDomain.UnhandledException += (_, args) =>
+        {
+            if (args.ExceptionObject is Exception ex)
+                Log.Fatal(ex, "Unhandled AppDomain exception (IsTerminating={IsTerminating})", args.IsTerminating);
+            else
+                Log.Fatal("Unhandled AppDomain exception: {ExceptionObject}", args.ExceptionObject);
+
+            Log.CloseAndFlush();
+        };
+
+        // Unobserved Task exceptions — app usually survives, so log but don't close
+        TaskScheduler.UnobservedTaskException += (_, args) =>
+        {
+            Log.Error(args.Exception, "Unobserved task exception");
+        };
+
+#if ANDROID
+        // Android-specific: Java-side unhandled exceptions bridged into .NET
+        Android.Runtime.AndroidEnvironment.UnhandledExceptionRaiser += (_, args) =>
+        {
+            Log.Fatal(args.Exception, "Unhandled Android exception");
+            Log.CloseAndFlush();
+        };
+#endif
     }
 }

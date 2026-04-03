@@ -18,13 +18,17 @@
 /// A one-time device seed is derived from a GUID stored in <see cref="Preferences"/>
 /// (persists across app restarts but is unique per device/install). The seed
 /// occupies the upper bits of the negative range; a monotonically increasing
-/// counter fills the lower bits. This gives each device ~65 535 locally-created
-/// members before any theoretical overlap — far more than a single intergroup
-/// meeting will ever need.
+/// counter fills the lower bits. The counter is persisted to
+/// <see cref="Preferences"/> so that IDs are never reused across app restarts,
+/// even when temporary members from a previous session still exist in the
+/// local database. This gives each device ~65 535 locally-created members
+/// before any theoretical overlap — far more than a single intergroup meeting
+/// will ever need.
 /// </summary>
 public static class TemporaryIdGenerator
 {
     private const string DeviceSeedKey = "temp_id_device_seed";
+    private const string CounterKey = "temp_id_counter";
 
     /// <summary>
     /// Upper 16 bits: device seed (1–65 535).
@@ -37,6 +41,11 @@ public static class TemporaryIdGenerator
     static TemporaryIdGenerator()
     {
         DeviceSeed = GetOrCreateDeviceSeed();
+
+        // Resume the counter from its last persisted value so we never
+        // reissue an ID that may still exist in the local SQLite database
+        // from a previous app session.
+        _counter = Preferences.Default.Get(CounterKey, 0);
     }
 
     /// <summary>
@@ -46,6 +55,9 @@ public static class TemporaryIdGenerator
     public static int Next()
     {
         var count = Interlocked.Increment(ref _counter);
+
+        // Persist so the next app launch continues from here.
+        Preferences.Default.Set(CounterKey, count);
 
         // Combine device seed (upper 16 bits) with counter (lower 16 bits)
         // and negate to guarantee a negative value.
@@ -58,6 +70,17 @@ public static class TemporaryIdGenerator
     /// ID that was generated locally and has not yet been resolved by the Unity API.
     /// </summary>
     public static bool IsTemporary(int id) => id < 0;
+
+    /// <summary>
+    /// Resets the persisted counter to zero. Call this after a full sync has
+    /// deleted all temporary members from the local database, so the ID space
+    /// is reclaimed cleanly.
+    /// </summary>
+    public static void ResetCounter()
+    {
+        Interlocked.Exchange(ref _counter, 0);
+        Preferences.Default.Set(CounterKey, 0);
+    }
 
     private static int GetOrCreateDeviceSeed()
     {

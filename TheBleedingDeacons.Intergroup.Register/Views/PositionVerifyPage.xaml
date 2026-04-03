@@ -66,6 +66,12 @@
                                            Style="{StaticResource FieldLabelStyle}"/>
                                     <Label Text="{Binding MobileNumber, Converter={StaticResource ObscurePhoneNumber}}"
                                            Style="{StaticResource ValueLabelStyle}"/>
+
+                                    <!-- Rotation Date -->
+                                    <Label Text="Rotation Date"
+                                           Style="{StaticResource FieldLabelStyle}"/>
+                                    <Label Text="{Binding IntergroupPositionRotation}"
+                                           Style="{StaticResource ValueLabelStyle}"/>
                                 </StackLayout>
                             </Border>
                         </DataTemplate>

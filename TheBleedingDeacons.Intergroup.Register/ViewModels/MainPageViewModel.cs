@@ -27,6 +27,8 @@ public partial class MainPageViewModel : BaseViewModel
 
     public bool IsButtonsEnabled => IsMeetingSelected && !IsBusy;
 
+    public string AppVersion => $"v{AppInfo.VersionString}";
+
     public MainPageViewModel(IConfigurationService configService, IIntergroupMeetingRepository intergroupMeetingRepository)
     {
         _configService = configService;

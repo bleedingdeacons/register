@@ -1,4 +1,6 @@
-﻿namespace TheBleedingDeacons.Intergroup.Register;
+﻿using Serilog;
+
+namespace TheBleedingDeacons.Intergroup.Register;
 
 public partial class App : Application
 {
@@ -14,6 +16,13 @@ public partial class App : Application
         {
             Title = "Intergroup"
         };
+    }
+
+    protected override void CleanUp()
+    {
+        Log.Information("Application shutting down");
+        Log.CloseAndFlush();
+        base.CleanUp();
     }
 
     public static Window MainWindow => Current?.Windows?.FirstOrDefault();

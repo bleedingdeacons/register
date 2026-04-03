@@ -19,15 +19,6 @@
                    HorizontalOptions="Center"
                    Margin="0,0,0,30"/>
 
-            <Button x:Name="ImportExportButton"
-                    Text="Import/Export"
-                    FontSize="18"
-                    BackgroundColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
-                    TextColor="White"
-                    CornerRadius="8"
-                    HeightRequest="60"
-                    Command="{Binding NavigateToImportExportCommand}"/>
-
             <Button x:Name="MailSettingButton"
                     Text="Mail Settings"
                     FontSize="18"
@@ -45,6 +36,15 @@
                     CornerRadius="8"
                     HeightRequest="60"
                     Command="{Binding NavigateToUnitySettingCommand}"/>
+
+            <Button x:Name="BetterStackSettingButton"
+                    Text="Better Stack Settings"
+                    FontSize="18"
+                    BackgroundColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
+                    TextColor="White"
+                    CornerRadius="8"
+                    HeightRequest="60"
+                    Command="{Binding NavigateToBetterStackSettingCommand}"/>
 
             <Button x:Name="BackupButton"
                     Text="Database Backup"

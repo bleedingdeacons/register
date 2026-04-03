@@ -2,9 +2,9 @@ using TheBleedingDeacons.Intergroup.Register.ViewModels;
 
 namespace TheBleedingDeacons.Intergroup.Register.Views;
 
-public partial class ImportExportPage : ContentPage
+public partial class BetterStackSettingsPage : ContentPage
 {
-    public ImportExportPage(ImportExportViewModel viewModel)
+    public BetterStackSettingsPage(BetterStackSettingsViewModel viewModel)
     {
         InitializeComponent();
         BindingContext = viewModel;

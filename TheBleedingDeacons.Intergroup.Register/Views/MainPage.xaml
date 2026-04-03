@@ -6,7 +6,19 @@
              x:DataType="vm:MainPageViewModel"
              Title="{Binding Title}">
 
-    <ScrollView>
+    <Shell.TitleView>
+        <Grid>
+            <Label FontSize="Micro" Text="{Binding AppVersion}"
+                   Opacity="0.5"
+                   VerticalOptions="Center"
+                   HorizontalOptions="End"
+                   Margin="0,0,8,0" />
+
+        </Grid>
+    </Shell.TitleView>
+
+   
+
         <VerticalStackLayout Spacing="30" Padding="30,0" VerticalOptions="Center">
 
             <Image Source="badi.png"
@@ -18,8 +30,7 @@
                    FontAttributes="Bold"
                    Text="Welcome to Bristol and District Intergroup"
                    HorizontalOptions="Center" />
-
-            <!-- No meeting selected warning -->
+        <!-- No meeting selected warning -->
             <Border BackgroundColor="{AppThemeBinding Light=#FFF8E1, Dark=#4A3700}"
                     Stroke="{AppThemeBinding Light=#FFC107, Dark=#FFB300}"
                     StrokeShape="RoundRectangle 8"
@@ -77,6 +88,6 @@
                               HorizontalOptions="Center" />
 
         </VerticalStackLayout>
-    </ScrollView>
+    
 
 </ContentPage>

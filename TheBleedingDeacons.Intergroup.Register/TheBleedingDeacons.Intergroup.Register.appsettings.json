@@ -8,6 +8,10 @@
     "FromDisplayName": "Bristol and Distict Intergroup",
     "TimeoutSeconds": 30
   },
+  "BetterStack": {
+    "Endpoint": "https://in.logs.betterstack.com",
+    "SourceToken": "<YOUR_BETTERSTACK_SOURCE_TOKEN>"
+  },
   "Logging": {
     "LogLevel": {
       "Default": "Information",

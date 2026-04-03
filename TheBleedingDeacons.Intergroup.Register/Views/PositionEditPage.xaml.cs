@@ -7,6 +7,7 @@ public partial class PositionEditPage : ContentPage, IQueryAttributable
     private readonly PositionEditViewModel _viewModel;
 
     public PositionEditPage(PositionEditViewModel viewModel)
+
     {
         InitializeComponent();
         _viewModel = viewModel;

@@ -20,5 +20,9 @@ namespace TheBleedingDeacons.Intergroup.Register.Services.Interfaces
 
         /// <summary>Persists only the active intergroup meeting ID, leaving all other settings untouched.</summary>
         Task SaveActiveIntergroupMeetingAsync(int? meetingId);
+
+        BetterStackConfiguration GetBetterStackConfiguration();
+        Task SaveBetterStackConfigurationAsync(BetterStackConfiguration config);
+        Task<BetterStackConfiguration> LoadBetterStackConfigurationAsync();
     }
 }
