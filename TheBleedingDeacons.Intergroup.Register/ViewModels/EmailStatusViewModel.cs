@@ -60,7 +60,7 @@ public partial class EmailStatusViewModel : BaseViewModel
             TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30));
 
         // Initial load
-        _ = Task.Run(async () => await LoadEmailsAsync());
+        Task.Run(async () => await LoadEmailsAsync()).SafeFireAndForget("InitialEmailLoad");
     }
 
     [RelayCommand]

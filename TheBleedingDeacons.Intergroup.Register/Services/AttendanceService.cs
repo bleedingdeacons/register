@@ -1,30 +1,39 @@
-﻿using Serilog;
-using TheBleedingDeacons.Intergroup.Register.Extensions;
-using TheBleedingDeacons.Intergroup.Register.Models;
+using Serilog;
 using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Support;
+using TheBleedingDeacons.Unity.Intergroup.Data;
+using TheBleedingDeacons.Unity.Intergroup.Entities;
 
 namespace TheBleedingDeacons.Intergroup.Register.Services
 {
+    /// <summary>
+    /// Manages attendance registration state locally.
+    ///
+    /// All changes are written to the local <see cref="UnityDbContext"/> only.
+    /// The <see cref="ReconciliationService"/> is responsible for detecting
+    /// these changes (via snapshot diffing) and pushing them to the Unity API
+    /// in the correct dependency order at reconciliation time.
+    /// </summary>
     public class AttendanceService : IAttendanceRegistration<Position>, IAttendanceRegistration<Group>, IDisposable
     {
         private static readonly ILogger Logger = AppLogger.ForContext<AttendanceService>();
 
         private readonly IMailService _mailService;
         private readonly IEmailTemplateService _emailTemplate;
-        private readonly IGroupRepository _groupRepository;
-        private readonly IPositionRepository _positionRepository;
+        private readonly UnityDbContext _dbContext;
 
         private readonly EventHandler<EmailSentEventArgs> _emailSentHandler;
         private readonly EventHandler<EmailFailedEventArgs> _emailFailedHandler;
         private bool _disposed;
 
-        public AttendanceService(IGroupRepository groupRepository, IPositionRepository positionRepository, IEmailTemplateService emailTemplate, IMailService mailService)
+        public AttendanceService(
+            IEmailTemplateService emailTemplate,
+            IMailService mailService,
+            UnityDbContext dbContext)
         {
-            _positionRepository = positionRepository;
-            _groupRepository = groupRepository;
             _mailService = mailService;
             _emailTemplate = emailTemplate;
+            _dbContext = dbContext;
 
             _emailSentHandler = (s, e) => Logger.Information("Email sent to {Recipient}", e.Email.To);
             _emailFailedHandler = (s, e) => Logger.Warning("Email failed for {Recipient}: {Error}", e.Email.To, e.Error);
@@ -35,47 +44,60 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 
         public async Task Register(Position entity)
         {
-            entity.Attended = true;
-            await _positionRepository.SavePositionAsync(entity);
+            Logger.Information("Position {PositionName} attendance registered locally", entity.ShortDescription);
+            await SetPositionRegisteredAsync(entity.Id, true);
         }
 
         public async Task Register(Group entity)
         {
-            entity.Attended = true;
-            await _groupRepository.SaveGroupAsync(entity);
-
-            // TODO: Enable welcome email sending once SMTP is configured
-            // var welcome = new WelcomeEmail
-            // {
-            //     FirstName = entity.GetFirstName(),
-            //     GroupName = entity.Name,
-            //     StartTime = entity.Time,
-            //     Location = entity.Location,
-            //     Address = entity.Address,
-            //     GroupContacts = entity.GetContacts()
-            // };
-            // var emailBody = await _emailTemplate.RenderTemplateAsync("WelcomeEmail", welcome);
-            // if (!string.IsNullOrEmpty(entity.GsrEmailPersonal))
-            //     await _mailService.SendEmailAsync(entity.GsrEmailPersonal, "Important information about your group.", emailBody, isHtml: true);
-
-            Logger.Information("Group {GroupName} attendance registered", entity.Name);
+            Logger.Information("Group {GroupName} attendance registered locally", entity.Name);
+            await SetGroupRegisteredAsync(entity.Id, true);
         }
 
         public async Task Unregister(Position entity)
         {
-            entity.Attended = false;
-            await _positionRepository.SavePositionAsync(entity);
-            Logger.Information("Position {PositionName} attendance unregistered", entity.PositionName);
+            Logger.Information("Position {PositionName} attendance unregistered locally", entity.ShortDescription);
+            await SetPositionRegisteredAsync(entity.Id, false);
         }
 
         public async Task Unregister(Group entity)
         {
-            entity.Attended = false;
-            entity.ProxyAttendance = false;
-            entity.ProxyEmail = null;
-            entity.ProxyName = null;
-            await _groupRepository.SaveGroupAsync(entity);
-            Logger.Information("Group {GroupName} attendance unregistered", entity.Name);
+            Logger.Information("Group {GroupName} attendance unregistered locally", entity.Name);
+            await SetGroupRegisteredAsync(entity.Id, false);
+        }
+
+        private async Task SetGroupRegisteredAsync(int groupId, bool registered)
+        {
+            try
+            {
+                var group = await _dbContext.Groups.FindAsync(groupId);
+                if (group != null)
+                {
+                    group.Registered = registered;
+                    await _dbContext.SaveChangesAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning(ex, "Failed to persist Registered state for group {GroupId}", groupId);
+            }
+        }
+
+        private async Task SetPositionRegisteredAsync(int positionId, bool registered)
+        {
+            try
+            {
+                var position = await _dbContext.Positions.FindAsync(positionId);
+                if (position != null)
+                {
+                    position.Registered = registered;
+                    await _dbContext.SaveChangesAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning(ex, "Failed to persist Registered state for position {PositionId}", positionId);
+            }
         }
 
         public void Dispose()
@@ -87,6 +109,5 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
                 _disposed = true;
             }
         }
-
     }
 }

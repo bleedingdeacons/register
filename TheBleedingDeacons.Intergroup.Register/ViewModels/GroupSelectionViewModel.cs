@@ -1,14 +1,13 @@
-﻿using CommunityToolkit.Maui.Alerts;
-using CommunityToolkit.Maui.Core;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Serilog;
 using System.Collections.ObjectModel;
 using TheBleedingDeacons.Intergroup.Register.Extensions;
 using TheBleedingDeacons.Intergroup.Register.Models;
-using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Support;
 using TheBleedingDeacons.Intergroup.Register.Views;
+using TheBleedingDeacons.Unity.Intergroup.Entities;
+using TheBleedingDeacons.Unity.Intergroup.Repositories.Interfaces;
 
 namespace TheBleedingDeacons.Intergroup.Register.ViewModels;
 
@@ -17,11 +16,12 @@ public partial class GroupSelectionViewModel : BaseViewModel
     private static readonly ILogger Logger = AppLogger.ForContext<GroupSelectionViewModel>();
 
     private readonly IGroupRepository _groupRepository;
+    private readonly IMeetingRepository _meetingRepository;
 
     public ObservableCollection<Group> Groups { get; } = new();
 
     [ObservableProperty]
-    GroupCriteria criteria;
+    MeetingCriteria criteria;
 
     [ObservableProperty]
     string header = string.Empty;
@@ -32,28 +32,23 @@ public partial class GroupSelectionViewModel : BaseViewModel
     [ObservableProperty]
     bool isDataLoaded = false;
 
-
-    public GroupSelectionViewModel(IGroupRepository groupRepository)
+    public GroupSelectionViewModel(
+        IGroupRepository groupRepository,
+        IMeetingRepository meetingRepository)
     {
-
         _groupRepository = groupRepository;
-
-        Title = "Select Meeting";
+        _meetingRepository = meetingRepository;
+        Title = "Select Group";
     }
 
     public override void ApplyQueryAttributes(IDictionary<string, object> query)
     {
-
         if (query == null) return;
-
-        Criteria = (GroupCriteria)query["criteria"];
-
-
+        Criteria = (MeetingCriteria)query["criteria"];
     }
 
-    partial void OnCriteriaChanged(GroupCriteria value)
+    partial void OnCriteriaChanged(MeetingCriteria value)
     {
-        // Use MainThread for proper Android compatibility
         MainThread.BeginInvokeOnMainThread(async () =>
         {
             await LoadDataAsync();
@@ -71,23 +66,41 @@ public partial class GroupSelectionViewModel : BaseViewModel
             IsLoading = true;
             IsDataLoaded = false;
 
-
             await Task.Yield();
 
             Groups.Clear();
 
-            var allGroups = await _groupRepository.GetAllGroupsAsync();
+            // Get all meetings matching the day/type criteria
+            var allMeetings = await _meetingRepository.GetAllAsync();
 
-            var filteredGroups = allGroups
-                .Where(g =>
+            var filteredMeetings = allMeetings
+                .Where(m =>
                 {
-                    return string.Equals(g.Day, Criteria.Day, StringComparison.OrdinalIgnoreCase) && g.IsOnline() == (Criteria.MeetingType == "Online");
+                    return string.Equals(m.DayOfWeek, Criteria.Day, StringComparison.OrdinalIgnoreCase)
+                        && m.IsOnline() == (Criteria.MeetingType == "Online");
                 }).ToList();
+
+            // Get the distinct groups from those meetings
+            var groupIds = filteredMeetings
+                .Where(m => m.GroupId.HasValue && m.GroupId.Value > 0)
+                .Select(m => m.GroupId!.Value)
+                .Distinct()
+                .ToList();
+
+            var groups = new List<Group>();
+            foreach (var groupId in groupIds)
+            {
+                var group = await _groupRepository.GetByIdWithMembersAsync(groupId);
+                if (group != null)
+                    groups.Add(group);
+            }
+
+            // Sort by group name
+            groups = groups.OrderBy(g => g.Name).ToList();
 
             MainThread.BeginInvokeOnMainThread(() =>
             {
-
-                foreach (var group in filteredGroups)
+                foreach (var group in groups)
                 {
                     Groups.Add(group);
                 }
@@ -96,10 +109,7 @@ public partial class GroupSelectionViewModel : BaseViewModel
                 IsLoading = false;
             });
 
-
-            //HasGroups = Groups.Count > 0;
-
-            Header = $"{Criteria.Day} {Criteria.MeetingType} Meetings";
+            Header = $"{Criteria.Day} {Criteria.MeetingType} Groups";
         }
         finally
         {
@@ -113,19 +123,9 @@ public partial class GroupSelectionViewModel : BaseViewModel
     {
         if (group == null) return;
 
-        //await ShowFeedback();
-
         var parameters = new Dictionary<string, object> {
-                {"groupId", group.ID.ToString()} };
+            {"groupId", group.Id.ToString()} };
 
-        //await Shell.Current.GoToAsync(nameof(GroupEditPage), parameters);
-        await Shell.Current.GoToAsync(nameof(GsrVerifyPage), parameters);
+        await Shell.Current.GoToAsync(nameof(GroupVerifyPage), parameters);
     }
-
-    //private async Task ShowFeedback()
-    //{
-    //    await Task.Delay(100);
-    //    await Toast.Make("Loading Group...", ToastDuration.Short).Show();
-    //}
-
 }

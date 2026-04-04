@@ -3,7 +3,7 @@
              xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:vm="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
-             xmlns:models="clr-namespace:TheBleedingDeacons.Intergroup.Register.Models"
+             xmlns:entities="clr-namespace:TheBleedingDeacons.Unity.Intergroup.Entities;assembly=TheBleedingDeacons.Unity.Intergroup"
              x:DataType="vm:PositionSelectionViewModel"
              Title="{Binding Title}">
 
@@ -38,7 +38,7 @@
                     <LinearItemsLayout Orientation="Vertical" ItemSpacing="5" />
                 </CollectionView.ItemsLayout>
                 <CollectionView.ItemTemplate>
-                    <DataTemplate x:DataType="models:Position">
+                    <DataTemplate x:DataType="entities:Position">
                         <Border BackgroundColor="White"
                                StrokeShape="RoundRectangle 8"
                                Stroke="{StaticResource Gray200}"
@@ -51,15 +51,32 @@
                             </Border.GestureRecognizers>
 
                             <Grid Padding="15" 
-                                  RowDefinitions="Auto" 
-                                  ColumnDefinitions="*,Auto">
+                                  RowDefinitions="Auto,Auto" 
+                                  ColumnDefinitions="Auto,*">
+
+                                <!-- Registered indicator -->
+                                <Label Grid.Row="0" Grid.RowSpan="2" Grid.Column="0"
+                                       Text="✓"
+                                       FontSize="28"
+                                       FontAttributes="Bold"
+                                       TextColor="#4CAF50"
+                                       VerticalOptions="Center"
+                                       Margin="0,0,12,0"
+                                       IsVisible="{Binding Registered}" />
 
                                 <!-- Position Long Name -->
-                                <Label Grid.Row="0" Grid.Column="0"
-                                       Text="{Binding PositionLongName}"
+                                <Label Grid.Row="0" Grid.Column="1"
+                                       Text="{Binding LongName}"
                                        FontSize="24"
                                        FontAttributes="Bold"
                                        TextColor="{StaticResource Gray900}" />
+
+                                <!-- Registered status text -->
+                                <Label Grid.Row="1" Grid.Column="1"
+                                       Text="Registered"
+                                       FontSize="16"
+                                       TextColor="#4CAF50"
+                                       IsVisible="{Binding Registered}" />
 
                             </Grid>
                         </Border>

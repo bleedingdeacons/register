@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.Maui.Alerts;
+using CommunityToolkit.Maui.Alerts;
 using CommunityToolkit.Maui.Core;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -40,7 +40,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 
             await ShowFeedback();
 
-            var criteria = new GroupCriteria() { MeetingType = isOnline ? "Online" : "Face 2 Face", Day = Day };
+            var criteria = new MeetingCriteria() { MeetingType = isOnline ? "Online" : "Face 2 Face", Day = Day };
 
             var parameters = new Dictionary<string, object> { { "criteria", criteria } };            
 
@@ -57,7 +57,6 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
         private async Task ShowFeedback()
         {
             await Task.Delay(100);
-            //await Toast.Make("Loading Groups...", ToastDuration.Short).Show();            
         }
     }
 }

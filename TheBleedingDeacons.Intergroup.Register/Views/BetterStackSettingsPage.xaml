@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:controls="clr-namespace:TheBleedingDeacons.Intergroup.Register.Controls"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
+             xmlns:tc="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+             x:Class="TheBleedingDeacons.Intergroup.Register.Views.BetterStackSettingsPage"
+             x:DataType="vm:BetterStackSettingsViewModel"
+             Title="Better Stack Settings">
+
+    <ContentPage.Resources>
+        <tc:BoolToObjectConverter x:Key="BoolToColorConverter" TrueObject="Red" FalseObject="Green" />
+        <tc:BoolToObjectConverter x:Key="BoolToTestButtonTextConverter" TrueObject="Testing Connection..." FalseObject="Test Connection" />
+        <tc:BoolToObjectConverter x:Key="BoolToSaveButtonTextConverter" TrueObject="Saving..." FalseObject="Save Settings" />
+    </ContentPage.Resources>
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="15">
+
+            <Label Text="Better Stack Configuration"
+                   FontSize="24"
+                   FontAttributes="Bold"/>
+
+            <!-- Status Message -->
+            <Frame IsVisible="{Binding IsStatusVisible}"
+                   BackgroundColor="{Binding IsStatusError, Converter={StaticResource BoolToColorConverter}}"
+                   BorderColor="Transparent"
+                   Padding="15">
+                <Label Text="{Binding StatusMessage}"
+                       TextColor="White"
+                       FontAttributes="Bold"/>
+            </Frame>
+
+            <!-- Connection Settings -->
+            <Frame BackgroundColor="{AppThemeBinding Light=White, Dark=#2D2D30}"
+                   BorderColor="{AppThemeBinding Light=LightGray, Dark=Gray}">
+                <VerticalStackLayout Spacing="15">
+
+                    <Label Text="Better Stack Connection"
+                           FontSize="18"
+                           FontAttributes="Bold"/>
+
+                    <VerticalStackLayout>
+                        <Label Text="Ingesting Endpoint *"/>
+                        <controls:ClearableEntry Text="{Binding Endpoint}"
+                               Placeholder="e.g. https://in.logs.betterstack.com"
+                               Keyboard="Url"/>
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout>
+                        <Label Text="Source Token *"/>
+                        <controls:ClearableEntry Text="{Binding SourceToken}"
+                               Placeholder="Enter your Better Stack source token"
+                               IsPassword="True"/>
+                    </VerticalStackLayout>
+
+                </VerticalStackLayout>
+            </Frame>
+
+            <!-- Help Section -->
+            <Frame BackgroundColor="{AppThemeBinding Light=#E3F2FD, Dark=#1E3A8A}"
+                   BorderColor="{AppThemeBinding Light=#2196F3, Dark=#3B82F6}">
+                <VerticalStackLayout>
+                    <Label Text="&#x1F4A1; Setup"
+                           FontAttributes="Bold"
+                           TextColor="{AppThemeBinding Light=#1976D2, Dark=#60A5FA}"/>
+                    <Label TextColor="{AppThemeBinding Light=#1565C0, Dark=#93C5FD}">
+                        <Label.FormattedText>
+                            <FormattedString>
+                                <Span Text="• Go to Better Stack → Logs → Sources to create a source"/>
+                                <Span Text="&#x0a;• Copy the Source Token from the source details"/>
+                                <Span Text="&#x0a;• The ingesting endpoint is shown alongside the token"/>
+                                <Span Text="&#x0a;• Use Test Connection to verify your settings"/>
+                            </FormattedString>
+                        </Label.FormattedText>
+                    </Label>
+                </VerticalStackLayout>
+            </Frame>
+
+            <!-- Action Buttons -->
+            <VerticalStackLayout Spacing="10">
+                <Button Text="{Binding IsTesting, Converter={StaticResource BoolToTestButtonTextConverter}}"
+                        Command="{Binding TestConnectionCommand}"
+                        IsEnabled="{Binding IsFormValid}"
+                        BackgroundColor="{AppThemeBinding Light=#4CAF50, Dark=#22C55E}"
+                        TextColor="White">
+                    <Button.Triggers>
+                        <DataTrigger TargetType="Button"
+                                     Binding="{Binding IsTesting}"
+                                     Value="True">
+                            <Setter Property="BackgroundColor" Value="Gray"/>
+                        </DataTrigger>
+                    </Button.Triggers>
+                </Button>
+
+                <Button Text="{Binding IsSaving, Converter={StaticResource BoolToSaveButtonTextConverter}}"
+                        Command="{Binding SaveSettingsCommand}"
+                        IsEnabled="{Binding IsFormValid}"
+                        BackgroundColor="{AppThemeBinding Light=#2196F3, Dark=#3B82F6}"
+                        TextColor="White">
+                    <Button.Triggers>
+                        <DataTrigger TargetType="Button"
+                                     Binding="{Binding IsSaving}"
+                                     Value="True">
+                            <Setter Property="BackgroundColor" Value="Gray"/>
+                        </DataTrigger>
+                    </Button.Triggers>
+                </Button>
+            </VerticalStackLayout>
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

@@ -10,21 +10,15 @@
                   ContentTemplate="{DataTemplate local:MainPage}"
                   Route="MainPage" />
 
-    <!--<ShellContent Title="Groups"
-                  Icon="groups.png"
-                  ContentTemplate="{DataTemplate local:GroupListPage}"
-                  Route="GroupListPage" />-->
-    
+    <ShellContent Title="Admin"
+          Icon="admin.png"
+          ContentTemplate="{DataTemplate local:AdminPage}"
+          Route="AdminPage" />
+
     <ShellContent Title="Settings"
               Icon="settings.png"
               ContentTemplate="{DataTemplate local:SettingsPage}"
               Route="SettingsPage" />
-
-    <ShellContent Title="Import/Export"
-          Icon="settings.png"
-          ContentTemplate="{DataTemplate local:ImportExportPage}"
-          Route="ImportExportPage"
-          IsVisible="False" />
 
     <ShellContent Title="Mail"
           Icon="settings.png"
@@ -43,6 +37,7 @@
       ContentTemplate="{DataTemplate local:EmailStatusPage}"
       Route="EmailStatusPage" 
       IsVisible="False" />
-    
-    
+
+
+
 </Shell>

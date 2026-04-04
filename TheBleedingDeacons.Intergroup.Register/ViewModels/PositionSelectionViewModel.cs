@@ -1,13 +1,11 @@
-﻿using CommunityToolkit.Maui.Alerts;
-using CommunityToolkit.Maui.Core;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Serilog;
 using System.Collections.ObjectModel;
-using TheBleedingDeacons.Intergroup.Register.Models;
-using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Support;
 using TheBleedingDeacons.Intergroup.Register.Views;
+using TheBleedingDeacons.Unity.Intergroup.Entities;
+using TheBleedingDeacons.Unity.Intergroup.Repositories.Interfaces;
 
 namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 {
@@ -45,25 +43,22 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
                 IsLoading = true;
                 IsDataLoaded = false;
 
-
                 await Task.Yield();
 
                 Positions.Clear();
 
-                var allPositions = await _positionRepository.GetAllPositionsAsync();
+                var allPositions = await _positionRepository.GetAllAsync();
 
                 MainThread.BeginInvokeOnMainThread(() =>
                 {
-
-                    foreach (var Position in allPositions)
+                    foreach (var position in allPositions)
                     {
-                        Positions.Add(Position);
+                        Positions.Add(position);
                     }
 
                     IsDataLoaded = true;
                     IsLoading = false;
                 });
-
             }
             finally
             {
@@ -73,23 +68,14 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
         }
 
         [RelayCommand]
-        async Task SelectPosition(Position Position)
+        async Task SelectPosition(Position position)
         {
-            if (Position == null) return;
-
-            await ShowFeedback();
+            if (position == null) return;
 
             var parameters = new Dictionary<string, object> {
-                {"positionId", Position.ID.ToString()} };
+        {"positionId", position.Id.ToString()} };
 
-            await Shell.Current.GoToAsync(nameof(PositionEditPage), parameters);
-
-        }
-
-        private async Task ShowFeedback()
-        {
-            await Task.Delay(100);
-            await Toast.Make("Loading Position...", ToastDuration.Short).Show();
+            await Shell.Current.GoToAsync(nameof(PositionVerifyPage), parameters);
         }
     }
 }

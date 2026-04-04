@@ -5,7 +5,6 @@ using MimeKit;
 using MimeKit.Utils;
 using Serilog;
 using System.Diagnostics;
-using System.Net.NetworkInformation;
 using TheBleedingDeacons.Intergroup.Register.Data;
 using TheBleedingDeacons.Intergroup.Register.Models;
 using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
@@ -79,7 +78,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 
             // Start background processing timer
             _backgroundTimer = new Timer(async _ => await ProcessQueueInBackground(),
-                null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(5));
+                null, ServiceConstants.EmailTimerInitialDelay, ServiceConstants.EmailTimerInterval);
 
             Logger.Information("MailKitService initialized with host: {Host}:{Port}, SSL: {EnableSsl}, MaxRetries: {MaxRetries}",
                 _smtpHost, _smtpPort, _enableSsl, _maxRetries);
@@ -220,7 +219,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 
                 // Configure client settings
                 client.Timeout = _timeoutSeconds * 1000; // MailKit timeout in milliseconds
-                client.CheckCertificateRevocation = false; // Optional: for faster connections
+                client.CheckCertificateRevocation = true;
 
                 // Create cancellation token for the entire operation
                 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(_timeoutSeconds + 10));
@@ -314,6 +313,82 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
             finally
             {
                 _configSemaphore.Release();
+            }
+        }
+
+        /// <summary>
+        /// Resolves MailKit's SecureSocketOptions from the SSL flag and port number.
+        /// Extracted from TrySendEmailWithMailKitAsync for reuse in batch connection setup.
+        /// </summary>
+        private static SecureSocketOptions ResolveSecureSocketOptions(bool enableSsl, int port)
+        {
+            if (!enableSsl) return SecureSocketOptions.None;
+            if (port == 465) return SecureSocketOptions.SslOnConnect;
+            if (port is 587 or 25) return SecureSocketOptions.StartTls;
+            return SecureSocketOptions.Auto;
+        }
+
+        /// <summary>
+        /// Creates, connects, and authenticates a new SmtpClient.
+        /// Used by both single-send and batch-send paths.
+        /// </summary>
+        private async Task<SmtpClient> ConnectSmtpClientAsync(
+            string host, int port, string username, string password,
+            SecureSocketOptions secureSocketOptions)
+        {
+            var client = new SmtpClient
+            {
+                Timeout = _timeoutSeconds * 1000,
+                CheckCertificateRevocation = true
+            };
+
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(_timeoutSeconds + 10));
+            await client.ConnectAsync(host, port, secureSocketOptions, cts.Token);
+            await client.AuthenticateAsync(username, password, cts.Token);
+
+            Logger.Debug("SMTP client connected and authenticated to {Host}:{Port}", host, port);
+            return client;
+        }
+
+        /// <summary>
+        /// Sends a single email using an already-connected SmtpClient (for batch processing).
+        /// Falls back to the per-message TrySendEmailWithMailKitAsync on connection-level errors.
+        /// </summary>
+        private async Task<bool> TrySendEmailWithSharedClientAsync(SmtpClient client, QueuedEmail queuedEmail)
+        {
+            var operationId = Guid.NewGuid().ToString("N")[..8];
+            var stopwatch = Stopwatch.StartNew();
+
+            try
+            {
+                var message = await CreateMimeMessageAsync(queuedEmail);
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(_timeoutSeconds + 10));
+                await client.SendAsync(message, cts.Token);
+
+                stopwatch.Stop();
+
+                queuedEmail.Status = EmailStatus.Sent;
+                queuedEmail.LastAttemptAt = DateTime.UtcNow;
+                await UpdateEmailInDatabase(queuedEmail);
+
+                EmailSent?.Invoke(this, new EmailSentEventArgs
+                {
+                    Email = queuedEmail,
+                    SentAt = DateTime.UtcNow
+                });
+
+                Logger.Information("[{OperationId}] Email sent via shared connection in {ElapsedMs}ms to {To}",
+                    operationId, stopwatch.ElapsedMilliseconds, queuedEmail.To);
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                stopwatch.Stop();
+                Logger.Error(ex, "[{OperationId}] Email send FAILED via shared connection after {ElapsedMs}ms to {To}",
+                    operationId, stopwatch.ElapsedMilliseconds, queuedEmail.To);
+
+                return await HandleEmailFailure(queuedEmail, ex);
             }
         }
 
@@ -521,7 +596,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
                     .Where(e => e.Status == EmailStatus.Pending)
                     .OrderBy(e => e.AttemptCount)
                     .ThenBy(e => e.CreatedAt)
-                    .Take(20) // Process fewer emails at once with MailKit for better stability
+                    .Take(ServiceConstants.EmailBatchSize) // Process emails in controlled batches
                     .ToListAsync();
 
                 if (!pendingEmails.Any())
@@ -536,34 +611,68 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
                 Logger.Information("Processing {EmailCount} pending emails with MailKit (MaxRetries: {MaxRetries})",
                     pendingEmails.Count, _maxRetries);
 
-                foreach (var email in pendingEmails)
+                // ARCH-003: Reuse a single SMTP connection for the entire batch.
+                // This avoids N connect/auth handshakes (each ~2s) for N emails.
+                var (host, port, username, password, enableSsl) = await GetCurrentConfigAsync();
+                var secureSocketOptions = ResolveSecureSocketOptions(enableSsl, port);
+                SmtpClient? sharedClient = null;
+
+                try
                 {
-                    try
+                    sharedClient = await ConnectSmtpClientAsync(host, port, username, password, secureSocketOptions);
+
+                    foreach (var email in pendingEmails)
                     {
-                        if (await TrySendEmailWithMailKitAsync(email))
+                        try
                         {
-                            processedCount++;
+                            // Reconnect if the shared client was disconnected by a previous failure
+                            if (sharedClient == null || !sharedClient.IsConnected)
+                            {
+                                sharedClient?.Dispose();
+                                sharedClient = await ConnectSmtpClientAsync(host, port, username, password, secureSocketOptions);
+                            }
+
+                            if (await TrySendEmailWithSharedClientAsync(sharedClient, email))
+                            {
+                                processedCount++;
+                            }
+                            else
+                            {
+                                failedCount++;
+                            }
+
+                            // Small delay between sends
+                            await Task.Delay(ServiceConstants.EmailInterSendDelayMs);
+
+                            // Check if we should stop processing
+                            if (_isOfflineMode || !await IsNetworkAvailableAsync())
+                            {
+                                Logger.Information("Queue processing interrupted - offline mode or network unavailable");
+                                break;
+                            }
                         }
-                        else
+                        catch (Exception ex) when (ex is MailKit.ServiceNotConnectedException or MailKit.ServiceNotAuthenticatedException)
                         {
+                            Logger.Warning(ex, "SMTP connection lost during batch, reconnecting for email {EmailId}", email.Id);
+                            sharedClient?.Dispose();
+                            sharedClient = null;
                             failedCount++;
                         }
-
-                        // Small delay between sends
-                        await Task.Delay(2000); // 2 seconds between emails for better server handling
-
-                        // Check if we should stop processing
-                        if (_isOfflineMode || !await IsNetworkAvailableAsync())
+                        catch (Exception ex)
                         {
-                            Logger.Information("Queue processing interrupted - offline mode or network unavailable");
-                            break;
+                            Logger.Error(ex, "Unexpected error processing email {EmailId}", email.Id);
+                            failedCount++;
                         }
                     }
-                    catch (Exception ex)
+                }
+                finally
+                {
+                    if (sharedClient is { IsConnected: true })
                     {
-                        Logger.Error(ex, "Unexpected error processing email {EmailId}", email.Id);
-                        failedCount++;
+                        try { await sharedClient.DisconnectAsync(true); }
+                        catch (Exception ex) { Logger.Debug(ex, "Error disconnecting shared SMTP client"); }
                     }
+                    sharedClient?.Dispose();
                 }
 
                 stopwatch.Stop();
@@ -863,18 +972,17 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
             }
         }
 
-        private async Task<bool> IsNetworkAvailableAsync()
+        private Task<bool> IsNetworkAvailableAsync()
         {
             try
             {
-                using var ping = new Ping();
-                var reply = await ping.SendPingAsync("8.8.8.8", 5000);
-                return reply.Status == IPStatus.Success;
+                var isAvailable = Connectivity.Current.NetworkAccess == NetworkAccess.Internet;
+                return Task.FromResult(isAvailable);
             }
             catch (Exception ex)
             {
                 Logger.Debug(ex, "Network availability check failed");
-                return false;
+                return Task.FromResult(false);
             }
         }
 

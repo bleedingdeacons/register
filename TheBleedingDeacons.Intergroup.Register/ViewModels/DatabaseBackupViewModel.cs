@@ -31,7 +31,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
         public DatabaseBackupViewModel()
         {
             LoadLastBackupDate();
-            _ = RefreshDatabaseListAsync(); // Load database files on startup
+            RefreshDatabaseListAsync().SafeFireAndForget("RefreshDatabaseList"); // Load database files on startup
         }
 
         [RelayCommand]

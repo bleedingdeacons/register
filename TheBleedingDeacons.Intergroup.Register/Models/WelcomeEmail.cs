@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -18,8 +18,8 @@ namespace TheBleedingDeacons.Intergroup.Register.Models
         public string StartTime { get; set; }
         public string Email { get; set; }
         public string Mobile { get; set; }
-        public string GroupName { get; set; }
-        public List<GroupContact> GroupContacts { get; set; }
+        public string MeetingName { get; set; }
+        public List<MeetingContact> MeetingContacts { get; set; }
 
     }
 }

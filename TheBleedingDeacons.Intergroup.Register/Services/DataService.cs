@@ -1,61 +1,139 @@
-﻿using Microsoft.EntityFrameworkCore;
 using OfficeOpenXml;
 using Serilog;
-using TheBleedingDeacons.Intergroup.Register.Data;
-using TheBleedingDeacons.Intergroup.Register.Models;
-using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Support;
-using TheBleedingDeacons.Intergroup.Register.Utilities;
+using TheBleedingDeacons.Unity.Intergroup.Entities;
+using TheBleedingDeacons.Unity.Intergroup.Repositories.Interfaces;
+using TheBleedingDeacons.Unity.Intergroup.Services;
 
 namespace TheBleedingDeacons.Intergroup.Register.Services;
 
 /// <summary>
-/// Handles Excel import/export and search operations.
-/// For standard CRUD, use IGroupRepository and IPositionRepository directly.
+/// Handles Unity sync, Excel export, and search operations.
+/// All domain data access goes through Unity.Data repositories.
 /// </summary>
 public class DataService
 {
     private static readonly ILogger Logger = AppLogger.ForContext<DataService>();
 
-    private readonly RegisterContext _context;
-    private readonly IGroupRepository _groupRepository;
+    private readonly UnitySyncService _syncService;
+    private readonly SnapshotService _snapshotService;
+    private readonly ReconciliationService _reconciliationService;
+    private readonly IMeetingRepository _meetingRepository;
     private readonly IPositionRepository _positionRepository;
 
-    public DataService(RegisterContext context, IGroupRepository groupRepository, IPositionRepository positionRepository)
+    public DataService(
+        UnitySyncService syncService,
+        SnapshotService snapshotService,
+        ReconciliationService reconciliationService,
+        IMeetingRepository meetingRepository,
+        IPositionRepository positionRepository)
     {
-        _context = context;
-        _groupRepository = groupRepository;
+        _syncService = syncService;
+        _snapshotService = snapshotService;
+        _reconciliationService = reconciliationService;
+        _meetingRepository = meetingRepository;
         _positionRepository = positionRepository;
     }
 
     // ====================================================================
-    // Import/Export Methods
+    // Import (Sync) Methods
     // ====================================================================
 
-    public async Task ImportFromExcel(Stream excelStream)
+    public async Task<(int Meetings, int Positions, int Members, int Groups, int Contacts, int IntergroupMeetings)> ImportFromUnityAsync(
+        CancellationToken cancellationToken = default)
     {
         try
         {
-            RegisterData data = ExcelSerializer.DeserializeFromExcel(excelStream);
+            Logger.Information("Starting sync from Unity API");
 
-            await _context.Groups.ExecuteDeleteAsync();
-            await _context.Positions.ExecuteDeleteAsync();
+            var result = await _syncService.SyncAsync(cancellationToken);
 
-            await _context.Groups.AddRangeAsync(data.Groups);
-            await _context.Positions.AddRangeAsync(data.Positions);
+            Logger.Information(
+                "Unity sync complete: {Groups} groups, {Meetings} meetings, {Members} members, {Positions} positions, {Contacts} contacts, {IntergroupMeetings} intergroup meetings",
+                result.Groups, result.Meetings, result.Members, result.Positions, result.Contacts, result.IntergroupMeetings);
 
-            await _context.SaveChangesAsync();
-
-            // Invalidate all caches after bulk import
-            await _groupRepository.InvalidateAllGroupsCacheAsync();
-            await _positionRepository.InvalidateAllPositionsCacheAsync();
+            return (result.Meetings, result.Positions, result.Members, result.Groups, result.Contacts, result.IntergroupMeetings);
         }
         catch (Exception ex)
         {
-            Logger.Error(ex, "Import from Excel Failed!");
+            Logger.Error(ex, "Sync from Unity API failed");
             throw;
         }
     }
+
+    /// <summary>
+    /// Performs the initial Unity sync and captures a baseline snapshot.
+    /// Call this at the start of a session (e.g. app launch or before an
+    /// intergroup meeting) to establish the "clean" state.
+    ///
+    /// Flow: Sync all data from Unity → Snapshot the result.
+    /// </summary>
+    public async Task<(int Meetings, int Positions, int Members, int Groups, int Contacts, int IntergroupMeetings)> ImportWithSnapshotAsync(
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            Logger.Information("Starting Unity sync with snapshot capture");
+
+            var sync = await _syncService.SyncAsync(cancellationToken);
+            var snap = await _snapshotService.CaptureAsync(cancellationToken);
+
+            Logger.Information(
+                "Unity sync + snapshot complete: {Groups} groups, {Meetings} meetings, {Members} members, {Positions} positions, {Contacts} contacts, {IntergroupMeetings} IG meetings. " +
+                "Snapshot: {SnapGroups} groups, {SnapMembers} members, {SnapPositions} positions",
+                sync.Groups, sync.Meetings, sync.Members, sync.Positions, sync.Contacts, sync.IntergroupMeetings,
+                snap.Groups, snap.Members, snap.Positions);
+
+            return (sync.Meetings, sync.Positions, sync.Members, sync.Groups, sync.Contacts, sync.IntergroupMeetings);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Unity sync with snapshot failed");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Detects local changes, pushes them to the Unity API in the correct
+    /// dependency order, then re-syncs and re-snapshots.
+    ///
+    /// Flow: Detect → Push creates → Push updates → Push registrations → Re-sync → Re-snapshot.
+    /// </summary>
+    public async Task<(int Meetings, int Positions, int Members, int Groups, int Contacts, int IntergroupMeetings,
+                        int Created, int Modified, int Registered, int ApiErrors, int ApiWarnings)> ImportWithReconciliationAsync(
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            Logger.Information("Starting Unity reconciliation");
+
+            var result = await _reconciliationService.ReconcileAsync(cancellationToken);
+            var sync = result.Resync;
+
+            Logger.Information(
+                "Reconciliation complete: {Created} members created, {Modified} modified, " +
+                "{RegGroups} groups registered, {RegPos} positions registered, {Errors} errors, {Warnings} warnings. " +
+                "Re-synced {Groups} groups, {Meetings} meetings, {Members} members, {Positions} positions",
+                result.CreatedMembers, result.ModifiedMembers,
+                result.RegisteredGroups, result.RegisteredPositions, result.ApiErrors, result.ApiWarnings,
+                sync.Groups, sync.Meetings, sync.Members, sync.Positions);
+
+            return (sync.Meetings, sync.Positions, sync.Members, sync.Groups,
+                    sync.Contacts, sync.IntergroupMeetings,
+                    result.CreatedMembers, result.ModifiedMembers,
+                    result.RegisteredGroups + result.RegisteredPositions,
+                    result.ApiErrors, result.ApiWarnings);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Unity reconciliation failed");
+            throw;
+        }
+    }
+
+    // ====================================================================
+    // Export Methods
+    // ====================================================================
 
     public async Task<byte[]?> ExportToExcel()
     {
@@ -64,120 +142,88 @@ public class DataService
             ExcelPackage.License.SetNonCommercialOrganization("AABristol");
             using var package = new ExcelPackage();
 
-            // Sort By Day Start on Monday
-            var groups = await _groupRepository.GetAllGroupsAsync();
+            var meetings = await _meetingRepository.GetAllAsync();
 
-            groups = groups.OrderBy(g =>
+            // Sort by Day, start on Monday
+            meetings = meetings.OrderBy(m =>
             {
-                if (Enum.TryParse<DayOfWeek>(g.Day, out var dayOfWeek))
+                if (Enum.TryParse<DayOfWeek>(m.DayOfWeek, out var dayOfWeek))
                     return dayOfWeek == DayOfWeek.Sunday ? 6 : (int)dayOfWeek - 1;
                 else
                     return int.MaxValue;
-            }).ThenBy(g => g.Name).ToList();
+            }).ThenBy(m => m.Name).ToList();
 
-            if (groups.Count > 0)
+            if (meetings.Count > 0)
             {
-                var groupsWorksheet = package.Workbook.Worksheets.Add("Groups");
+                var ws = package.Workbook.Worksheets.Add("Meetings");
 
-                // Add headers for Groups
-                groupsWorksheet.Cells[1, 1].Value = "ID";
-                groupsWorksheet.Cells[1, 2].Value = "Day";
-                groupsWorksheet.Cells[1, 3].Value = "Time";
-                groupsWorksheet.Cells[1, 4].Value = "End Time";
-                groupsWorksheet.Cells[1, 5].Value = "Name";
-                groupsWorksheet.Cells[1, 6].Value = "Gsr Name";
-                groupsWorksheet.Cells[1, 7].Value = "Gsr Email Personal";
-                groupsWorksheet.Cells[1, 8].Value = "Gsr Phone";
-                groupsWorksheet.Cells[1, 9].Value = "Group Generic Email";
-                groupsWorksheet.Cells[1, 10].Value = "Using Generic";
-                groupsWorksheet.Cells[1, 11].Value = "Location";
-                groupsWorksheet.Cells[1, 12].Value = "Address";
-                groupsWorksheet.Cells[1, 13].Value = "Contact 1 Name";
-                groupsWorksheet.Cells[1, 14].Value = "Contact 1 Email";
-                groupsWorksheet.Cells[1, 15].Value = "Contact 1 Phone";
-                groupsWorksheet.Cells[1, 16].Value = "Contact 2 Name";
-                groupsWorksheet.Cells[1, 17].Value = "Contact 2 Email";
-                groupsWorksheet.Cells[1, 18].Value = "Contact 2 Phone";
-                groupsWorksheet.Cells[1, 19].Value = "Contact 3 Name";
-                groupsWorksheet.Cells[1, 20].Value = "Contact 3 Email";
-                groupsWorksheet.Cells[1, 21].Value = "Contact 3 Phone";
-                groupsWorksheet.Cells[1, 22].Value = "Updated";
-                groupsWorksheet.Cells[1, 23].Value = "Attended";
-                groupsWorksheet.Cells[1, 24].Value = "Proxy Attended";
-                groupsWorksheet.Cells[1, 25].Value = "Proxy Name";
-                groupsWorksheet.Cells[1, 26].Value = "Proxy Email";
+                ws.Cells[1, 1].Value = "ID";
+                ws.Cells[1, 2].Value = "Day";
+                ws.Cells[1, 3].Value = "Time";
+                ws.Cells[1, 4].Value = "End Time";
+                ws.Cells[1, 5].Value = "Name";
+                ws.Cells[1, 6].Value = "GSR Name";
+                ws.Cells[1, 7].Value = "GSR Email";
+                ws.Cells[1, 8].Value = "GSR Phone";
+                ws.Cells[1, 9].Value = "Location";
+                ws.Cells[1, 10].Value = "Address";
+                ws.Cells[1, 11].Value = "Types";
+                ws.Cells[1, 12].Value = "Online";
 
-                for (int i = 0; i < groups.Count; i++)
+                for (int i = 0; i < meetings.Count; i++)
                 {
                     int row = i + 2;
-                    var group = groups[i];
+                    var m = meetings[i];
+                    var gsrs = m.Group?.Members.Where(mb => mb.IsGsr).ToList() ?? [];
 
-                    groupsWorksheet.Cells[row, 1].Value = group.ID;
-                    groupsWorksheet.Cells[row, 2].Value = group.Day;
-                    groupsWorksheet.Cells[row, 3].Value = group.Time;
-                    groupsWorksheet.Cells[row, 4].Value = group.EndTime;
-                    groupsWorksheet.Cells[row, 5].Value = group.Name;
-                    groupsWorksheet.Cells[row, 6].Value = group.GsrName;
-                    groupsWorksheet.Cells[row, 7].Value = group.GsrEmailPersonal;
-                    groupsWorksheet.Cells[row, 8].Value = group.GsrPhone;
-                    groupsWorksheet.Cells[row, 9].Value = group.GroupGenericEmail;
-                    groupsWorksheet.Cells[row, 10].Value = group.UsingGeneric;
-                    groupsWorksheet.Cells[row, 11].Value = group.Location;
-                    groupsWorksheet.Cells[row, 12].Value = group.Address;
-                    groupsWorksheet.Cells[row, 13].Value = group.Contact1Name;
-                    groupsWorksheet.Cells[row, 14].Value = group.Contact1Email;
-                    groupsWorksheet.Cells[row, 15].Value = group.Contact1Phone;
-                    groupsWorksheet.Cells[row, 16].Value = group.Contact2Name;
-                    groupsWorksheet.Cells[row, 17].Value = group.Contact2Email;
-                    groupsWorksheet.Cells[row, 18].Value = group.Contact2Phone;
-                    groupsWorksheet.Cells[row, 19].Value = group.Contact3Name;
-                    groupsWorksheet.Cells[row, 20].Value = group.Contact3Email;
-                    groupsWorksheet.Cells[row, 21].Value = group.Contact3Phone;
-                    groupsWorksheet.Cells[row, 22].Value = group.Updated?.ToString("yyyy-MM-dd HH:mm:ss");
-                    groupsWorksheet.Cells[row, 23].Value = group.Attended;
-                    groupsWorksheet.Cells[row, 24].Value = group.ProxyAttendance;
-                    groupsWorksheet.Cells[row, 25].Value = group.ProxyName;
-                    groupsWorksheet.Cells[row, 26].Value = group.ProxyEmail;
+                    ws.Cells[row, 1].Value = m.Id;
+                    ws.Cells[row, 2].Value = m.DayOfWeek;
+                    ws.Cells[row, 3].Value = m.Time;
+                    ws.Cells[row, 4].Value = m.EndTime;
+                    ws.Cells[row, 5].Value = m.Name;
+                    ws.Cells[row, 6].Value = string.Join("; ", gsrs.Select(g => g.AnonymousName));
+                    ws.Cells[row, 7].Value = string.Join("; ", gsrs.Select(g => g.PersonalEmail ?? ""));
+                    ws.Cells[row, 8].Value = string.Join("; ", gsrs.Select(g => g.MobileNumber ?? ""));
+                    ws.Cells[row, 9].Value = m.LocationName;
+                    ws.Cells[row, 10].Value = m.Address;
+                    ws.Cells[row, 11].Value = m.Types;
+                    ws.Cells[row, 12].Value = m.IsOnline;
                 }
 
-                groupsWorksheet.Cells.AutoFitColumns();
+                ws.Cells.AutoFitColumns();
             }
 
-            // Export Positions
-            var positions = await _positionRepository.GetAllPositionsAsync();
+            var positions = await _positionRepository.GetAllAsync();
             if (positions.Count > 0)
             {
-                var positionsWorksheet = package.Workbook.Worksheets.Add("Positions");
+                var ws = package.Workbook.Worksheets.Add("Positions");
 
-                positionsWorksheet.Cells[1, 1].Value = "ID";
-                positionsWorksheet.Cells[1, 2].Value = "Position Name";
-                positionsWorksheet.Cells[1, 3].Value = "Position Long Name";
-                positionsWorksheet.Cells[1, 4].Value = "Position Generic Email";
-                positionsWorksheet.Cells[1, 5].Value = "Member Anonymous Name";
-                positionsWorksheet.Cells[1, 6].Value = "Member Personal Email";
-                positionsWorksheet.Cells[1, 7].Value = "Member Mobile";
-                positionsWorksheet.Cells[1, 8].Value = "Position Duration";
-                positionsWorksheet.Cells[1, 9].Value = "Started Service";
-                positionsWorksheet.Cells[1, 10].Value = "Attended";
+                ws.Cells[1, 1].Value = "ID";
+                ws.Cells[1, 2].Value = "Position Name";
+                ws.Cells[1, 3].Value = "Long Name";
+                ws.Cells[1, 4].Value = "Email";
+                ws.Cells[1, 5].Value = "Holder";
+                ws.Cells[1, 6].Value = "Holder Email";
+                ws.Cells[1, 7].Value = "Holder Mobile";
+                ws.Cells[1, 8].Value = "Term Years";
 
                 for (int i = 0; i < positions.Count; i++)
                 {
                     int row = i + 2;
-                    var position = positions[i];
+                    var p = positions[i];
+                    var holder = p.Holders.FirstOrDefault();
 
-                    positionsWorksheet.Cells[row, 1].Value = position.ID;
-                    positionsWorksheet.Cells[row, 2].Value = position.PositionName;
-                    positionsWorksheet.Cells[row, 3].Value = position.PositionLongName;
-                    positionsWorksheet.Cells[row, 4].Value = position.PositionGenericEmail;
-                    positionsWorksheet.Cells[row, 5].Value = position.MemberAnonymousName;
-                    positionsWorksheet.Cells[row, 6].Value = position.MemberPersonalEmail;
-                    positionsWorksheet.Cells[row, 7].Value = position.MemberMobile;
-                    positionsWorksheet.Cells[row, 8].Value = position.PositionDuration;
-                    positionsWorksheet.Cells[row, 9].Value = position.StartedService?.ToString("yyyy-MM-dd");
-                    positionsWorksheet.Cells[row, 10].Value = position.Attended;
+                    ws.Cells[row, 1].Value = p.Id;
+                    ws.Cells[row, 2].Value = p.ShortDescription;
+                    ws.Cells[row, 3].Value = p.LongName;
+                    ws.Cells[row, 4].Value = p.Email;
+                    ws.Cells[row, 5].Value = holder?.AnonymousName;
+                    ws.Cells[row, 6].Value = holder?.PersonalEmail;
+                    ws.Cells[row, 7].Value = holder?.MobileNumber;
+                    ws.Cells[row, 8].Value = p.TermYears;
                 }
 
-                positionsWorksheet.Cells.AutoFitColumns();
+                ws.Cells.AutoFitColumns();
             }
 
             return await package.GetAsByteArrayAsync();
@@ -190,29 +236,12 @@ public class DataService
     }
 
     // ====================================================================
-    // Search Methods (kept here as they span the DbContext directly)
+    // Search Methods
     // ====================================================================
 
-    public async Task<List<Group>> SearchGroups(string searchTerm)
-    {
-        return await _context.Groups
-            .Where(g => (g.Name ?? "").Contains(searchTerm) ||
-                       (g.Day ?? "").Contains(searchTerm) ||
-                       (g.Contact1Name ?? "").Contains(searchTerm) ||
-                       (g.Contact2Name ?? "").Contains(searchTerm) ||
-                       (g.Contact3Name ?? "").Contains(searchTerm))
-            .OrderBy(g => g.Day)
-            .ThenBy(g => g.Name)
-            .ToListAsync();
-    }
+    public async Task<List<Meeting>> SearchMeetings(string searchTerm) =>
+        await _meetingRepository.SearchAsync(searchTerm);
 
-    public async Task<List<Position>> SearchPositions(string searchTerm)
-    {
-        return await _context.Positions
-            .Where(p => (p.PositionName ?? "").Contains(searchTerm) ||
-                       (p.PositionLongName ?? "").Contains(searchTerm) ||
-                       (p.MemberAnonymousName ?? "").Contains(searchTerm))
-            .OrderBy(p => p.PositionName)
-            .ToListAsync();
-    }
+    public async Task<List<Position>> SearchPositions(string searchTerm) =>
+        await _positionRepository.SearchAsync(searchTerm);
 }

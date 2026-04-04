@@ -3,7 +3,7 @@
              xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:vm="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
-             xmlns:models="clr-namespace:TheBleedingDeacons.Intergroup.Register.Models"
+             xmlns:entities="clr-namespace:TheBleedingDeacons.Unity.Intergroup.Entities;assembly=TheBleedingDeacons.Unity.Intergroup"
              x:DataType="vm:GroupSelectionViewModel"
              Title="{Binding Title}">
 
@@ -19,7 +19,7 @@
                 <StackLayout Orientation="Horizontal" 
                             HorizontalOptions="CenterAndExpand"
                             Spacing="10">
-                    <Label Text="📅" 
+                    <Label Text="👥" 
                            FontSize="24" 
                            VerticalOptions="Center" />
                     <Label Text="{Binding Header}" 
@@ -38,7 +38,7 @@
                     <LinearItemsLayout Orientation="Vertical" ItemSpacing="5" />
                 </CollectionView.ItemsLayout>
                 <CollectionView.ItemTemplate>
-                    <DataTemplate x:DataType="models:Group">
+                    <DataTemplate x:DataType="entities:Group">
                         <Border BackgroundColor="White"
                                StrokeShape="RoundRectangle 8"
                                Stroke="{StaticResource Gray200}"
@@ -51,96 +51,59 @@
                             </Border.GestureRecognizers>
 
                             <Grid Padding="15" 
-                                  RowDefinitions="Auto,Auto,Auto,Auto" 
-                                  ColumnDefinitions="*,Auto">
+                                  RowDefinitions="Auto,Auto" 
+                                  ColumnDefinitions="Auto,*,Auto">
+
+                                <!-- Registered indicator -->
+                                <Label Grid.Row="0" Grid.RowSpan="2" Grid.Column="0"
+                                       Text="✓"
+                                       FontSize="28"
+                                       FontAttributes="Bold"
+                                       TextColor="#4CAF50"
+                                       VerticalOptions="Center"
+                                       Margin="0,0,12,0"
+                                       IsVisible="{Binding Registered}" />
 
                                 <!-- Group Name -->
-                                <Label Grid.Row="0" Grid.Column="0"
+                                <Label Grid.Row="0" Grid.Column="1"
                                        Text="{Binding Name}"
                                        FontSize="24"
                                        FontAttributes="Bold"
                                        TextColor="{StaticResource Gray900}" />
 
-                                <Label Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
-                                       Text="{Binding Time}"
-                                       FontSize="18"                                       
+                                <!-- Registered status text -->
+                                <Label Grid.Row="1" Grid.Column="1"
+                                       Text="Registered"
+                                       FontSize="16"
+                                       TextColor="#4CAF50"
+                                       IsVisible="{Binding Registered}" />
+
+                                <!-- Arrow indicator -->
+                                <Label Grid.Row="0" Grid.RowSpan="2" Grid.Column="2"
+                                       Text="›"
+                                       FontSize="32"
                                        TextColor="{StaticResource Primary}"
-                                       Margin="0,5,0,0" />
-
-                                <StackLayout Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
-                                           Orientation="Horizontal"
-                                           Spacing="5"
-                                           Margin="0,8,0,0">
-                                    <Label Text="Location:"
-                                           FontSize="18"
-                                           FontAttributes="Bold"
-                                           TextColor="{StaticResource Gray600}" />
-                                    <Label Text="{Binding Location}"
-                                           FontSize="18"
-                                           TextColor="{StaticResource Gray700}" />
-                                    <Label Text="Address:"
-                                           FontSize="18"
-                                           FontAttributes="Bold"
-                                           TextColor="{StaticResource Gray600}" />
-                                    <Label Text="{Binding Address}"
-                                           FontSize="18"
-                                           TextColor="{StaticResource Gray700}" />
-                                </StackLayout>
-
-                                <!-- Contact Info -->
-                                <StackLayout Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2"
-                                           Spacing="2"
-                                           Margin="0,8,0,0">
-
-                                </StackLayout>
+                                       VerticalOptions="Center" />
 
                             </Grid>
                         </Border>
                     </DataTemplate>
                 </CollectionView.ItemTemplate>
 
+                <!-- Empty state -->
+                <CollectionView.EmptyView>
+                    <StackLayout Padding="40"
+                                VerticalOptions="Center"
+                                HorizontalOptions="Center">
+                        <Label Text="No groups found for this day and type."
+                               FontSize="18"
+                               HorizontalOptions="Center"
+                               HorizontalTextAlignment="Center"
+                               TextColor="{StaticResource Gray500}" />
+                    </StackLayout>
+                </CollectionView.EmptyView>
+
             </CollectionView>
-
-            <!-- Empty state -->
-            <StackLayout Grid.Row="2"
-                        Padding="40"
-                        VerticalOptions="Center"
-                        IsVisible="{Binding IsDataLoaded, Converter={StaticResource InvertedBoolConverter}}">
-
-                <!--<Label Text="📋"
-                       FontSize="64"
-                       HorizontalOptions="Center"
-                       TextColor="{StaticResource Gray300}" />
-
-                <Label Text="No Groups Found"
-                       FontSize="20"
-                       FontAttributes="Bold"
-                       HorizontalOptions="Center"
-                       TextColor="{StaticResource Gray500}"
-                       Margin="0,20,0,0" />-->
-
-                <!--<Label FontSize="16"
-                       HorizontalOptions="Center"
-                       TextColor="{StaticResource Gray400}"
-                       HorizontalTextAlignment="Center"
-                       Margin="0,10,0,20">
-                    <Label.Text>
-                        <MultiBinding StringFormat="No groups found for {0}.{1}Add a new group or import from Excel.">
-                            <Binding Path="SelectedDay" />
-                            <Binding Source="&#x0A;" />
-                        </MultiBinding>
-                    </Label.Text>
-                </Label>-->
-
-                <!--<Button Text="Add First Group"
-                        Command="{Binding AddGroupCommand}"
-                        BackgroundColor="{StaticResource Primary}"
-                        TextColor="White"
-                        FontSize="16"
-                        HorizontalOptions="Center"
-                        Padding="30,15" />-->
-
-            </StackLayout>
 
         </Grid>
 

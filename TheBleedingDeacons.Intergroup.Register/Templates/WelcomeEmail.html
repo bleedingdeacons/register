@@ -82,7 +82,7 @@
         <div class="content">
             <h2>Hello {{FirstName}},</h2>
 
-            <p>We have the following information for your group <strong>{{GroupName}}</strong>:</p>
+            <p>We have the following information for your meeting <strong>{{MeetingName}}</strong>:</p>
 
             <div class="info-section">
                 <p><strong>🕐 Time:</strong> {{StartTime}}</p>
@@ -92,7 +92,7 @@
 
             <h3>📋 Group Contacts:</h3>
 
-            {{#if GroupContacts}}
+            {{#if MeetingContacts}}
             <table>
                 <thead>
                     <tr>
@@ -102,7 +102,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {{#each GroupContacts}}
+                    {{#each MeetingContacts}}
                     <tr>
                         <td><strong>{{Name}}</strong></td>
                         <td>{{Email}}</td>

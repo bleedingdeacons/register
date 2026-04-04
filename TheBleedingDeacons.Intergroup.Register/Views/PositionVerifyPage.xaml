@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage x:Class="TheBleedingDeacons.Intergroup.Register.Views.PositionVerifyPage"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:controls="clr-namespace:TheBleedingDeacons.Intergroup.Register.Controls"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodels="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
+             xmlns:entities="clr-namespace:TheBleedingDeacons.Unity.Intergroup.Entities;assembly=TheBleedingDeacons.Unity.Intergroup"
+             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+             x:DataType="viewmodels:VerifyPositionViewModel"
+             Title="{Binding Title}">
+
+    <ContentPage.Behaviors>
+        <toolkit:StatusBarBehavior StatusBarColor="{AppThemeBinding Light=White, Dark=Black}" 
+                                   StatusBarStyle="{AppThemeBinding Light=DarkContent, Dark=LightContent}" />
+    </ContentPage.Behaviors>
+
+    <Grid>
+        <!-- Loading Indicator -->
+        <ActivityIndicator IsVisible="{Binding IsLoading}" 
+                          IsRunning="{Binding IsLoading}"
+                          HorizontalOptions="Center"
+                          VerticalOptions="Center"
+                          Scale="1.5"
+                          Color="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"/>
+
+        <!-- Main Content -->
+        <ScrollView IsVisible="{Binding IsLoading, Converter={StaticResource InvertedBoolConverter}}">
+            <StackLayout Padding="20" Spacing="10">
+
+                <!-- Position Name -->
+                <Label Text="{Binding Position.ShortDescription}"
+                       Style="{StaticResource HeaderLabelStyle}"/>
+
+                <!-- Holder Count -->
+                <Label Text="{Binding HolderCountText}"
+                       FontSize="18"
+                       FontAttributes="Italic"
+                       TextColor="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource Gray400}}"
+                       Margin="0,0,0,5"/>
+
+                <!-- Holder Member List -->
+                <CollectionView ItemsSource="{Binding ActiveHolders}"
+                                SelectionMode="None"
+                                IsVisible="{Binding HasActiveHolders}">
+                    <CollectionView.ItemsLayout>
+                        <LinearItemsLayout Orientation="Vertical" ItemSpacing="5" />
+                    </CollectionView.ItemsLayout>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="entities:Member">
+                            <Border Style="{StaticResource MemberCardStyle}">
+                                <StackLayout Spacing="4">
+                                    <!-- Member Name -->
+                                    <Label Text="Name"
+                                           Style="{StaticResource FieldLabelStyle}"/>
+                                    <Label Text="{Binding AnonymousName}"
+                                           Style="{StaticResource ValueLabelStyle}"/>
+
+                                    <!-- Member Email -->
+                                    <Label Text="Personal Email"
+                                           Style="{StaticResource FieldLabelStyle}"/>
+                                    <Label Text="{Binding PersonalEmail}"
+                                           Style="{StaticResource ValueLabelStyle}"/>
+
+                                    <!-- Member Phone (Obscured) -->
+                                    <Label Text="Mobile Phone"
+                                           Style="{StaticResource FieldLabelStyle}"/>
+                                    <Label Text="{Binding MobileNumber, Converter={StaticResource ObscurePhoneNumber}}"
+                                           Style="{StaticResource ValueLabelStyle}"/>
+
+                                    <!-- Rotation Date -->
+                                    <Label Text="Rotation Date"
+                                           Style="{StaticResource FieldLabelStyle}"/>
+                                    <Label Text="{Binding IntergroupPositionRotation}"
+                                           Style="{StaticResource ValueLabelStyle}"/>
+                                </StackLayout>
+                            </Border>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+
+                <!-- Empty State: no active holders -->
+                <Border IsVisible="{Binding HasActiveHolders, Converter={StaticResource InvertedBoolConverter}}"
+                        Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}"
+                        StrokeThickness="1"
+                        StrokeShape="RoundRectangle 10"
+                        Padding="20"
+                        Margin="0,10,0,10"
+                        BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray900}}">
+                    <StackLayout HorizontalOptions="Center" Spacing="10">
+                        <Label Text="No Position Holders"
+                               FontSize="20"
+                               FontAttributes="Bold"
+                               HorizontalOptions="Center"
+                               TextColor="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource Gray400}}"/>
+                        <Label Text="Tap 'No' below to add a position holder."
+                               FontSize="16"
+                               HorizontalOptions="Center"
+                               HorizontalTextAlignment="Center"
+                               TextColor="{AppThemeBinding Light={StaticResource Gray400}, Dark={StaticResource Gray500}}"/>
+                    </StackLayout>
+                </Border>
+
+                <!-- Standing In Section with Border -->
+                <Border Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}"
+                        StrokeThickness="2"
+                        StrokeShape="RoundRectangle 10"
+                        Padding="15"
+                        Margin="0,10,0,15"
+                        BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray900}}">
+                    <StackLayout Spacing="10">
+                        <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="10">
+                            <Label Text="Are Standing In?" 
+                                   FontSize="20"
+                                   FontAttributes="Bold"
+                                   TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}"
+                                   VerticalOptions="Center"
+                                   Margin="0"
+                                   Grid.Column="0"/>
+                            <CheckBox x:Name="StandingInCheckBox" 
+                                      IsChecked="{Binding StandingIn, Mode=TwoWay}"
+                                      Grid.Column="1"
+                                      VerticalOptions="Center"/>
+                        </Grid>
+
+                        <!-- Stand-in Name and Email Entries -->
+                        <StackLayout IsVisible="{Binding Source={x:Reference StandingInCheckBox}, Path=IsChecked}"
+                                    Spacing="5">
+                            <Label Text="Your Name" 
+                                   FontSize="20"
+                                   FontAttributes="Bold"
+                                   TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}"
+                                   Margin="0"/>
+                            <controls:ClearableEntry x:Name="StandingInNameEntry"
+                                       Text="{Binding StandinName}"
+                                       Placeholder="Enter your name"
+                                       Keyboard="Text"
+                                       FontSize="18"
+                                       BackgroundColor="{AppThemeBinding Light=White, Dark={StaticResource Gray800}}"
+                                       TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"/>
+
+                            <Label Text="Your Email" 
+                                   FontSize="20"
+                                   FontAttributes="Bold"
+                                   TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}"
+                                   Margin="0"/>
+                            <controls:ClearableEntry x:Name="StandingInEmailEntry"
+                                       Text="{Binding StandinEmail}"
+                                       Placeholder="Enter your email address"
+                                       Keyboard="Email"
+                                       FontSize="18"
+                                       BackgroundColor="{AppThemeBinding Light=White, Dark={StaticResource Gray800}}"
+                                       TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"/>
+                        </StackLayout>
+                    </StackLayout>
+                </Border>
+
+                <Label FontSize="32"
+                       FontAttributes="Bold"
+                       Text="Is this correct?"
+                       HorizontalOptions="Center"
+                       Margin="0,10,0,0"/>
+
+                <!-- Verify Mode Action Buttons -->
+                <FlexLayout Direction="Row" 
+                            JustifyContent="SpaceEvenly" 
+                            AlignItems="Center"
+                            Margin="0,20,0,0">
+
+                    <Button Text="Yes" 
+                            Command="{Binding YesCommand}"
+                            IsEnabled="{Binding CanRegister}"
+                            Style="{StaticResource PrimaryButtonStyle}"
+                            TextColor="White"
+                            CornerRadius="25"
+                            HeightRequest="100"
+                            FlexLayout.Grow="1"
+                            Margin="0,0,7.5,0"/>
+
+                    <Button Text="No" 
+                            Command="{Binding NoCommand}"
+                            Style="{StaticResource PrimaryButtonStyle}"
+                            TextColor="White"
+                            CornerRadius="25"
+                            HeightRequest="100"
+                            FlexLayout.Grow="1"
+                            Margin="7.5,0,0,0"/>
+                </FlexLayout>
+
+            </StackLayout>
+        </ScrollView>
+    </Grid>
+
+</ContentPage>

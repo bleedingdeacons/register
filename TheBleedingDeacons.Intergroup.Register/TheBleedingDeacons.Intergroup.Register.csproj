@@ -27,6 +27,7 @@
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
 		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
 		<DefaultLanguage>en-gb</DefaultLanguage>
+		<Copyright>Don't take yourself too damn seriously</Copyright>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -58,8 +59,8 @@
 		</PackageReference>
 		<PackageReference Include="EPPlus" Version="8.2.0" />
 		<PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="9.0.9" />
-		<PackageReference Include="Microsoft.Maui.Controls" Version="9.0.110" />
-		<PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="9.0.110" />
+		<PackageReference Include="Microsoft.Maui.Controls" Version="9.0.120" />
+		<PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="9.0.120" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.9" />
 		<PackageReference Include="CommunityToolkit.Maui" Version="12.2.0" />
 		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
@@ -68,6 +69,7 @@
 		<PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
 		<PackageReference Include="Serilog.Sinks.Debug" Version="3.0.0" />
 		<PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+		<PackageReference Include="BetterStack.Logs.Serilog" Version="1.1.0" />
 		<PackageReference Include="SonarAnalyzer.CSharp" Version="10.15.0.120848">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -89,16 +91,10 @@
 		<MauiXaml Update="Views\EmailStatusPage.xaml">
 			<Generator>MSBuild:Compile</Generator>
 		</MauiXaml>
-		<MauiXaml Update="Views\GroupEditPage.xaml">
-			<Generator>MSBuild:Compile</Generator>
-		</MauiXaml>
 		<MauiXaml Update="Views\GroupSelectionPage.xaml">
 			<Generator>MSBuild:Compile</Generator>
 		</MauiXaml>
-		<MauiXaml Update="Views\GroupView.xaml">
-			<Generator>MSBuild:Compile</Generator>
-		</MauiXaml>
-		<MauiXaml Update="Views\GsrEditPage.xaml">
+		<MauiXaml Update="Views\GroupEditPage.xaml">
 			<Generator>MSBuild:Compile</Generator>
 		</MauiXaml>
 		<MauiXaml Update="Views\PositionEditPage.xaml">
@@ -106,6 +102,9 @@
 		</MauiXaml>
 		<MauiXaml Update="Views\PositionSelectionPage.xaml">
 			<Generator>MSBuild:Compile</Generator>
+		</MauiXaml>
+		<MauiXaml Update="Views\PositionVerifyPage.xaml">
+		  <Generator>MSBuild:Compile</Generator>
 		</MauiXaml>
 		<MauiXaml Update="Views\SettingsPage.xaml">
 			<Generator>MSBuild:Compile</Generator>
@@ -116,30 +115,26 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<Folder Include="Resources\Images\" />
+		<Folder Include="Data\Configurations\" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\TheBleedingDeacons.Unity.Intergroup\TheBleedingDeacons.Unity.Intergroup.csproj" />
 	</ItemGroup>
 
 	<!-- TODO: Re-add Integrity.Client as a NuGet package or relative project reference -->
 
 	<ItemGroup>
-		<Compile Update="Views\ImportExportPage.xaml.cs">
-			<DependentUpon>ImportExportPage.xaml</DependentUpon>
+		<Compile Update="Views\GroupEditPage.xaml.cs">
+		  <DependentUpon>GroupEditPage.xaml</DependentUpon>
 		</Compile>
 		<Compile Update="Views\DatabaseBackupPage.xaml.cs">
 			<DependentUpon>DatabaseBackupPage.xaml</DependentUpon>
 		</Compile>
 		<Compile Update="Views\GroupSelectionPage.xaml.cs">
-			<DependentUpon>GroupSelectionPage.xaml</DependentUpon>
-		</Compile>
-		<Compile Update="Views\GsrVerifyPage.xaml.cs">
-			<DependentUpon>GsrVerifyPage.xaml</DependentUpon>
+		  <DependentUpon>GroupSelectionPage.xaml</DependentUpon>
 		</Compile>
 	</ItemGroup>
 
-	<ItemGroup>
-		<None Update="Views\GroupEditPage.xaml">
-			<Generator>MSBuild:Compile</Generator>
-		</None>
-	</ItemGroup>
 
 </Project>
