@@ -28,6 +28,48 @@
 		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
 		<DefaultLanguage>en-gb</DefaultLanguage>
 		<Copyright>Don't take yourself too damn seriously</Copyright>
+		<AssemblyVersion>10.0.1.0</AssemblyVersion>
+		<FileVersion>10.0.1.0</FileVersion>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net9.0-android|AnyCPU'">
+	  <ApplicationDisplayVersion>10.0.1</ApplicationDisplayVersion>
+	  <ApplicationId>org.thebleedingdeacons.intergroup.register</ApplicationId>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net9.0-ios|AnyCPU'">
+	  <ApplicationDisplayVersion>10.0.1</ApplicationDisplayVersion>
+	  <ApplicationId>org.thebleedingdeacons.intergroup.register</ApplicationId>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net9.0-maccatalyst|AnyCPU'">
+	  <ApplicationDisplayVersion>10.0.1</ApplicationDisplayVersion>
+	  <ApplicationId>org.thebleedingdeacons.intergroup.register</ApplicationId>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net9.0-windows10.0.19041.0|AnyCPU'">
+	  <ApplicationDisplayVersion>10.0.1</ApplicationDisplayVersion>
+	  <ApplicationId>org.thebleedingdeacons.intergroup.register</ApplicationId>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net9.0-android|AnyCPU'">
+	  <ApplicationDisplayVersion>10.0.1</ApplicationDisplayVersion>
+	  <ApplicationId>org.thebleedingdeacons.intergroup.register</ApplicationId>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net9.0-ios|AnyCPU'">
+	  <ApplicationDisplayVersion>10.0.1</ApplicationDisplayVersion>
+	  <ApplicationId>org.thebleedingdeacons.intergroup.register</ApplicationId>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net9.0-maccatalyst|AnyCPU'">
+	  <ApplicationDisplayVersion>10.0.1</ApplicationDisplayVersion>
+	  <ApplicationId>org.thebleedingdeacons.intergroup.register</ApplicationId>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net9.0-windows10.0.19041.0|AnyCPU'">
+	  <ApplicationDisplayVersion>10.0.1</ApplicationDisplayVersion>
+	  <ApplicationId>org.thebleedingdeacons.intergroup.register</ApplicationId>
 	</PropertyGroup>
 
 	<ItemGroup>
