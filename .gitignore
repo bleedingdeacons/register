@@ -118,3 +118,6 @@ yarn-error.log*
 /Utils/TheBleedingDeacons.Intergroup.Register.zip
 /Utils/TheBleedingDeacons.Unity.Client.zip
 /Utils/TheBleedingDeacons.Unity.Models.zip
+/TheBleedingDeacons.Intergroup.Register/build.txt
+/TheBleedingDeacons.Intergroup.Register/Logging.txt
+/TheBleedingDeacons.Intergroup.Register/register.keystore
