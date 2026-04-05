@@ -285,6 +285,7 @@
                                Text="{Binding EditName, Mode=TwoWay}"
                                Placeholder="Tap to enter name..."
                                FontSize="22"
+                               HeightRequest="50"
                                BackgroundColor="{AppThemeBinding Light=White, Dark=#2D2D30}"
                                TextColor="{AppThemeBinding Light=Black, Dark=White}"
                                PlaceholderColor="{AppThemeBinding Light=Gray, Dark=LightGray}"/>
@@ -301,6 +302,7 @@
                         <controls:ClearableEntry x:Name="EditPhoneEntry"
                                Text="{Binding EditPhone, Mode=TwoWay}"
                                FontSize="22"
+                               HeightRequest="50"
                                Placeholder="Tap to enter phone number..."
                                Keyboard="Telephone"
                                BackgroundColor="{AppThemeBinding Light=White, Dark=#2D2D30}"
@@ -320,6 +322,7 @@
                                Text="{Binding EditEmail, Mode=TwoWay}"
                                Placeholder="Tap to enter email address..."
                                FontSize="22"
+                               HeightRequest="50"
                                Keyboard="Email"
                                BackgroundColor="{AppThemeBinding Light=White, Dark=#2D2D30}"
                                TextColor="{AppThemeBinding Light=Black, Dark=White}"
