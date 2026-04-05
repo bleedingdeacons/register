@@ -416,3 +416,13 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# .NET JSON configuration files
+appsettings.json
+appsettings.*.json
+host.json
+local.settings.json
+secrets.json
+bundleconfig.json
+launchSettings.json
+Properties/launchSettings.json

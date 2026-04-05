@@ -3,7 +3,7 @@
     "Host": "mail.aa-bristol.org",
     "Port": 465,
     "Username": "wtf@aa-bristol.org",
-    "Password": "C|1#@*748w`l",
+    "Password": "",
     "EnableSsl": true,
     "FromDisplayName": "Bristol and Distict Intergroup",
     "TimeoutSeconds": 30
