@@ -36,10 +36,6 @@
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net9.0-android|AnyCPU'">
 	  <ApplicationDisplayVersion>1.0.1</ApplicationDisplayVersion>
-	  <AndroidKeyStore>True</AndroidKeyStore>
-	  <AndroidSigningKeyAlias>intergroup-register</AndroidSigningKeyAlias>
-	  <!--<AndroidSigningKeyPass>YOUR_KEY_PASSWORD</AndroidSigningKeyPass>-->
-	  <AndroidSigningStorePass>100635</AndroidSigningStorePass>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net9.0-ios|AnyCPU'">
