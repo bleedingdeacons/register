@@ -35,7 +35,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 		private readonly DataService _dataService;
 		private readonly IIntergroupMeetingRepository _intergroupMeetingRepository;
 		private readonly IConfigurationService _configService;
-		private readonly UnityDbContext _dbContext;
+		private readonly IDbContextFactory<UnityDbContext> _dbContextFactory;
 
 		// ── Meeting phase ────────────────────────────────────────────
 		public enum MeetingPhase
@@ -112,12 +112,12 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 			DataService dataService,
 			IIntergroupMeetingRepository intergroupMeetingRepository,
 			IConfigurationService configService,
-			UnityDbContext dbContext)
+			IDbContextFactory<UnityDbContext> dbContextFactory)
 		{
 			_dataService = dataService;
 			_intergroupMeetingRepository = intergroupMeetingRepository;
 			_configService = configService;
-			_dbContext = dbContext;
+			_dbContextFactory = dbContextFactory;
 
 			// Restore phase if a meeting is already active (app restarted mid-session)
 			RestorePhaseAsync().SafeFireAndForget("RestorePhase");
@@ -338,7 +338,8 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 			{
 				ShowStatus("Purging database...", false);
 
-				await _dbContext.PurgeDatabaseAsync(Token);
+				using var dbContext = _dbContextFactory.CreateDbContext();
+				await dbContext.PurgeDatabaseAsync(Token);
 
 				Phase = MeetingPhase.NotStarted;
 				FinishSummary = string.Empty;
@@ -399,11 +400,13 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 		{
 			try
 			{
-				await _dbContext.Groups
+				using var dbContext = _dbContextFactory.CreateDbContext();
+
+				await dbContext.Groups
 					.Where(g => g.Registered)
 					.ExecuteUpdateAsync(s => s.SetProperty(g => g.Registered, false), Token);
 
-				await _dbContext.Positions
+				await dbContext.Positions
 					.Where(p => p.Registered)
 					.ExecuteUpdateAsync(s => s.SetProperty(p => p.Registered, false), Token);
 

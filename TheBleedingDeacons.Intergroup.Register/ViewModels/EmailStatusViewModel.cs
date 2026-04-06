@@ -10,444 +10,448 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels;
 
 public partial class EmailStatusViewModel : BaseViewModel
 {
-    private static readonly ILogger Logger = AppLogger.ForContext<EmailStatusViewModel>();
+	private static readonly ILogger Logger = AppLogger.ForContext<EmailStatusViewModel>();
 
-    private readonly IMailService _mailService;
-    
-    private readonly Timer _refreshTimer;
+	private readonly IMailService _mailService;
 
-    [ObservableProperty]
-    private ObservableCollection<EmailDisplayModel> _emails = new();
+	private readonly Timer _refreshTimer;
 
-    [ObservableProperty]
-    private bool _isOnline = true;
+	private bool _disposed;
 
-    [ObservableProperty]
-    private bool _isLoading;
+	[ObservableProperty]
+	private ObservableCollection<EmailDisplayModel> _emails = new();
 
-    [ObservableProperty]
-    private bool _isRefreshing;
+	[ObservableProperty]
+	private bool _isOnline = true;
 
-    [ObservableProperty]
-    private string _statusMessage = "Ready";
+	[ObservableProperty]
+	private bool _isLoading;
 
-    [ObservableProperty]
-    private int _totalEmails;
+	[ObservableProperty]
+	private bool _isRefreshing;
 
-    [ObservableProperty]
-    private int _pendingEmails;
+	[ObservableProperty]
+	private string _statusMessage = "Ready";
 
-    [ObservableProperty]
-    private int _sentEmails;
+	[ObservableProperty]
+	private int _totalEmails;
 
-    [ObservableProperty]
-    private int _failedEmails;
+	[ObservableProperty]
+	private int _pendingEmails;
 
-    [ObservableProperty]
-    private EmailDisplayModel? _selectedEmail;
+	[ObservableProperty]
+	private int _sentEmails;
 
-    public EmailStatusViewModel(IMailService mailService)
-    {
-        _mailService = mailService ?? throw new ArgumentNullException(nameof(mailService));        
+	[ObservableProperty]
+	private int _failedEmails;
 
-        // Subscribe to mail service events
-        _mailService.EmailSent += OnEmailSent;
-        _mailService.EmailFailed += OnEmailFailed;
-        _mailService.QueueProcessed += OnQueueProcessed;
+	[ObservableProperty]
+	private EmailDisplayModel? _selectedEmail;
 
-        // Setup auto-refresh timer (every 30 seconds)
-        _refreshTimer = new Timer(async _ => await RefreshEmailsAsync(), null,
-            TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30));
+	public EmailStatusViewModel(IMailService mailService)
+	{
+		_mailService = mailService ?? throw new ArgumentNullException(nameof(mailService));
 
-        // Initial load
-        Task.Run(async () => await LoadEmailsAsync()).SafeFireAndForget("InitialEmailLoad");
-    }
+		// Subscribe to mail service events
+		_mailService.EmailSent += OnEmailSent;
+		_mailService.EmailFailed += OnEmailFailed;
+		_mailService.QueueProcessed += OnQueueProcessed;
 
-    [RelayCommand]
-    private async Task LoadEmailsAsync()
-    {
-        try
-        {
-            IsLoading = true;
-            StatusMessage = "Loading emails...";
+		// Setup auto-refresh timer (every 30 seconds)
+		_refreshTimer = new Timer(async _ => await RefreshEmailsAsync(), null,
+			TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30));
 
-            var emails = await _mailService.GetQueuedEmailsAsync();
+		// Initial load
+		Task.Run(async () => await LoadEmailsAsync()).SafeFireAndForget("InitialEmailLoad");
+	}
 
-            await MainThread.InvokeOnMainThreadAsync(() =>
-            {
-                Emails.Clear();
-                foreach (var email in emails)
-                {
-                    Emails.Add(new EmailDisplayModel(email));
-                }
+	[RelayCommand]
+	private async Task LoadEmailsAsync()
+	{
+		try
+		{
+			IsLoading = true;
+			StatusMessage = "Loading emails...";
 
-                UpdateStatistics();
-            });
+			var emails = await _mailService.GetQueuedEmailsAsync();
 
-            StatusMessage = $"Loaded {emails.Count} emails";
-        }
-        catch (Exception ex)
-        {
-            Logger.Error(ex, "Error loading emails");
-            StatusMessage = $"Error loading emails: {ex.Message}";
-        }
-        finally
-        {
-            IsLoading = false;
-        }
-    }
+			await MainThread.InvokeOnMainThreadAsync(() =>
+			{
+				Emails.Clear();
+				foreach (var email in emails)
+				{
+					Emails.Add(new EmailDisplayModel(email));
+				}
 
-    [RelayCommand]
-    private async Task RefreshEmailsAsync()
-    {
-        if (IsLoading || IsRefreshing) return;
+				UpdateStatistics();
+			});
 
-        try
-        {
-            IsRefreshing = true;
-            await LoadEmailsAsync();
-        }
-        finally
-        {
-            IsRefreshing = false;
-        }
-    }
+			StatusMessage = $"Loaded {emails.Count} emails";
+		}
+		catch (Exception ex)
+		{
+			Logger.Error(ex, "Error loading emails");
+			StatusMessage = $"Error loading emails: {ex.Message}";
+		}
+		finally
+		{
+			IsLoading = false;
+		}
+	}
 
-    [RelayCommand]
-    private async Task RetryAllEmailsAsync()
-    {
-        try
-        {
-            IsLoading = true;
-            StatusMessage = "Resetting all email retry counts...";
+	[RelayCommand]
+	private async Task RefreshEmailsAsync()
+	{
+		if (IsLoading || IsRefreshing) return;
 
-            await _mailService.ResetRetryCountAsync();
-            StatusMessage = "All email retry counts reset. Processing queue...";
+		try
+		{
+			IsRefreshing = true;
+			await LoadEmailsAsync();
+		}
+		finally
+		{
+			IsRefreshing = false;
+		}
+	}
 
-            // Trigger queue processing
-            await _mailService.ProcessQueueAsync();
+	[RelayCommand]
+	private async Task RetryAllEmailsAsync()
+	{
+		try
+		{
+			IsLoading = true;
+			StatusMessage = "Resetting all email retry counts...";
 
-            // Refresh the display
-            await LoadEmailsAsync();
+			await _mailService.ResetRetryCountAsync();
+			StatusMessage = "All email retry counts reset. Processing queue...";
 
-            StatusMessage = "All emails queued for retry";
-        }
-        catch (Exception ex)
-        {
-            Logger.Error(ex, "Error retrying all emails");
-            StatusMessage = $"Error retrying all emails: {ex.Message}";
-        }
-        finally
-        {
-            IsLoading = false;
-        }
-    }
+			// Trigger queue processing
+			await _mailService.ProcessQueueAsync();
 
-    [RelayCommand]
-    private async Task RetryFailedEmailsAsync()
-    {
-        try
-        {
-            IsLoading = true;
-            StatusMessage = "Retrying failed emails...";
+			// Refresh the display
+			await LoadEmailsAsync();
 
-            await _mailService.RetryFailedEmailsAsync();
-            StatusMessage = "Failed emails reset to pending. Processing queue...";
+			StatusMessage = "All emails queued for retry";
+		}
+		catch (Exception ex)
+		{
+			Logger.Error(ex, "Error retrying all emails");
+			StatusMessage = $"Error retrying all emails: {ex.Message}";
+		}
+		finally
+		{
+			IsLoading = false;
+		}
+	}
 
-            // Trigger queue processing
-            await _mailService.ProcessQueueAsync();
+	[RelayCommand]
+	private async Task RetryFailedEmailsAsync()
+	{
+		try
+		{
+			IsLoading = true;
+			StatusMessage = "Retrying failed emails...";
 
-            // Refresh the display
-            await LoadEmailsAsync();
+			await _mailService.RetryFailedEmailsAsync();
+			StatusMessage = "Failed emails reset to pending. Processing queue...";
 
-            StatusMessage = "Failed emails queued for retry";
-        }
-        catch (Exception ex)
-        {
-            Logger.Error(ex, "Error retrying failed emails");
-            StatusMessage = $"Error retrying failed emails: {ex.Message}";
-        }
-        finally
-        {
-            IsLoading = false;
-        }
-    }
+			// Trigger queue processing
+			await _mailService.ProcessQueueAsync();
 
-    [RelayCommand]
-    private async Task RetryEmailAsync(EmailDisplayModel emailModel)
-    {
-        if (emailModel?.Id == null) return;
+			// Refresh the display
+			await LoadEmailsAsync();
 
-        try
-        {
-            StatusMessage = $"Retrying email to {emailModel.To}...";
+			StatusMessage = "Failed emails queued for retry";
+		}
+		catch (Exception ex)
+		{
+			Logger.Error(ex, "Error retrying failed emails");
+			StatusMessage = $"Error retrying failed emails: {ex.Message}";
+		}
+		finally
+		{
+			IsLoading = false;
+		}
+	}
 
-            await _mailService.ResetRetryCountAsync(emailModel.Id.Value);
+	[RelayCommand]
+	private async Task RetryEmailAsync(EmailDisplayModel emailModel)
+	{
+		if (emailModel?.Id == null) return;
 
-            // Trigger queue processing
-            await _mailService.ProcessQueueAsync();
+		try
+		{
+			StatusMessage = $"Retrying email to {emailModel.To}...";
 
-            // Refresh the display
-            await LoadEmailsAsync();
+			await _mailService.ResetRetryCountAsync(emailModel.Id.Value);
 
-            StatusMessage = $"Email to {emailModel.To} queued for retry";
-        }
-        catch (Exception ex)
-        {
-            Logger.Error(ex, "Error retrying email {EmailId}", emailModel.Id);
-            StatusMessage = $"Error retrying email: {ex.Message}";
-        }
-    }
+			// Trigger queue processing
+			await _mailService.ProcessQueueAsync();
 
-    [RelayCommand]
-    private async Task DeleteEmailAsync(EmailDisplayModel emailModel)
-    {
-        if (emailModel?.Id == null) return;
+			// Refresh the display
+			await LoadEmailsAsync();
 
-        try
-        {
-            // Note: You'll need to add a delete method to your mail service
-            // For now, we'll just remove it from the display and log it
-            Logger.Information("Delete email {EmailId} requested", emailModel.Id);
+			StatusMessage = $"Email to {emailModel.To} queued for retry";
+		}
+		catch (Exception ex)
+		{
+			Logger.Error(ex, "Error retrying email {EmailId}", emailModel.Id);
+			StatusMessage = $"Error retrying email: {ex.Message}";
+		}
+	}
 
-            await MainThread.InvokeOnMainThreadAsync(() =>
-            {
-                Emails.Remove(emailModel);
-                UpdateStatistics();
-            });
+	[RelayCommand]
+	private async Task DeleteEmailAsync(EmailDisplayModel emailModel)
+	{
+		if (emailModel?.Id == null) return;
 
-            StatusMessage = $"Email to {emailModel.To} removed from display";
-        }
-        catch (Exception ex)
-        {
-            Logger.Error(ex, "Error deleting email {EmailId}", emailModel.Id);
-            StatusMessage = $"Error deleting email: {ex.Message}";
-        }
-    }
+		try
+		{
+			// Note: You'll need to add a delete method to your mail service
+			// For now, we'll just remove it from the display and log it
+			Logger.Information("Delete email {EmailId} requested", emailModel.Id);
 
-    [RelayCommand]
-    private async Task ToggleOfflineModeAsync()
-    {
-        try
-        {
-            if (_mailService.IsOfflineMode)
-            {
-                _mailService.DisableOfflineMode();
-                IsOnline = true;
-                StatusMessage = "Online mode enabled";
-            }
-            else
-            {
-                _mailService.EnableOfflineMode();
-                IsOnline = false;
-                StatusMessage = "Offline mode enabled";
-            }
-        }
-        catch (Exception ex)
-        {
-            Logger.Error(ex, "Error toggling offline mode");
-            StatusMessage = $"Error toggling offline mode: {ex.Message}";
-        }
-    }
+			await MainThread.InvokeOnMainThreadAsync(() =>
+			{
+				Emails.Remove(emailModel);
+				UpdateStatistics();
+			});
 
-    [RelayCommand]
-    private async Task ProcessQueueAsync()
-    {
-        try
-        {
-            IsLoading = true;
-            StatusMessage = "Processing email queue...";
+			StatusMessage = $"Email to {emailModel.To} removed from display";
+		}
+		catch (Exception ex)
+		{
+			Logger.Error(ex, "Error deleting email {EmailId}", emailModel.Id);
+			StatusMessage = $"Error deleting email: {ex.Message}";
+		}
+	}
 
-            var result = await _mailService.ProcessQueueAsync();
+	[RelayCommand]
+	private async Task ToggleOfflineModeAsync()
+	{
+		try
+		{
+			if (_mailService.IsOfflineMode)
+			{
+				_mailService.DisableOfflineMode();
+				IsOnline = true;
+				StatusMessage = "Online mode enabled";
+			}
+			else
+			{
+				_mailService.EnableOfflineMode();
+				IsOnline = false;
+				StatusMessage = "Offline mode enabled";
+			}
+		}
+		catch (Exception ex)
+		{
+			Logger.Error(ex, "Error toggling offline mode");
+			StatusMessage = $"Error toggling offline mode: {ex.Message}";
+		}
+	}
 
-            if (result)
-            {
-                StatusMessage = "Queue processing completed";
-            }
-            else
-            {
-                StatusMessage = "Queue processing failed or skipped";
-            }
+	[RelayCommand]
+	private async Task ProcessQueueAsync()
+	{
+		try
+		{
+			IsLoading = true;
+			StatusMessage = "Processing email queue...";
 
-            // Refresh the display
-            await LoadEmailsAsync();
-        }
-        catch (Exception ex)
-        {
-            Logger.Error(ex, "Error processing queue");
-            StatusMessage = $"Error processing queue: {ex.Message}";
-        }
-        finally
-        {
-            IsLoading = false;
-        }
-    }
+			var result = await _mailService.ProcessQueueAsync();
 
-    [RelayCommand]
-    private async Task ClearSentEmailsAsync()
-    {
-        try
-        {
-            IsLoading = true;
-            StatusMessage = "Clearing sent emails...";
+			if (result)
+			{
+				StatusMessage = "Queue processing completed";
+			}
+			else
+			{
+				StatusMessage = "Queue processing failed or skipped";
+			}
 
-            await _mailService.ClearSentEmailsAsync();
+			// Refresh the display
+			await LoadEmailsAsync();
+		}
+		catch (Exception ex)
+		{
+			Logger.Error(ex, "Error processing queue");
+			StatusMessage = $"Error processing queue: {ex.Message}";
+		}
+		finally
+		{
+			IsLoading = false;
+		}
+	}
 
-            // Refresh the display
-            await LoadEmailsAsync();
+	[RelayCommand]
+	private async Task ClearSentEmailsAsync()
+	{
+		try
+		{
+			IsLoading = true;
+			StatusMessage = "Clearing sent emails...";
 
-            StatusMessage = "Sent emails cleared";
-        }
-        catch (Exception ex)
-        {
-            Logger.Error(ex, "Error clearing sent emails");
-            StatusMessage = $"Error clearing sent emails: {ex.Message}";
-        }
-        finally
-        {
-            IsLoading = false;
-        }
-    }
+			await _mailService.ClearSentEmailsAsync();
 
-    private void UpdateStatistics()
-    {
-        TotalEmails = Emails.Count;
-        PendingEmails = Emails.Count(e => e.Status == EmailStatus.Pending);
-        SentEmails = Emails.Count(e => e.Status == EmailStatus.Sent);
-        FailedEmails = Emails.Count(e => e.Status == EmailStatus.Failed);
-        IsOnline = !_mailService.IsOfflineMode;
-    }
+			// Refresh the display
+			await LoadEmailsAsync();
 
-    private void OnEmailSent(object? sender, EmailSentEventArgs e)
-    {
-        MainThread.BeginInvokeOnMainThread(async () =>
-        {
-            var email = Emails.FirstOrDefault(em => em.Id == e.Email.Id);
-            if (email != null)
-            {
-                email.UpdateFromQueuedEmail(e.Email);
-                UpdateStatistics();
-            }
+			StatusMessage = "Sent emails cleared";
+		}
+		catch (Exception ex)
+		{
+			Logger.Error(ex, "Error clearing sent emails");
+			StatusMessage = $"Error clearing sent emails: {ex.Message}";
+		}
+		finally
+		{
+			IsLoading = false;
+		}
+	}
 
-            StatusMessage = $"Email sent to {e.Email.To}";
-        });
-    }
+	private void UpdateStatistics()
+	{
+		TotalEmails = Emails.Count;
+		PendingEmails = Emails.Count(e => e.Status == EmailStatus.Pending);
+		SentEmails = Emails.Count(e => e.Status == EmailStatus.Sent);
+		FailedEmails = Emails.Count(e => e.Status == EmailStatus.Failed);
+		IsOnline = !_mailService.IsOfflineMode;
+	}
 
-    private void OnEmailFailed(object? sender, EmailFailedEventArgs e)
-    {
-        MainThread.BeginInvokeOnMainThread(async () =>
-        {
-            var email = Emails.FirstOrDefault(em => em.Id == e.Email.Id);
-            if (email != null)
-            {
-                email.UpdateFromQueuedEmail(e.Email);
-                UpdateStatistics();
-            }
+	private void OnEmailSent(object? sender, EmailSentEventArgs e)
+	{
+		MainThread.BeginInvokeOnMainThread(async () =>
+		{
+			var email = Emails.FirstOrDefault(em => em.Id == e.Email.Id);
+			if (email != null)
+			{
+				email.UpdateFromQueuedEmail(e.Email);
+				UpdateStatistics();
+			}
 
-            StatusMessage = $"Email failed to {e.Email.To}: {e.Error}";
-        });
-    }
+			StatusMessage = $"Email sent to {e.Email.To}";
+		});
+	}
 
-    private void OnQueueProcessed(object? sender, QueueProcessedEventArgs e)
-    {
-        MainThread.BeginInvokeOnMainThread(async () =>
-        {
-            StatusMessage = $"Queue processed: {e.ProcessedCount} sent, {e.FailedCount} failed, {e.RemainingCount} remaining";
-            await RefreshEmailsAsync();
-        });
-    }
+	private void OnEmailFailed(object? sender, EmailFailedEventArgs e)
+	{
+		MainThread.BeginInvokeOnMainThread(async () =>
+		{
+			var email = Emails.FirstOrDefault(em => em.Id == e.Email.Id);
+			if (email != null)
+			{
+				email.UpdateFromQueuedEmail(e.Email);
+				UpdateStatistics();
+			}
 
-    //protected override void Dispose(bool disposing)
-    //{
-    //    if (disposing)
-    //    {
-    //        _refreshTimer?.Dispose();
+			StatusMessage = $"Email failed to {e.Email.To}: {e.Error}";
+		});
+	}
 
-    //        // Unsubscribe from events
-    //        _mailService.EmailSent -= OnEmailSent;
-    //        _mailService.EmailFailed -= OnEmailFailed;
-    //        _mailService.QueueProcessed -= OnQueueProcessed;
-    //    }
-    //    base.Dispose(disposing);
-    //}
+	private void OnQueueProcessed(object? sender, QueueProcessedEventArgs e)
+	{
+		MainThread.BeginInvokeOnMainThread(async () =>
+		{
+			StatusMessage = $"Queue processed: {e.ProcessedCount} sent, {e.FailedCount} failed, {e.RemainingCount} remaining";
+			await RefreshEmailsAsync();
+		});
+	}
+
+	protected override void Dispose(bool disposing)
+	{
+		if (!_disposed && disposing)
+		{
+			_disposed = true;
+
+			_refreshTimer?.Dispose();
+
+			// Unsubscribe from events
+			_mailService.EmailSent -= OnEmailSent;
+			_mailService.EmailFailed -= OnEmailFailed;
+			_mailService.QueueProcessed -= OnQueueProcessed;
+		}
+		base.Dispose(disposing);
+	}
 }
 
 // Display model for emails in the UI
 public partial class EmailDisplayModel : ObservableObject
 {
-    [ObservableProperty]
-    private int? _id;
+	[ObservableProperty]
+	private int? _id;
 
-    [ObservableProperty]
-    private string _to = string.Empty;
+	[ObservableProperty]
+	private string _to = string.Empty;
 
-    [ObservableProperty]
-    private string _subject = string.Empty;
+	[ObservableProperty]
+	private string _subject = string.Empty;
 
-    [ObservableProperty]
-    private string _from = string.Empty;
+	[ObservableProperty]
+	private string _from = string.Empty;
 
-    [ObservableProperty]
-    private EmailStatus _status;
+	[ObservableProperty]
+	private EmailStatus _status;
 
-    [ObservableProperty]
-    private DateTime _createdAt;
+	[ObservableProperty]
+	private DateTime _createdAt;
 
-    [ObservableProperty]
-    private DateTime? _lastAttemptAt;
+	[ObservableProperty]
+	private DateTime? _lastAttemptAt;
 
-    [ObservableProperty]
-    private int _attemptCount;
+	[ObservableProperty]
+	private int _attemptCount;
 
-    [ObservableProperty]
-    private int _maxRetries;
+	[ObservableProperty]
+	private int _maxRetries;
 
-    [ObservableProperty]
-    private string? _lastError;
+	[ObservableProperty]
+	private string? _lastError;
 
-    [ObservableProperty]
-    private bool _isHtml;
+	[ObservableProperty]
+	private bool _isHtml;
 
-    public string StatusText => Status.ToString();
+	public string StatusText => Status.ToString();
 
-    public string StatusColor => Status switch
-    {
-        EmailStatus.Sent => "Green",
-        EmailStatus.Failed => "Red",
-        EmailStatus.Pending => "Orange",
-        EmailStatus.Sending => "Blue",
-        _ => "Gray"
-    };
+	public string StatusColor => Status switch
+	{
+		EmailStatus.Sent => "Green",
+		EmailStatus.Failed => "Red",
+		EmailStatus.Pending => "Orange",
+		EmailStatus.Sending => "Blue",
+		_ => "Gray"
+	};
 
-    public string AttemptText => $"{AttemptCount}/{MaxRetries}";
+	public string AttemptText => $"{AttemptCount}/{MaxRetries}";
 
-    public string CreatedAtText => CreatedAt.ToString("MM/dd/yyyy HH:mm");
+	public string CreatedAtText => CreatedAt.ToString("MM/dd/yyyy HH:mm");
 
-    public string LastAttemptText => LastAttemptAt?.ToString("MM/dd/yyyy HH:mm") ?? "Never";
+	public string LastAttemptText => LastAttemptAt?.ToString("MM/dd/yyyy HH:mm") ?? "Never";
 
-    public bool HasError => !string.IsNullOrWhiteSpace(LastError);
+	public bool HasError => !string.IsNullOrWhiteSpace(LastError);
 
-    public bool CanRetry => Status == EmailStatus.Failed || Status == EmailStatus.Pending;
+	public bool CanRetry => Status == EmailStatus.Failed || Status == EmailStatus.Pending;
 
-    public string ShortSubject => Subject.Length > 50 ? Subject[..47] + "..." : Subject;
+	public string ShortSubject => Subject.Length > 50 ? Subject[..47] + "..." : Subject;
 
-    public EmailDisplayModel(QueuedEmail queuedEmail)
-    {
-        UpdateFromQueuedEmail(queuedEmail);
-    }
+	public EmailDisplayModel(QueuedEmail queuedEmail)
+	{
+		UpdateFromQueuedEmail(queuedEmail);
+	}
 
-    public void UpdateFromQueuedEmail(QueuedEmail queuedEmail)
-    {
-        Id = queuedEmail.Id;
-        To = queuedEmail.To;
-        Subject = queuedEmail.Subject;
-        From = queuedEmail.From;
-        Status = queuedEmail.Status;
-        CreatedAt = queuedEmail.CreatedAt;
-        LastAttemptAt = queuedEmail.LastAttemptAt;
-        AttemptCount = queuedEmail.AttemptCount;
-        MaxRetries = queuedEmail.MaxRetries;
-        LastError = queuedEmail.LastError;
-        IsHtml = queuedEmail.IsHtml;
-    }
+	public void UpdateFromQueuedEmail(QueuedEmail queuedEmail)
+	{
+		Id = queuedEmail.Id;
+		To = queuedEmail.To;
+		Subject = queuedEmail.Subject;
+		From = queuedEmail.From;
+		Status = queuedEmail.Status;
+		CreatedAt = queuedEmail.CreatedAt;
+		LastAttemptAt = queuedEmail.LastAttemptAt;
+		AttemptCount = queuedEmail.AttemptCount;
+		MaxRetries = queuedEmail.MaxRetries;
+		LastError = queuedEmail.LastError;
+		IsHtml = queuedEmail.IsHtml;
+	}
 }

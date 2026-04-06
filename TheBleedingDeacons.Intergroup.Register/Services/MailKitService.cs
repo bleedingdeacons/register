@@ -146,11 +146,6 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			}
 		}
 
-		public void UpdateConfiguration(SmtpConfiguration config)
-		{
-			UpdateConfigurationAsync(config).GetAwaiter().GetResult();
-		}
-
 		#endregion
 
 		#region Core Email Sending Methods
@@ -262,19 +257,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 				var (host, port, username, password, enableSsl) = await GetCurrentConfigAsync();
 
 				// Determine SSL options
-				var secureSocketOptions = SecureSocketOptions.Auto; // Let MailKit decide
-				if (!enableSsl)
-				{
-					secureSocketOptions = SecureSocketOptions.None;
-				}
-				else if (port == 465)
-				{
-					secureSocketOptions = SecureSocketOptions.SslOnConnect; // SMTPS
-				}
-				else if (port == 587 || port == 25)
-				{
-					secureSocketOptions = SecureSocketOptions.StartTls; // SMTP with STARTTLS
-				}
+				var secureSocketOptions = ResolveSecureSocketOptions(enableSsl, port);
 
 				Logger.Debug("[{OperationId}] Connecting to {Host}:{Port} with SSL={EnableSsl} ({SSLOptions})",
 					operationId, host, port, enableSsl, secureSocketOptions);
@@ -1012,19 +995,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 				using var client = new SmtpClient();
 				client.Timeout = config.TimeoutSeconds * 1000;
 
-				var secureSocketOptions = SecureSocketOptions.Auto;
-				if (!config.EnableSsl)
-				{
-					secureSocketOptions = SecureSocketOptions.None;
-				}
-				else if (config.Port == 465)
-				{
-					secureSocketOptions = SecureSocketOptions.SslOnConnect;
-				}
-				else if (config.Port == 587 || config.Port == 25)
-				{
-					secureSocketOptions = SecureSocketOptions.StartTls;
-				}
+				var secureSocketOptions = ResolveSecureSocketOptions(config.EnableSsl, config.Port);
 
 				using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(config.TimeoutSeconds + 10));
 

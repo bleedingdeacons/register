@@ -29,7 +29,6 @@ namespace TheBleedingDeacons.Intergroup.Register.Services.Interfaces
 
 		// Configuration methods
 		Task UpdateConfigurationAsync(SmtpConfiguration config);
-		void UpdateConfiguration(SmtpConfiguration config);
 
 		// Queue management methods
 		Task<bool> ProcessQueueAsync();

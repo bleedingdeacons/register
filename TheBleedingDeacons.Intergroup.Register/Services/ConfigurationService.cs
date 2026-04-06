@@ -50,6 +50,12 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			}
 
 			_configuration = builder.Build();
+
+			// One-time migration: a previous version of EmailSettingsViewModel
+			// stored SMTP credentials (including the password) in plain-text
+			// Preferences. Scrub those keys so the password is only ever held
+			// in SecureStorage going forward.
+			RemoveStaleSmtpPreferencesKeys();
 		}
 
 		// =================================================================
@@ -104,7 +110,22 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		public async Task<SmtpConfiguration> LoadSmtpConfigurationAsync()
 		{
 			_cachedSmtpConfig = null;
-			return await Task.FromResult(GetSmtpConfiguration());
+
+			var section = _configuration.GetSection("SmtpSettings");
+			var password = await GetSecretAsync(SMTP_PASSWORD_KEY, "SMTP password");
+
+			_cachedSmtpConfig = new SmtpConfiguration
+			{
+				Host = section["Host"] ?? "",
+				Port = int.TryParse(section["Port"], out int port) ? port : 587,
+				Username = section["Username"] ?? "",
+				Password = password,
+				EnableSsl = bool.TryParse(section["EnableSsl"], out bool ssl) ? ssl : true,
+				FromDisplayName = section["FromDisplayName"] ?? "",
+				TimeoutSeconds = int.TryParse(section["TimeoutSeconds"], out int timeout) ? timeout : 30
+			};
+
+			return _cachedSmtpConfig;
 		}
 
 		// =================================================================
@@ -304,13 +325,15 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		// =================================================================
 
 		/// <summary>
-		/// Reads a secret from SecureStorage (sync). Returns empty string on failure.
+		/// Reads a secret from SecureStorage (sync-safe). Uses Task.Run to
+		/// hop off the calling SynchronizationContext, avoiding deadlock when
+		/// called from the MAUI UI thread. Returns empty string on failure.
 		/// </summary>
 		private static string GetSecretSync(string key, string description)
 		{
 			try
 			{
-				return SecureStorage.GetAsync(key).GetAwaiter().GetResult() ?? "";
+				return Task.Run(() => SecureStorage.GetAsync(key)).GetAwaiter().GetResult() ?? "";
 			}
 			catch (Exception ex)
 			{
@@ -347,6 +370,35 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			catch (Exception ex)
 			{
 				Logger.Warning(ex, "SecureStorage unavailable for {Description}", description);
+			}
+		}
+
+		/// <summary>
+		/// One-time migration: removes SMTP settings that a previous version
+		/// stored in plain-text <see cref="Preferences"/> (including the password).
+		/// Called once from the constructor on every app launch; the check is
+		/// essentially free when the keys don't exist.
+		/// </summary>
+		private static void RemoveStaleSmtpPreferencesKeys()
+		{
+			string[] staleKeys =
+			[
+				"smtp_host",
+				"smtp_port",
+				"smtp_username",
+				"smtp_password",   // ← the critical one (was plaintext)
+				"smtp_enable_ssl",
+				"smtp_timeout",
+				"smtp_max_retries"
+			];
+
+			foreach (var key in staleKeys)
+			{
+				if (Preferences.ContainsKey(key))
+				{
+					Preferences.Remove(key);
+					Logger.Information("Removed stale plaintext Preferences key: {Key}", key);
+				}
 			}
 		}
 	}

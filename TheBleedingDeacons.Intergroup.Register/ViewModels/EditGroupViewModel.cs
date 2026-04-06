@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.EntityFrameworkCore;
 using Serilog;
 using System.Collections.ObjectModel;
 using System.ComponentModel.DataAnnotations;
@@ -31,7 +32,7 @@ public partial class EditGroupViewModel : BaseViewModel
 {
 	private static readonly ILogger Logger = AppLogger.ForContext<EditGroupViewModel>();
 
-	private readonly UnityDbContext _context;
+	private readonly IDbContextFactory<UnityDbContext> _contextFactory;
 	private readonly IPopupNotification _popupService;
 
 	// The group whose GSRs are being managed
@@ -126,10 +127,10 @@ public partial class EditGroupViewModel : BaseViewModel
 	private bool hasEmailError;
 
 	public EditGroupViewModel(
-		UnityDbContext context,
+		IDbContextFactory<UnityDbContext> contextFactory,
 		IPopupNotification popupService)
 	{
-		_context = context;
+		_contextFactory = contextFactory;
 		_popupService = popupService;
 
 		ValidateForm();
@@ -275,6 +276,8 @@ public partial class EditGroupViewModel : BaseViewModel
 		{
 			IsLoading = true;
 
+			using var context = _contextFactory.CreateDbContext();
+
 			if (IsCreatingNew)
 			{
 				// Create a brand-new GSR member for this group.
@@ -292,8 +295,8 @@ public partial class EditGroupViewModel : BaseViewModel
 					PersonalEmail = EditEmail?.Trim(),
 					IsGsr = true,
 				};
-				_context.Members.Add(newMember);
-				await _context.SaveChangesAsync(Token);
+				context.Members.Add(newMember);
+				await context.SaveChangesAsync(Token);
 
 				// Add to the group's in-memory collection and our observable list
 				_group.Members.Add(newMember);
@@ -305,14 +308,14 @@ public partial class EditGroupViewModel : BaseViewModel
 			else if (SelectedMember != null && SelectedMember.Id != 0)
 			{
 				// Update an existing tracked member
-				var tracked = await _context.Members.FindAsync(new object[] { SelectedMember.Id }, Token);
+				var tracked = await context.Members.FindAsync(new object[] { SelectedMember.Id }, Token);
 				if (tracked != null)
 				{
 					tracked.AnonymousName = EditName?.Trim() ?? string.Empty;
 					tracked.MobileNumber = EditPhone?.Trim();
 					tracked.PersonalEmail = EditEmail?.Trim();
 
-					await _context.SaveChangesAsync(Token);
+					await context.SaveChangesAsync(Token);
 
 					// Reflect changes in the in-memory object for the list
 					SelectedMember.AnonymousName = tracked.AnonymousName;
@@ -437,15 +440,17 @@ public partial class EditGroupViewModel : BaseViewModel
 
 		try
 		{
+			using var context = _contextFactory.CreateDbContext();
+
 			// Commit all pending removals to the database
 			foreach (var member in PendingRemovals)
 			{
-				var tracked = await _context.Members.FindAsync(new object[] { member.Id }, Token);
+				var tracked = await context.Members.FindAsync(new object[] { member.Id }, Token);
 				if (tracked != null)
 				{
 					if (member.IsTemporary)
 					{
-						_context.Members.Remove(tracked);
+						context.Members.Remove(tracked);
 						_group?.Members.Remove(member);
 						Logger.Information("Deleted temporary member {MemberName} (ID={MemberId}) from local database",
 							member.AnonymousName, member.Id);
@@ -461,7 +466,7 @@ public partial class EditGroupViewModel : BaseViewModel
 
 			if (PendingRemovals.Count > 0)
 			{
-				await _context.SaveChangesAsync(Token);
+				await context.SaveChangesAsync(Token);
 			}
 
 			PendingRemovals.Clear();

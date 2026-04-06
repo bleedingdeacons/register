@@ -26,6 +26,13 @@ public static class MauiProgram
 	public const string UNITY_DATABASE_NAME = "unity.db";
 	public const string MAIL_DATABASE_NAME = "emails.db";
 
+	// Resolved once in SetupSerilog, reused by ReconfigureSerilogWithBetterStack
+	// so both loggers carry identical Application / Environment properties.
+	private const string DefaultAppName = "Badi";
+	private const string DefaultEnvironment = "Development";
+	private static string _resolvedAppName = DefaultAppName;
+	private static string _resolvedEnvironment = DefaultEnvironment;
+
 	public static MauiApp CreateMauiApp()
 	{
 		var builder = MauiApp.CreateBuilder();
@@ -51,6 +58,11 @@ public static class MauiProgram
 		var unityDbPath = Path.Combine(FileSystem.AppDataDirectory, UNITY_DATABASE_NAME);
 		builder.Services.AddDbContext<UnityDbContext>(options =>
 			options.UseSqlite($"Data Source={unityDbPath}"));
+
+		// Factory for ViewModels — each transient ViewModel creates its own
+		// short-lived DbContext, avoiding stale-entity tracking bleed between pages.
+		builder.Services.AddDbContextFactory<UnityDbContext>(options =>
+			options.UseSqlite($"Data Source={unityDbPath}"), ServiceLifetime.Singleton);
 
 		Log.Logger.Information("Unity Db {databasePath}", unityDbPath);
 
@@ -197,8 +209,12 @@ public static class MauiProgram
 		var logPath = Path.Combine(FileSystem.AppDataDirectory, "logs");
 		Directory.CreateDirectory(logPath);
 
-		var appName = builder.Configuration["App:Name"] ?? "Badi";
-		var environment = builder.Configuration["App:Environment"] ?? "Development";
+		var appName = builder.Configuration["App:Name"] ?? DefaultAppName;
+		var environment = builder.Configuration["App:Environment"] ?? DefaultEnvironment;
+
+		// Persist for ReconfigureSerilogWithBetterStack (which runs after DI is built).
+		_resolvedAppName = appName;
+		_resolvedEnvironment = environment;
 
 		var config = new LoggerConfiguration()
 			.ReadFrom.Configuration(builder.Configuration)
@@ -241,9 +257,9 @@ public static class MauiProgram
 			return;
 		}
 
-		// Mirror the same values used in SetupSerilog.
-		var appName = "Badi";
-		var environment = "Development";
+		// Reuse the same values resolved during SetupSerilog.
+		var appName = _resolvedAppName;
+		var environment = _resolvedEnvironment;
 
 		// Build the new logger into a local variable first. If CreateLogger()
 		// or BetterStack() throws, Log.Logger keeps the original file/console/
