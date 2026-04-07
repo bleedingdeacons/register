@@ -82,6 +82,10 @@ public static class MauiProgram
 				var config = await configService.LoadUnityConfigurationAsync();
 				if (!config.IsValid())
 					throw new InvalidOperationException("Unity API is not configured.");
+				Log.Logger.Debug(
+					"UnityRestSharp factory — BaseUrl: {BaseUrl}, ApiKey: {ApiKeyStatus}",
+					config.BaseUrl,
+					string.IsNullOrEmpty(config.ApiKey) ? "(not set)" : "***");
 				return new UnityRestSharp(config.BaseUrl, config.ApiKey);
 			};
 		});

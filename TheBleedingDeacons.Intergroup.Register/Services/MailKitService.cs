@@ -31,15 +31,15 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		private int _timeoutSeconds;
 		private int _maxRetries;
 
-		private bool _isOfflineMode;
+		private volatile bool _isOfflineMode;
 		private bool _disposed;
 
 		// Circuit breaker — pauses the background timer after repeated failures
 		// so a persistent SMTP misconfiguration doesn't spin forever.
 		private const int CircuitBreakerThreshold = 3;
 		private int _consecutiveQueueFailures;
-		private bool _circuitOpen;
-		private string? _lastQueueError;
+		private volatile bool _circuitOpen;
+		private volatile string? _lastQueueError;
 		private DateTime? _circuitOpenedAt;
 
 		#endregion
@@ -241,7 +241,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			try
 			{
 				Logger.Debug("[{OperationId}] Creating MIME message for {To}", operationId, queuedEmail.To);
-				var message = await CreateMimeMessageAsync(queuedEmail);
+				var message = CreateMimeMessage(queuedEmail);
 
 				Logger.Debug("[{OperationId}] Creating SMTP client", operationId);
 				using var client = new SmtpClient();
@@ -378,7 +378,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 
 			try
 			{
-				var message = await CreateMimeMessageAsync(queuedEmail);
+				var message = CreateMimeMessage(queuedEmail);
 				using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(_timeoutSeconds + 10));
 				await client.SendAsync(message, cts.Token);
 
@@ -409,67 +409,64 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			}
 		}
 
-		private async Task<MimeMessage> CreateMimeMessageAsync(QueuedEmail queuedEmail)
+		private MimeMessage CreateMimeMessage(QueuedEmail queuedEmail)
 		{
-			return await Task.Run(() =>
+			var message = new MimeMessage();
+
+			// Set From address
+			message.From.Add(new MailboxAddress("", queuedEmail.From));
+
+			// Set To address
+			message.To.Add(new MailboxAddress("", queuedEmail.To));
+
+			// Set subject
+			message.Subject = queuedEmail.Subject;
+
+			// Add CC recipients if specified
+			if (!string.IsNullOrWhiteSpace(queuedEmail.Cc))
 			{
-				var message = new MimeMessage();
+				var ccAddresses = queuedEmail.Cc.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
+					.Select(addr => addr.Trim())
+					.Where(addr => !string.IsNullOrWhiteSpace(addr));
 
-				// Set From address
-				message.From.Add(new MailboxAddress("", queuedEmail.From));
-
-				// Set To address
-				message.To.Add(new MailboxAddress("", queuedEmail.To));
-
-				// Set subject
-				message.Subject = queuedEmail.Subject;
-
-				// Add CC recipients if specified
-				if (!string.IsNullOrWhiteSpace(queuedEmail.Cc))
+				foreach (var ccAddress in ccAddresses)
 				{
-					var ccAddresses = queuedEmail.Cc.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
-						.Select(addr => addr.Trim())
-						.Where(addr => !string.IsNullOrWhiteSpace(addr));
-
-					foreach (var ccAddress in ccAddresses)
-					{
-						message.Cc.Add(new MailboxAddress("", ccAddress));
-					}
+					message.Cc.Add(new MailboxAddress("", ccAddress));
 				}
+			}
 
-				// Add BCC recipients if specified
-				if (!string.IsNullOrWhiteSpace(queuedEmail.Bcc))
+			// Add BCC recipients if specified
+			if (!string.IsNullOrWhiteSpace(queuedEmail.Bcc))
+			{
+				var bccAddresses = queuedEmail.Bcc.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
+					.Select(addr => addr.Trim())
+					.Where(addr => !string.IsNullOrWhiteSpace(addr));
+
+				foreach (var bccAddress in bccAddresses)
 				{
-					var bccAddresses = queuedEmail.Bcc.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
-						.Select(addr => addr.Trim())
-						.Where(addr => !string.IsNullOrWhiteSpace(addr));
-
-					foreach (var bccAddress in bccAddresses)
-					{
-						message.Bcc.Add(new MailboxAddress("", bccAddress));
-					}
+					message.Bcc.Add(new MailboxAddress("", bccAddress));
 				}
+			}
 
-				// Create body
-				var bodyBuilder = new BodyBuilder();
+			// Create body
+			var bodyBuilder = new BodyBuilder();
 
-				if (queuedEmail.IsHtml)
-				{
-					bodyBuilder.HtmlBody = queuedEmail.Body;
-				}
-				else
-				{
-					bodyBuilder.TextBody = queuedEmail.Body;
-				}
+			if (queuedEmail.IsHtml)
+			{
+				bodyBuilder.HtmlBody = queuedEmail.Body;
+			}
+			else
+			{
+				bodyBuilder.TextBody = queuedEmail.Body;
+			}
 
-				message.Body = bodyBuilder.ToMessageBody();
+			message.Body = bodyBuilder.ToMessageBody();
 
-				// Set additional headers
-				message.MessageId = MimeUtils.GenerateMessageId();
-				message.Date = DateTimeOffset.UtcNow;
+			// Set additional headers
+			message.MessageId = MimeUtils.GenerateMessageId();
+			message.Date = DateTimeOffset.UtcNow;
 
-				return message;
-			});
+			return message;
 		}
 
 		private async Task<bool> HandleEmailFailure(QueuedEmail queuedEmail, Exception ex)
@@ -740,13 +737,13 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 				{
 					// Reset on any successful run (even if some individual emails failed —
 					// ProcessQueueAsync returns true when the SMTP connection itself worked).
-					if (_consecutiveQueueFailures > 0)
+					var previousFailures = Interlocked.Exchange(ref _consecutiveQueueFailures, 0);
+					if (previousFailures > 0)
 					{
 						Logger.Information(
 							"Queue processing succeeded — resetting failure counter (was {Count})",
-							_consecutiveQueueFailures);
+							previousFailures);
 					}
-					_consecutiveQueueFailures = 0;
 					_lastQueueError = null;
 				}
 				else
@@ -764,10 +761,10 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 
 		private void RecordQueueFailure(string error)
 		{
-			_consecutiveQueueFailures++;
+			var count = Interlocked.Increment(ref _consecutiveQueueFailures);
 			_lastQueueError = error;
 
-			if (_consecutiveQueueFailures >= CircuitBreakerThreshold && !_circuitOpen)
+			if (count >= CircuitBreakerThreshold && !_circuitOpen)
 			{
 				_circuitOpen = true;
 				_circuitOpenedAt = DateTime.UtcNow;
@@ -775,7 +772,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 				Logger.Warning(
 					"Circuit breaker OPEN — background email processing paused after {Count} consecutive failures. " +
 					"Last error: {Error}. Call ResetCircuitBreaker() or update SMTP settings to resume.",
-					_consecutiveQueueFailures, _lastQueueError);
+					count, _lastQueueError);
 			}
 		}
 
@@ -788,7 +785,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		{
 			_circuitOpen = false;
 			_circuitOpenedAt = null;
-			_consecutiveQueueFailures = 0;
+			Interlocked.Exchange(ref _consecutiveQueueFailures, 0);
 			_lastQueueError = null;
 
 			Logger.Information("Circuit breaker reset — background email processing will resume");

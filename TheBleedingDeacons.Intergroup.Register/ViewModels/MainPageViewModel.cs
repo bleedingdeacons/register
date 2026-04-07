@@ -27,14 +27,26 @@ public partial class MainPageViewModel : BaseViewModel
 
     public bool IsButtonsEnabled => IsMeetingSelected && !IsBusy;
 
-    public string AppVersion => $"v{AppInfo.VersionString}";
+    [ObservableProperty]
+    public string appVersion;
 
     public MainPageViewModel(IConfigurationService configService, IIntergroupMeetingRepository intergroupMeetingRepository)
     {
         _configService = configService;
         _intergroupMeetingRepository = intergroupMeetingRepository;
         Title = BaseTitle;
-    }
+
+		if (DeviceInfo.Platform == DevicePlatform.WinUI)
+		{
+			AppVersion = System.Diagnostics.FileVersionInfo
+				.GetVersionInfo(System.Environment.ProcessPath!)
+				.FileVersion ?? AppInfo.VersionString;
+		}
+		else
+		{
+			AppVersion = AppInfo.VersionString;
+		}
+	}
 
     // Called each time the page appears so meeting state refreshes.
     public override void ApplyQueryAttributes(IDictionary<string, object> query)

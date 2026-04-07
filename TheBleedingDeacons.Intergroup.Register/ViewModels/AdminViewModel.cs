@@ -142,6 +142,12 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 				return;
 			}
 
+			Logger.Information(
+				"StartMeeting config — BaseUrl: {BaseUrl}, ApiKey: {ApiKeyStatus}, ActiveMeetingId: {ActiveMeetingId}",
+				config.BaseUrl,
+				string.IsNullOrEmpty(config.ApiKey) ? "(not set)" : "***",
+				config.ActiveIntergroupMeetingId);
+
 			try
 			{
 				Phase = MeetingPhase.Syncing;
@@ -230,9 +236,26 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 
 			if (!confirmed) return;
 
+			Phase = MeetingPhase.Finishing;
+			await ExecuteFinishReconciliationAsync();
+		}
+
+		/// <summary>
+		/// Retries the finish-meeting sync after a previous failure.
+		/// </summary>
+		[RelayCommand]
+		private async Task RetryFinish()
+		{
+			await ExecuteFinishReconciliationAsync();
+		}
+
+		/// <summary>
+		/// Shared reconciliation logic for both FinishMeeting and RetryFinish.
+		/// </summary>
+		private async Task ExecuteFinishReconciliationAsync()
+		{
 			try
 			{
-				Phase = MeetingPhase.Finishing;
 				HasFinishSyncError = false;
 				ShowStatus("Pushing changes to Unity...", false);
 
@@ -270,53 +293,6 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 				ShowStatus($"Reconciliation failed: {ex.Message}", true);
 				HasFinishSyncError = true;
 				// Remain at Finishing phase so the retry button is visible
-			}
-		}
-
-		/// <summary>
-		/// Retries the finish-meeting sync after a previous failure.
-		/// </summary>
-		[RelayCommand]
-		private async Task RetryFinish()
-		{
-			try
-			{
-				HasFinishSyncError = false;
-				ShowStatus("Pushing changes to Unity...", false);
-
-				var (meetings, positions, members, groups, contacts, intergroupMeetings,
-					 created, modified, registered, errors, warnings) =
-					await _dataService.ImportWithReconciliationAsync(Token);
-
-				// Clear the active meeting
-				await _configService.SaveActiveIntergroupMeetingAsync(null);
-				ActiveMeetingId = null;
-				ActiveMeetingDate = string.Empty;
-				ActiveMeetingTitle = string.Empty;
-
-				FinishSummary =
-					$"Pushed to Unity:\n" +
-					$"  • {created} new members created\n" +
-					$"  • {modified} members updated\n" +
-					$"  • {registered} registrations recorded\n" +
-					(errors > 0 ? $"  • {errors} API errors\n" : "") +
-					$"\nRe-synced: {groups} groups, {meetings} meetings, {members} members.";
-
-				if (warnings > 0)
-					Logger.Warning("Meeting finished (retry) with {Warnings} API warnings (non-fatal)", warnings);
-
-				Phase = MeetingPhase.Completed;
-				HideStatus();
-
-				Logger.Information(
-					"Meeting finished (retry): {Created} created, {Modified} modified, {Registered} registered, {Errors} errors, {Warnings} warnings",
-					created, modified, registered, errors, warnings);
-			}
-			catch (Exception ex)
-			{
-				Logger.Error(ex, "Retry finish reconciliation failed");
-				ShowStatus($"Reconciliation failed: {ex.Message}", true);
-				HasFinishSyncError = true;
 			}
 		}
 
