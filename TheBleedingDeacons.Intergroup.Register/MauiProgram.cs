@@ -119,9 +119,12 @@ public static class MauiProgram
 			return new EmailTemplateService(Assembly.GetExecutingAssembly(), "Templates");
 		});
 
-		// Register the mail service as scoped — same lifetime as AttendanceService
-		// and DbContext, so event subscriptions are safe across the scope boundary.
-		builder.Services.AddScoped<IMailService>(provider =>
+		// Register the mail service as singleton — MailKitService owns a background
+		// Timer for queue processing that must live for the entire app lifetime.
+		// This is safe because the service only uses IDbContextFactory<MailDbContext>
+		// (which is registered as singleton) rather than a scoped DbContext directly.
+		// SMTP configuration changes are applied via UpdateConfigurationAsync().
+		builder.Services.AddSingleton<IMailService>(provider =>
 		{
 			var dbContextFactory = provider.GetRequiredService<IDbContextFactory<MailDbContext>>();
 			var configService = provider.GetRequiredService<IConfigurationService>();

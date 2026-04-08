@@ -721,6 +721,13 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 
 		private async Task ProcessQueueInBackground()
 		{
+			// Guard against timer callbacks firing after Dispose() has been called.
+			// The Timer can enqueue one final callback between _backgroundTimer.Dispose()
+			// and the actual cancellation — without this check, the callback would run
+			// against disposed semaphores and throw ObjectDisposedException.
+			if (_disposed)
+				return;
+
 			if (_circuitOpen)
 			{
 				Logger.Debug(
@@ -750,6 +757,11 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 				{
 					RecordQueueFailure("Queue processing returned false (offline, no network, or semaphore contention)");
 				}
+			}
+			catch (ObjectDisposedException)
+			{
+				// Service was disposed while the timer callback was in-flight — expected, not an error.
+				Logger.Debug("Background queue processing aborted — service disposed");
 			}
 			catch (Exception ex)
 			{
@@ -1064,19 +1076,15 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			ResetCircuitBreaker();
 			Logger.Information("MailKit offline mode disabled - resuming email sending");
 
-			// Trigger immediate queue processing
-			Task.Run(async () =>
+			// Trigger immediate queue processing (unless already disposed)
+			if (!_disposed)
 			{
-				try
+				Task.Run(async () =>
 				{
 					await Task.Delay(1000);
 					await ProcessQueueAsync();
-				}
-				catch (Exception ex)
-				{
-					Logger.Error(ex, "Error processing queue after disabling offline mode");
-				}
-			});
+				}).SafeFireAndForget("DisableOfflineMode queue flush");
+			}
 		}
 
 		#endregion
@@ -1094,11 +1102,24 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			if (_disposed)
 				return;
 
+			// Set early so in-flight timer callbacks can bail out.
+			_disposed = true;
+
 			if (disposing)
 			{
 				try
 				{
-					_backgroundTimer?.Dispose();
+					// Stop the timer first. Change(Infinite, Infinite) prevents new
+					// callbacks from being enqueued, and the ManualResetEvent signals
+					// when any currently-executing callback has finished — so we don't
+					// dispose the semaphores out from under a running ProcessQueueAsync.
+					using var timerStopped = new ManualResetEvent(false);
+					if (_backgroundTimer.Dispose(timerStopped))
+					{
+						// Wait up to 30 seconds for in-flight callback to drain.
+						timerStopped.WaitOne(TimeSpan.FromSeconds(30));
+					}
+
 					_queueSemaphore?.Dispose();
 					_configSemaphore?.Dispose();
 
@@ -1109,8 +1130,6 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 					Logger.Error(ex, "Error during MailKitService disposal");
 				}
 			}
-
-			_disposed = true;
 		}
 
 		~MailKitService()
