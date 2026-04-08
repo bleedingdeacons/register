@@ -1,11 +1,11 @@
 {
   "SmtpSettings": {
-    "Host": "mail.aa-bristol.org",
+    "Host": "",
     "Port": 465,
-    "Username": "wtf@aa-bristol.org",
+    "Username": "",
     "Password": "",
     "EnableSsl": true,
-    "FromDisplayName": "Bristol and Distict Intergroup",
+    "FromDisplayName": "",
     "TimeoutSeconds": 30
   },
   "BetterStack": {
