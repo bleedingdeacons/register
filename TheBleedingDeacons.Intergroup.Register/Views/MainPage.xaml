@@ -8,11 +8,11 @@
 
     <Shell.TitleView>
         <Grid>
-            <Label FontSize="Micro" Text="{Binding AppVersion}"
+            <Label FontSize="Large" Text="{Binding AppVersion}"
                    Opacity="0.5"
                    VerticalOptions="Center"
                    HorizontalOptions="End"
-                   Margin="0,0,8,0" TextColor="Blue" />
+                   Margin="0,0,8,0" TextColor="Yellow" />
 
         </Grid>
     </Shell.TitleView>
