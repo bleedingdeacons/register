@@ -132,22 +132,6 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		// Unity
 		// =================================================================
 
-		public UnityConfiguration GetUnityConfiguration()
-		{
-			if (_cachedUnityConfig != null)
-				return _cachedUnityConfig;
-
-			var baseUrl = ReadJsonProperty(_unityConfigFilePath, "UnitySettings", "BaseUrl", "Unity settings");
-
-			_cachedUnityConfig = new UnityConfiguration
-			{
-				BaseUrl = baseUrl,
-				ApiKey = "",
-			};
-
-			return _cachedUnityConfig;
-		}
-
 		public async Task SaveUnityConfigurationAsync(UnityConfiguration config)
 		{
 			await SaveSecretAsync(UNITY_API_KEY, config.ApiKey, "Unity API key");
@@ -157,8 +141,13 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 
 		public async Task<UnityConfiguration> LoadUnityConfigurationAsync()
 		{
+#if DEBUG
+			var baseUrl = "https://aa-bristol.org/amber";
+			var apiKey = "int_4b8edd62928c4458f9994711b378f827c8e588ccd051c814d9ab290e190e835e";
+#else
 			var baseUrl = await ReadJsonPropertyAsync(_unityConfigFilePath, "UnitySettings", "BaseUrl", "Unity settings");
 			var apiKey = await GetSecretAsync(UNITY_API_KEY, "Unity API key");
+#endif
 
 			int? activeIntergroupMeetingId = null;
 			try

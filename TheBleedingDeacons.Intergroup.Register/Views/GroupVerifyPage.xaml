@@ -94,8 +94,9 @@
                     </StackLayout>
                 </Border>
 
-                <!-- Standing In Section with Border -->
-                <Border Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}"
+                <!-- Standing In Section with Border — only shown when group has a registered GSR -->
+                <Border IsVisible="{Binding HasActiveGsrs}"
+                        Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}"
                         StrokeThickness="2"
                         StrokeShape="RoundRectangle 10"
                         Padding="15"
@@ -128,19 +129,6 @@
                                        Text="{Binding StandinName}"
                                        Placeholder="Enter your name"
                                        Keyboard="Text"
-                                       FontSize="18"
-                                       BackgroundColor="{AppThemeBinding Light=White, Dark={StaticResource Gray800}}"
-                                       TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"/>
-
-                            <Label Text="Your Email" 
-                                   FontSize="20"
-                                   FontAttributes="Bold"
-                                   TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}"
-                                   Margin="0"/>
-                            <controls:ClearableEntry x:Name="StandingInEmailEntry"
-                                       Text="{Binding StandinEmail}"
-                                       Placeholder="Enter your email address"
-                                       Keyboard="Email"
                                        FontSize="18"
                                        BackgroundColor="{AppThemeBinding Light=White, Dark={StaticResource Gray800}}"
                                        TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"/>

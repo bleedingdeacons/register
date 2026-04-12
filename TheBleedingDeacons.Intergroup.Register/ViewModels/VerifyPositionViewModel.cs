@@ -194,7 +194,7 @@ public partial class VerifyPositionViewModel : BaseViewModel
             await _attendanceRegistration.Register(Position);
 
             await _popupService.ShowCountdownPopupAsync(
-                "Finished",
+                "Complete",
                 $"Thanks for registering {Position.ShortDescription}.",
                 async () => await Shell.Current.GoToAsync("//MainPage")
             );

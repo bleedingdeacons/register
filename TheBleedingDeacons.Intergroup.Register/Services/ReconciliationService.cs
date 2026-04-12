@@ -224,7 +224,7 @@ public class ReconciliationService
 
 						var response = await client.RegisterGroupAsync(
 							meetingId, group.Id, memberId, gsrName,
-							gsrProxy: false, gsrProxyName: null, ct);
+							gsrProxy: group.GsrProxy, gsrProxyName: group.GsrProxyName, ct);
 
 						if (response.Success)
 						{

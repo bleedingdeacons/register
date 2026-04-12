@@ -5,7 +5,7 @@
                xmlns:vm="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
                x:Class="TheBleedingDeacons.Intergroup.Register.Views.CountdownPopup"
                x:DataType="vm:CountdownPopupViewModel"
-               CanBeDismissedByTappingOutsideOfPopup="False">
+               CanBeDismissedByTappingOutsideOfPopup="True">
 
     <Border x:DataType="vm:CountdownPopupViewModel"
             BackgroundColor="White"
@@ -46,10 +46,6 @@
                     FontSize="24"
                     HorizontalOptions="Center"/>
 
-            <!-- Progress indicator -->
-            <ProgressBar Progress="{Binding CountdownSeconds, Converter={StaticResource CountdownToProgressConverter}}"
-                        ProgressColor="#007ACC"
-                        HeightRequest="12"/>
         </StackLayout>
     </Border>
 </toolkit:Popup>

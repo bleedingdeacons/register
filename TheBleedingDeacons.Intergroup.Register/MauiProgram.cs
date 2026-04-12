@@ -201,12 +201,20 @@ public static class MauiProgram
 		// SetupSerilog runs before DI is built, so it cannot read from
 		// ConfigurationService. We layer the BetterStack sink on here,
 		// once the container (and SecureStorage) are available.
+#if DEBUG
+		ReconfigureSerilogWithBetterStack(new BetterStackConfiguration
+		{
+			Endpoint = "https://in.logs.betterstack.com",
+			SourceToken = "goJkiJqUCb4qSJdFEpLx6hkw"
+		});
+#else
 		using (var scope = mauiapp.Services.CreateScope())
 		{
 			var configService = scope.ServiceProvider.GetRequiredService<IConfigurationService>();
 			var betterStackConfig = configService.GetBetterStackConfiguration();
 			ReconfigureSerilogWithBetterStack(betterStackConfig);
 		}
+#endif
 
 		return mauiapp;
 	}

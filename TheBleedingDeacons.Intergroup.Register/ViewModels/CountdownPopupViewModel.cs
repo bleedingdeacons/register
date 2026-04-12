@@ -19,7 +19,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
         private string _message = string.Empty;
 
         [ObservableProperty]
-        private int _countdownSeconds = 5;
+        private int _countdownSeconds = 3;
 
         [ObservableProperty]
         private string _nextButtonText = "Next Fellow 👆";
@@ -37,16 +37,14 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
             _timer = new System.Timers.Timer(1000); // 1 second interval
             _timer.Elapsed += OnTimerElapsed;
             _timer.Start();
-
-            UpdateNextButtonText();
+            
         }
 
         private void OnTimerElapsed(object? sender, ElapsedEventArgs e)
         {
             MainThread.BeginInvokeOnMainThread(() =>
             {
-                CountdownSeconds--;
-                UpdateNextButtonText();
+                CountdownSeconds--;                
 
                 if (CountdownSeconds <= 0)
                 {
@@ -58,11 +56,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
                 }
             });
         }
-
-        private void UpdateNextButtonText()
-        {
-            NextButtonText = $"Next Fellow ({CountdownSeconds}s) 👆";
-        }
+        
 
         [RelayCommand]
         private async Task NavigateAndClose()

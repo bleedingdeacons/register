@@ -50,8 +50,8 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 
 		public async Task Register(Group entity)
 		{
-			Logger.Information("Group {GroupName} attendance registered locally", entity.Name);
-			await SetGroupRegisteredAsync(entity.Id, true);
+			Logger.Information("Group {GroupName} attendance registered locally (Proxy={Proxy})", entity.Name, entity.GsrProxy);
+			await SetGroupRegisteredAsync(entity.Id, true, entity.GsrProxy, entity.GsrProxyName);
 		}
 
 		public async Task Unregister(Position entity)
@@ -66,7 +66,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			await SetGroupRegisteredAsync(entity.Id, false);
 		}
 
-		private async Task SetGroupRegisteredAsync(int groupId, bool registered, CancellationToken ct = default)
+		private async Task SetGroupRegisteredAsync(int groupId, bool registered, bool gsrProxy = false, string? gsrProxyName = null, CancellationToken ct = default)
 		{
 			try
 			{
@@ -74,6 +74,8 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 				if (group != null)
 				{
 					group.Registered = registered;
+					group.GsrProxy = gsrProxy;
+					group.GsrProxyName = gsrProxy ? gsrProxyName : null;
 					await _dbContext.SaveChangesAsync(ct);
 				}
 			}
