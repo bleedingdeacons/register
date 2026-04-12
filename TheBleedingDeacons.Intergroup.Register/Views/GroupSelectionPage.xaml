@@ -9,81 +9,72 @@
 
     <Grid>
         <!-- Main content - hidden while loading -->
-        <Grid RowDefinitions="Auto,Auto,*" IsVisible="{Binding IsDataLoaded}" Margin="10">
-
-            <!-- Header with selected day -->
-            <Border Grid.Row="0" 
-                    BackgroundColor="{StaticResource Primary}"
-                    Padding="20,15"
-                    Margin="0,0,0,10">
-                <StackLayout Orientation="Horizontal" 
-                            HorizontalOptions="CenterAndExpand"
-                            Spacing="10">
-                    <Label Text="👥" 
-                           FontSize="24" 
-                           VerticalOptions="Center" />
-                    <Label Text="{Binding Header}" 
-                           FontSize="20" 
-                           FontAttributes="Bold"
-                           TextColor="White" 
-                           VerticalOptions="Center" />
-                </StackLayout>
-            </Border>
+        <Grid RowDefinitions="*" IsVisible="{Binding IsDataLoaded}" Margin="10">
 
             <!-- Groups list -->
-            <CollectionView Grid.Row="2"
-                           ItemsSource="{Binding Groups}"                          
+            <CollectionView ItemsSource="{Binding Groups}"
                            SelectionMode="None">
                 <CollectionView.ItemsLayout>
                     <LinearItemsLayout Orientation="Vertical" ItemSpacing="5" />
                 </CollectionView.ItemsLayout>
                 <CollectionView.ItemTemplate>
                     <DataTemplate x:DataType="entities:Group">
-                        <Border BackgroundColor="White"
-                               StrokeShape="RoundRectangle 8"
-                               Stroke="{StaticResource Gray200}"
-                               StrokeThickness="1"
-                               Margin="15,5">
+                        <Border StrokeShape="RoundRectangle 15"
+                Stroke="#80FFFFFF"
+                StrokeThickness="1"
+                BackgroundColor="#0071BB"
+                Margin="15,5">
+
+                            <Border.Shadow>
+                                <Shadow Brush="Black"
+                        Opacity="0.25"
+                        Radius="12"
+                        Offset="0,6" />
+                            </Border.Shadow>
 
                             <Border.GestureRecognizers>
                                 <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type vm:GroupSelectionViewModel}}, Path=SelectGroupCommand}"
-                                                     CommandParameter="{Binding .}" />
+                                     CommandParameter="{Binding .}" />
                             </Border.GestureRecognizers>
 
-                            <Grid Padding="15" 
-                                  RowDefinitions="Auto,Auto" 
-                                  ColumnDefinitions="Auto,*,Auto">
+                            <Grid Padding="14,10"
+                  RowDefinitions="Auto,Auto"
+                  ColumnDefinitions="Auto,*,Auto">
 
                                 <!-- Registered indicator -->
                                 <Label Grid.Row="0" Grid.RowSpan="2" Grid.Column="0"
-                                       Text="✓"
-                                       FontSize="28"
-                                       FontAttributes="Bold"
-                                       TextColor="#4CAF50"
-                                       VerticalOptions="Center"
-                                       Margin="0,0,12,0"
-                                       IsVisible="{Binding Registered}" />
+                       Text="✓"
+                       FontSize="28"
+                       FontAttributes="Bold"
+                       TextColor="#A5D6A7"
+                       VerticalOptions="Center"
+                       Margin="0,0,12,0"
+                       IsVisible="{Binding Registered}" />
 
                                 <!-- Group Name -->
                                 <Label Grid.Row="0" Grid.Column="1"
-                                       Text="{Binding Name}"
-                                       FontSize="24"
-                                       FontAttributes="Bold"
-                                       TextColor="{Binding Members, Converter={StaticResource HasGsrToColorConverter}}" />
+                       Text="{Binding Name}"
+                       FontFamily="OpenSansRegular"
+                       FontSize="24"
+                       FontAttributes="Bold"
+                       TextColor="White"
+                       VerticalOptions="Center" />
 
                                 <!-- Registered status text -->
                                 <Label Grid.Row="1" Grid.Column="1"
-                                       Text="Registered"
-                                       FontSize="16"
-                                       TextColor="#4CAF50"
-                                       IsVisible="{Binding Registered}" />
+                       Text="Registered"
+                       FontSize="14"
+                       FontAttributes="Bold"
+                       TextColor="#C8E6C9"
+                       IsVisible="{Binding Registered}" />
 
                                 <!-- Arrow indicator -->
                                 <Label Grid.Row="0" Grid.RowSpan="2" Grid.Column="2"
-                                       Text="›"
-                                       FontSize="32"
-                                       TextColor="{StaticResource Primary}"
-                                       VerticalOptions="Center" />
+                       Text="›"
+                       FontSize="32"
+                       FontAttributes="Bold"
+                       TextColor="White"
+                       VerticalOptions="Center" />
 
                             </Grid>
                         </Border>
