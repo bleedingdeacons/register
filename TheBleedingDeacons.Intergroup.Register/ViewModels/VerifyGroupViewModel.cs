@@ -200,7 +200,7 @@ public partial class VerifyGroupViewModel : BaseViewModel
 
 			await _popupService.ShowCountdownPopupAsync(
 				"Complete",
-				$"Thanks {Group.Name}.",
+				$"Thanks {Group.Name}",
 				async () => await Shell.Current.GoToAsync("//MainPage")
 			);
 		}

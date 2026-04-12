@@ -195,7 +195,7 @@ public partial class VerifyPositionViewModel : BaseViewModel
 
             await _popupService.ShowCountdownPopupAsync(
                 "Complete",
-                $"Thanks {Position.ShortDescription}.",
+                $"Thanks {Position.ShortDescription}",
                 async () => await Shell.Current.GoToAsync("//MainPage")
             );
         }
