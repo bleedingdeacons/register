@@ -360,7 +360,7 @@
         <Setter Property="FontFamily" Value="OpenSansRegular" />
         <Setter Property="FontSize" Value="24" />
         <Setter Property="FontAttributes" Value="Bold" />
-        
+
         <!-- Glass surface -->
         <Setter Property="Background">
             <Setter.Value>
@@ -632,6 +632,7 @@
     <local:StringNotEmptyAndEditingConverter x:Key="StringNotEmptyAndEditingConverter" />
     <local:StringToBoolConverter x:Key="StringToBoolConverter" />
     <local:CountToBoolConverter x:Key="CountToBoolConverter" />
+    <local:HasGsrToColorConverter x:Key="HasGsrToColorConverter" />
 
     <converters:ObscurePhoneNumberConverter x:Key="ObscurePhoneNumber" />
 

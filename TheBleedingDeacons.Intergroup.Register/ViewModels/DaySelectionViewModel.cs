@@ -10,44 +10,48 @@ using TheBleedingDeacons.Intergroup.Register.Views;
 
 namespace TheBleedingDeacons.Intergroup.Register.ViewModels;
 
+[QueryProperty(nameof(MeetingType), "meetingType")]
 public partial class DaySelectionViewModel : BaseViewModel
 {
-    private static readonly ILogger Logger = AppLogger.ForContext<DaySelectionViewModel>();
+	private static readonly ILogger Logger = AppLogger.ForContext<DaySelectionViewModel>();
 
-    [ObservableProperty]
-    private ObservableCollection<DayItem> days;
+	[ObservableProperty]
+	private string meetingType = string.Empty;
 
-    [ObservableProperty]
-    private DayItem? selectedDay;
+	[ObservableProperty]
+	private ObservableCollection<DayItem> days;
 
-    public DaySelectionViewModel()
-    {
+	[ObservableProperty]
+	private DayItem? selectedDay;
 
-        Title = "Select a Day";
+	public DaySelectionViewModel()
+	{
 
-        days = new ObservableCollection<DayItem>
-        {
-            new("Monday"),
-            new("Tuesday"),
-            new("Wednesday"),
-            new("Thursday"),
-            new("Friday"),
-            new("Saturday"),
-            new("Sunday")
-        };
-    }
+		Title = "Select a Day";
 
-    [RelayCommand]
-    async Task SelectDay(DayItem day)
-    {
+		days = new ObservableCollection<DayItem>
+		{
+			new("Monday"),
+			new("Tuesday"),
+			new("Wednesday"),
+			new("Thursday"),
+			new("Friday"),
+			new("Saturday"),
+			new("Sunday")
+		};
+	}
 
-        var parameters = new Dictionary<string, object>{
+	[RelayCommand]
+	async Task SelectDay(DayItem day)
+	{
 
-                {"day", day.Name}};
+		var criteria = new MeetingCriteria() { MeetingType = MeetingType, Day = day.Name };
 
-        await Shell.Current.GoToAsync(nameof(TypeSelectionPage), parameters);
+		var parameters = new Dictionary<string, object> { { "criteria", criteria } };
+
+		await Shell.Current.GoToAsync(nameof(GroupSelectionPage), parameters);
 
 
-    }
+	}
 
 }

@@ -35,40 +35,40 @@
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net9.0-android|AnyCPU'">
-	  <ApplicationDisplayVersion>1.0.4</ApplicationDisplayVersion>
+		<ApplicationDisplayVersion>1.0.4</ApplicationDisplayVersion>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net9.0-ios|AnyCPU'">
-	  <ApplicationDisplayVersion>1.0.4</ApplicationDisplayVersion>
+		<ApplicationDisplayVersion>1.0.4</ApplicationDisplayVersion>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net9.0-maccatalyst|AnyCPU'">
-	  <ApplicationDisplayVersion>1.0.4</ApplicationDisplayVersion>
+		<ApplicationDisplayVersion>1.0.4</ApplicationDisplayVersion>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net9.0-windows10.0.19041.0|AnyCPU'">
-	  <ApplicationDisplayVersion>1.0.4</ApplicationDisplayVersion>
+		<ApplicationDisplayVersion>1.0.4</ApplicationDisplayVersion>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net9.0-android|AnyCPU'">
-	  <ApplicationDisplayVersion>1.0.4</ApplicationDisplayVersion>
-	  <AndroidPackageFormat>apk</AndroidPackageFormat>
-	  <AndroidUseAapt2>True</AndroidUseAapt2>
-	  <AndroidCreatePackagePerAbi>False</AndroidCreatePackagePerAbi>
-	  <DebugSymbols>True</DebugSymbols>
-	  <AndroidKeyStore>True</AndroidKeyStore>
+		<ApplicationDisplayVersion>1.0.4</ApplicationDisplayVersion>
+		<AndroidPackageFormat>apk</AndroidPackageFormat>
+		<AndroidUseAapt2>True</AndroidUseAapt2>
+		<AndroidCreatePackagePerAbi>False</AndroidCreatePackagePerAbi>
+		<DebugSymbols>True</DebugSymbols>
+		<AndroidKeyStore>True</AndroidKeyStore>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net9.0-ios|AnyCPU'">
-	  <ApplicationDisplayVersion>1.0.4</ApplicationDisplayVersion>
+		<ApplicationDisplayVersion>1.0.4</ApplicationDisplayVersion>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net9.0-maccatalyst|AnyCPU'">
-	  <ApplicationDisplayVersion>1.0.4</ApplicationDisplayVersion>
+		<ApplicationDisplayVersion>1.0.4</ApplicationDisplayVersion>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net9.0-windows10.0.19041.0|AnyCPU'">
-	  <ApplicationDisplayVersion>1.0.4</ApplicationDisplayVersion>
+		<ApplicationDisplayVersion>1.0.4</ApplicationDisplayVersion>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -89,6 +89,8 @@
 
 	<ItemGroup>
 		<EmbeddedResource Include="Templates\WelcomeEmail.html" />
+		<EmbeddedResource Include="appsettings.json" />
+		<None Remove="appsettings.json" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -100,6 +102,7 @@
 		</PackageReference>
 		<PackageReference Include="EPPlus" Version="8.2.0" />
 		<PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="9.0.9" />
+		<PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="9.0.9" />
 		<PackageReference Include="Microsoft.Maui.Controls" Version="9.0.120" />
 		<PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="9.0.120" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.9" />
@@ -111,6 +114,7 @@
 		<PackageReference Include="Serilog.Sinks.Debug" Version="3.0.0" />
 		<PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
 		<PackageReference Include="BetterStack.Logs.Serilog" Version="1.1.0" />
+		<PackageReference Include="Serilog.Extensions.Logging" Version="9.0.0" />
 		<PackageReference Include="SonarAnalyzer.CSharp" Version="10.15.0.120848">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -145,7 +149,7 @@
 			<Generator>MSBuild:Compile</Generator>
 		</MauiXaml>
 		<MauiXaml Update="Views\PositionVerifyPage.xaml">
-		  <Generator>MSBuild:Compile</Generator>
+			<Generator>MSBuild:Compile</Generator>
 		</MauiXaml>
 		<MauiXaml Update="Views\SettingsPage.xaml">
 			<Generator>MSBuild:Compile</Generator>
@@ -160,20 +164,20 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <ProjectReference Include="..\TheBleedingDeacons.Unity.Intergroup\TheBleedingDeacons.Unity.Intergroup.csproj" />
+		<ProjectReference Include="..\TheBleedingDeacons.Unity.Intergroup\TheBleedingDeacons.Unity.Intergroup.csproj" />
 	</ItemGroup>
 
 	<!-- TODO: Re-add Integrity.Client as a NuGet package or relative project reference -->
 
 	<ItemGroup>
 		<Compile Update="Views\GroupEditPage.xaml.cs">
-		  <DependentUpon>GroupEditPage.xaml</DependentUpon>
+			<DependentUpon>GroupEditPage.xaml</DependentUpon>
 		</Compile>
 		<Compile Update="Views\DatabaseBackupPage.xaml.cs">
 			<DependentUpon>DatabaseBackupPage.xaml</DependentUpon>
 		</Compile>
 		<Compile Update="Views\GroupSelectionPage.xaml.cs">
-		  <DependentUpon>GroupSelectionPage.xaml</DependentUpon>
+			<DependentUpon>GroupSelectionPage.xaml</DependentUpon>
 		</Compile>
 	</ItemGroup>
 

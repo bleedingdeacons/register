@@ -73,7 +73,7 @@
 
             <Button x:Name="RegisterBtn" Style="{StaticResource PrimaryButtonStyle}"
                     Text="Group Service Representative 👆"
-                    Command="{Binding SelectDayCommand}"
+                    Command="{Binding SelectTypeCommand}"
                     IsEnabled="{Binding IsButtonsEnabled}"
                     HeightRequest="120"
                     FlexLayout.Basis="48%"

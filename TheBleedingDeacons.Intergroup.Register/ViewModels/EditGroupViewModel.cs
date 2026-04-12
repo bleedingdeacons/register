@@ -317,10 +317,20 @@ public partial class EditGroupViewModel : BaseViewModel
 
 					await context.SaveChangesAsync(Token);
 
-					// Reflect changes in the in-memory object for the list
+					// Reflect changes in the in-memory object
 					SelectedMember.AnonymousName = tracked.AnonymousName;
 					SelectedMember.MobileNumber = tracked.MobileNumber;
 					SelectedMember.PersonalEmail = tracked.PersonalEmail;
+
+					// Member doesn't implement INotifyPropertyChanged, so the
+					// CollectionView won't pick up the property changes above.
+					// Replace the item in the ObservableCollection to trigger a
+					// CollectionChanged notification that refreshes the UI.
+					var index = ActiveMembers.IndexOf(SelectedMember);
+					if (index >= 0)
+					{
+						ActiveMembers[index] = SelectedMember;
+					}
 
 					Logger.Information("Updated member {MemberName} (ID={MemberId})",
 						tracked.AnonymousName, tracked.Id);

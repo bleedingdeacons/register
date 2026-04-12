@@ -23,6 +23,8 @@ public class UnitySyncService
 
 	public record SyncResult(int Groups, int Meetings, int Positions, int Members, int Contacts, int IntergroupMeetings);
 
+	private const int PageSize = 500;
+
 	/// <summary>
 	/// Pulls all data from Unity and replaces the local database.
 	/// </summary>
@@ -31,32 +33,32 @@ public class UnitySyncService
 		// Create a fresh client each sync so we always use the latest credentials.
 		using var client = await _clientFactory();
 
-		// ── Fetch from Unity API ──────────────────────────────────────
+		// ── Fetch from Unity API (paginated) ─────────────────────────
 
-		var groupsResponse = await client.GetGroupsAsync(perPage: 500, expandMeetings: true, cancellationToken: ct);
-		if (!groupsResponse.Success || groupsResponse.Data is null)
-			throw new InvalidOperationException($"Failed to fetch groups: {groupsResponse.Error?.Message}");
+		var allGroups = await FetchAllPagesAsync(
+			(page, token) => client.GetGroupsAsync(page: page, perPage: PageSize, expandMeetings: true, cancellationToken: token),
+			"groups", ct);
 
-		var positionsResponse = await client.GetPositionsAsync(perPage: 500, cancellationToken: ct);
-		if (!positionsResponse.Success || positionsResponse.Data is null)
-			throw new InvalidOperationException($"Failed to fetch positions: {positionsResponse.Error?.Message}");
+		var allPositions = await FetchAllPagesAsync(
+			(page, token) => client.GetPositionsAsync(page: page, perPage: PageSize, cancellationToken: token),
+			"positions", ct);
 
-		var membersResponse = await client.GetMembersAsync(perPage: 500, cancellationToken: ct);
-		if (!membersResponse.Success || membersResponse.Data is null)
-			throw new InvalidOperationException($"Failed to fetch members: {membersResponse.Error?.Message}");
+		var allMembers = await FetchAllPagesAsync(
+			(page, token) => client.GetMembersAsync(page: page, perPage: PageSize, cancellationToken: token),
+			"members", ct);
 
-		var intergroupResponse = await client.GetIntergroupMeetingsAsync(perPage: 500, cancellationToken: ct);
-		if (!intergroupResponse.Success || intergroupResponse.Data is null)
-			throw new InvalidOperationException($"Failed to fetch intergroup meetings: {intergroupResponse.Error?.Message}");
+		var allIntergroupMeetings = await FetchAllPagesAsync(
+			(page, token) => client.GetIntergroupMeetingsAsync(page: page, perPage: PageSize, cancellationToken: token),
+			"intergroup meetings", ct);
 
 		// ── Map to EF entities ────────────────────────────────────────
 
-		var groups = MapGroups(groupsResponse.Data);
-		var meetings = MapMeetings(groupsResponse.Data);
-		var contacts = MapContacts(groupsResponse.Data);
-		var members = MapMembers(membersResponse.Data);
-		var positions = MapPositions(positionsResponse.Data);
-		var intergroupMeetings = MapIntergroupMeetings(intergroupResponse.Data);
+		var groups = MapGroups(allGroups);
+		var meetings = MapMeetings(allGroups);
+		var contacts = MapContacts(allGroups);
+		var members = MapMembers(allMembers);
+		var positions = MapPositions(allPositions);
+		var intergroupMeetings = MapIntergroupMeetings(allIntergroupMeetings);
 
 		// ── Replace local data inside a transaction ────────────────────
 		// If the app crashes between delete and insert, the transaction
@@ -104,6 +106,39 @@ public class UnitySyncService
 		}
 
 		return new SyncResult(groups.Count, meetings.Count, positions.Count, members.Count, contacts.Count, intergroupMeetings.Count);
+	}
+
+	// ── Pagination ──────────────────────────────────────────────────
+
+	/// <summary>
+	/// Fetches every page of a paginated Unity endpoint and returns the
+	/// combined results as a single list.
+	/// </summary>
+	private static async Task<List<T>> FetchAllPagesAsync<T>(
+		Func<int, CancellationToken, Task<ApiResponse<List<T>>>> fetchPage,
+		string entityName,
+		CancellationToken ct) where T : class
+	{
+		var all = new List<T>();
+		int page = 1;
+
+		while (true)
+		{
+			var response = await fetchPage(page, ct);
+
+			if (!response.Success || response.Data is null)
+				throw new InvalidOperationException(
+					$"Failed to fetch {entityName} (page {page}): {response.Error?.Message}");
+
+			all.AddRange(response.Data);
+
+			if (response.Meta is null || page >= response.Meta.TotalPages)
+				break;
+
+			page++;
+		}
+
+		return all;
 	}
 
 	// ── Mapping ──────────────────────────────────────────────────────

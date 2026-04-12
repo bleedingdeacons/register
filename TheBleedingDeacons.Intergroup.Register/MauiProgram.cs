@@ -1,5 +1,6 @@
 using CommunityToolkit.Maui;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Serilog;
 using Serilog.Events;
@@ -36,6 +37,32 @@ public static class MauiProgram
 	public static MauiApp CreateMauiApp()
 	{
 		var builder = MauiApp.CreateBuilder();
+
+		// ── Load appsettings.json from embedded resource ──────────────
+		// MAUI does not auto-load appsettings.json the way ASP.NET Core does.
+		// The file is embedded in the assembly (see csproj <EmbeddedResource>)
+		// and must be loaded explicitly so Serilog's ReadFrom.Configuration
+		// and any builder.Configuration[...] lookups actually return values.
+		var assembly = Assembly.GetExecutingAssembly();
+		using (var stream = assembly.GetManifestResourceStream(
+			"TheBleedingDeacons.Intergroup.Register.appsettings.json"))
+		{
+			if (stream is not null)
+			{
+				var jsonConfig = new ConfigurationBuilder()
+					.AddJsonStream(stream)
+					.Build();
+				builder.Configuration.AddConfiguration(jsonConfig);
+			}
+			else
+			{
+				System.Diagnostics.Debug.WriteLine(
+					"WARNING: appsettings.json embedded resource not found. " +
+					"Available resources: " +
+					string.Join(", ", assembly.GetManifestResourceNames()));
+			}
+		}
+
 		builder
 			.UseMauiApp<App>()
 			.UseMauiCommunityToolkit()
@@ -47,6 +74,10 @@ public static class MauiProgram
 
 		// Register logging service
 		SetupSerilog(builder);
+
+		// Bridge Serilog into Microsoft.Extensions.Logging so that
+		// ILogger<T> resolved from DI flows through the Serilog pipeline.
+		builder.Logging.AddSerilog();
 
 		// Ensure Serilog is flushed on unhandled / fatal errors
 		RegisterGlobalExceptionHandlers();
@@ -77,6 +108,7 @@ public static class MauiProgram
 		builder.Services.AddSingleton<Func<Task<UnityRestSharp>>>(sp =>
 		{
 			var configService = sp.GetRequiredService<IConfigurationService>();
+			var logger = sp.GetRequiredService<ILogger<UnityRestSharp>>();
 			return async () =>
 			{
 				var config = await configService.LoadUnityConfigurationAsync();
@@ -86,7 +118,7 @@ public static class MauiProgram
 					"UnityRestSharp factory — BaseUrl: {BaseUrl}, ApiKey: {ApiKeyStatus}",
 					config.BaseUrl,
 					string.IsNullOrEmpty(config.ApiKey) ? "(not set)" : "***");
-				return new UnityRestSharp(config.BaseUrl, config.ApiKey);
+				return new UnityRestSharp(config.BaseUrl, config.ApiKey, logger: logger);
 			};
 		});
 
@@ -180,6 +212,12 @@ public static class MauiProgram
 #if DEBUG
 		builder.Services.AddLogging();
 		builder.Logging.AddDebug();
+
+		// Silence EF Core's per-command SQL logging in the Debug output window.
+		// The Serilog override in appsettings.json handles ILogger<T> → Serilog,
+		// but AddDebug writes directly to the MEL pipeline and needs its own filter.
+		builder.Logging.AddFilter("Microsoft.EntityFrameworkCore.Database.Command", LogLevel.Warning);
+		builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.Warning);
 #endif
 
 		var mauiapp = builder.Build();

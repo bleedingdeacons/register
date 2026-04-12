@@ -407,11 +407,21 @@ public partial class PositionEditViewModel : BaseViewModel
 
 					await context.SaveChangesAsync();
 
-					// Reflect changes in the in-memory object for the list
+					// Reflect changes in the in-memory object
 					SelectedMember.AnonymousName = tracked.AnonymousName;
 					SelectedMember.MobileNumber = tracked.MobileNumber;
 					SelectedMember.PersonalEmail = tracked.PersonalEmail;
 					SelectedMember.IntergroupPositionRotation = tracked.IntergroupPositionRotation;
+
+					// Member doesn't implement INotifyPropertyChanged, so the
+					// CollectionView won't pick up the property changes above.
+					// Replace the item in the ObservableCollection to trigger a
+					// CollectionChanged notification that refreshes the UI.
+					var index = ActiveHolders.IndexOf(SelectedMember);
+					if (index >= 0)
+					{
+						ActiveHolders[index] = SelectedMember;
+					}
 
 					Logger.Information("Updated holder {MemberName} (ID={MemberId})",
 						tracked.AnonymousName, tracked.Id);

@@ -69,7 +69,7 @@
                                        Text="{Binding Name}"
                                        FontSize="24"
                                        FontAttributes="Bold"
-                                       TextColor="{StaticResource Gray900}" />
+                                       TextColor="{Binding Members, Converter={StaticResource HasGsrToColorConverter}}" />
 
                                 <!-- Registered status text -->
                                 <Label Grid.Row="1" Grid.Column="1"
