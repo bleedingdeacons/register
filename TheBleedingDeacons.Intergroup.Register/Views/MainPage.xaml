@@ -17,35 +17,42 @@
         </Grid>
     </Shell.TitleView>
 
-   
 
-        <VerticalStackLayout Spacing="30" Padding="30,0" VerticalOptions="Center">
 
-            <Image Source="badi.png"
-                   HeightRequest="185"
-                   Aspect="AspectFit" />
+    <VerticalStackLayout Spacing="30" Padding="30,0" VerticalOptions="Center">
 
-            <Label x:Name="WelcomeLabel"
+
+        <Label x:Name="WelcomeLabel"
                    FontSize="32"
                    FontAttributes="Bold"
                    Text="Welcome to Bristol and District Intergroup"
                    HorizontalOptions="Center" />
+
+        <Image Source="badi.png"
+                   HeightRequest="185"
+                   Aspect="AspectFit" />
+
+        <Label Text="Register As?"
+                   FontSize="40"
+                   FontAttributes="Bold"
+                   HorizontalOptions="Center" />
+
         <!-- No meeting selected warning -->
-            <Border BackgroundColor="{AppThemeBinding Light=#FFF8E1, Dark=#4A3700}"
+        <Border BackgroundColor="{AppThemeBinding Light=#FFF8E1, Dark=#4A3700}"
                     Stroke="{AppThemeBinding Light=#FFC107, Dark=#FFB300}"
                     StrokeShape="RoundRectangle 8"
                     Padding="15,12"
                     IsVisible="{Binding IsMeetingSelected, Converter={StaticResource InvertedBoolConverter}}">
-                <StackLayout Spacing="10" HorizontalOptions="Center">
-                    <StackLayout Orientation="Horizontal" Spacing="10" HorizontalOptions="Center">
-                        <Label Text="⚠️" FontSize="20" VerticalOptions="Center"/>
-                        <Label Text="No meeting selected. Go to Admin to choose today's meeting."
+            <StackLayout Spacing="10" HorizontalOptions="Center">
+                <StackLayout Orientation="Horizontal" Spacing="10" HorizontalOptions="Center">
+                    <Label Text="⚠️" FontSize="20" VerticalOptions="Center"/>
+                    <Label Text="No meeting selected. Go to Admin to choose today's meeting."
                                FontSize="14"
                                VerticalOptions="Center"
                                TextColor="{AppThemeBinding Light=#5D4037, Dark=#FFE082}"
                                LineBreakMode="WordWrap"/>
-                    </StackLayout>
-                    <Button Text="Go to Admin"
+                </StackLayout>
+                <Button Text="Go to Admin"
                             Command="{Binding GoToAdminCommand}"
                             FontSize="14"
                             HeightRequest="40"
@@ -54,40 +61,40 @@
                             TextColor="{AppThemeBinding Light=#5D4037, Dark=#3E2723}"
                             CornerRadius="8"
                             HorizontalOptions="Center"/>
-                </StackLayout>
-            </Border>
+            </StackLayout>
+        </Border>
 
-            <!-- Main action buttons -->
-            <FlexLayout Direction="Row"
+        <!-- Main action buttons -->
+        <FlexLayout Direction="Row"
                 Wrap="Wrap"
                 JustifyContent="SpaceBetween"
                 AlignItems="Stretch"
                 AlignContent="Start">
 
-                <Button x:Name="RegisterBtn" Style="{StaticResource PrimaryButtonStyle}"
-                    Text="I'm a Group Service Representative 👆"
+            <Button x:Name="RegisterBtn" Style="{StaticResource PrimaryButtonStyle}"
+                    Text="Group Service Representative 👆"
                     Command="{Binding SelectDayCommand}"
                     IsEnabled="{Binding IsButtonsEnabled}"
                     HeightRequest="120"
                     FlexLayout.Basis="48%"
                     Margin="0,0,5,10" />
 
-                <Button x:Name="RegisterLOBtn" Style="{StaticResource PrimaryButtonStyle}"
-                    Text="I have an Intergroup Position 👆"
+            <Button x:Name="RegisterLOBtn" Style="{StaticResource PrimaryButtonStyle}"
+                    Text="Intergroup Position 👆"
                     Command="{Binding SelectPositionCommand}"
                     IsEnabled="{Binding IsButtonsEnabled}"
                     HeightRequest="120"
                     FlexLayout.Basis="48%"
                     Margin="5,0,0,10" />
 
-            </FlexLayout>
+        </FlexLayout>
 
-            <ActivityIndicator IsVisible="{Binding IsBusy}"
+        <ActivityIndicator IsVisible="{Binding IsBusy}"
                               IsRunning="{Binding IsBusy}"
                               Color="{StaticResource Primary}"
                               HorizontalOptions="Center" />
 
-        </VerticalStackLayout>
-    
+    </VerticalStackLayout>
+
 
 </ContentPage>
