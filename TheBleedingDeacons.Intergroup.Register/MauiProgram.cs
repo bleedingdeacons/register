@@ -103,12 +103,29 @@ public static class MauiProgram
 		builder.Services.AddScoped<IPositionRepository, PositionRepository>();
 		builder.Services.AddScoped<IIntergroupMeetingRepository, IntergroupMeetingRepository>();
 
+		// --- HttpClient ---
+		//
+		// Register a single HttpClient built on the PLATFORM-NATIVE HTTP handler.
+		// This is critical: some shared-hosting edge WAFs fingerprint TLS (JA3/JA4)
+		// and block .NET's managed SocketsHttpHandler while allowing requests from
+		// the platform's native HTTP stack (the same stack the system browser uses).
+		//
+		//   Windows       → WinHttpHandler         (schannel / WinHTTP)
+		//   Android       → AndroidMessageHandler  (OkHttp)
+		//   iOS / MacCat  → NSUrlSessionHandler    (NSURLSession)
+		//   Other         → HttpClientHandler      (managed fallback)
+		//
+		// AutomaticDecompression is enabled where supported so every request sends
+		// Accept-Encoding and the response is transparently decompressed.
+		builder.Services.AddSingleton<HttpClient>(_ => CreateHttpClient());
+
 		// Unity REST client factory — always reads the latest credentials from config + SecureStorage.
 		// Used by UnitySyncService so each sync call gets a fresh client.
 		builder.Services.AddSingleton<Func<Task<UnityRestSharp>>>(sp =>
 		{
 			var configService = sp.GetRequiredService<IConfigurationService>();
 			var logger = sp.GetRequiredService<ILogger<UnityRestSharp>>();
+			var platformClient = sp.GetRequiredService<HttpClient>();
 			return async () =>
 			{
 				var config = await configService.LoadUnityConfigurationAsync();
@@ -118,7 +135,7 @@ public static class MauiProgram
 					"UnityRestSharp factory — BaseUrl: {BaseUrl}, ApiKey: {ApiKeyStatus}",
 					config.BaseUrl,
 					string.IsNullOrEmpty(config.ApiKey) ? "(not set)" : "***");
-				return new UnityRestSharp(config.BaseUrl, config.ApiKey, logger: logger);
+				return new UnityRestSharp(config.BaseUrl, config.ApiKey, platformClient, logger: logger);
 			};
 		});
 
@@ -378,4 +395,50 @@ public static class MauiProgram
 		};
 #endif
 	}
+
+	/// <summary>
+	/// Creates an HttpClient backed by the platform's native HTTP handler.
+	/// Native handlers use the OS TLS stack, which shares its JA3/JA4 fingerprint
+	/// with the system browser and other OS-level HTTPS clients — making requests
+	/// indistinguishable from "normal" traffic to reputation-based edge WAFs.
+	/// </summary>
+	private static HttpClient CreateHttpClient()
+	{
+		HttpMessageHandler handler;
+
+#if WINDOWS
+		handler = new System.Net.Http.WinHttpHandler
+		{
+			AutomaticDecompression = System.Net.DecompressionMethods.GZip
+				| System.Net.DecompressionMethods.Deflate
+				| System.Net.DecompressionMethods.Brotli,
+			AutomaticRedirection = true,
+		};
+#elif ANDROID
+		handler = new Xamarin.Android.Net.AndroidMessageHandler
+		{
+			AutomaticDecompression = System.Net.DecompressionMethods.GZip
+				| System.Net.DecompressionMethods.Deflate
+				| System.Net.DecompressionMethods.Brotli,
+		};
+#elif IOS || MACCATALYST
+		// NSUrlSessionHandler honours the system's default decompression (gzip, br)
+		// transparently; no AutomaticDecompression property is exposed.
+		handler = new NSUrlSessionHandler();
+#else
+		handler = new HttpClientHandler
+		{
+			AutomaticDecompression = System.Net.DecompressionMethods.GZip
+				| System.Net.DecompressionMethods.Deflate
+				| System.Net.DecompressionMethods.Brotli,
+		};
+#endif
+
+		return new HttpClient(handler, disposeHandler: true)
+		{
+			Timeout = TimeSpan.FromSeconds(100),
+		};
+	}
 }
+
+

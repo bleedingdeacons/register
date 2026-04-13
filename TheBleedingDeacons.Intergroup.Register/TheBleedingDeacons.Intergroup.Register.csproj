@@ -122,7 +122,9 @@
 		<PackageReference Include="System.Formats.Asn1" Version="9.0.9" />
 		<PackageReference Include="System.Text.Json" Version="9.0.9" />
 	</ItemGroup>
-
+	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">
+		<PackageReference Include="System.Net.Http.WinHttpHandler" Version="9.0.0" />
+	</ItemGroup>
 	<ItemGroup>
 		<MauiXaml Update="Controls\ClearableEntry.xaml">
 			<Generator>MSBuild:Compile</Generator>
