@@ -231,10 +231,17 @@ public class ReconciliationService
 							registeredGroups++;
 							Logger.Information("Registered group {Name} (ID={Id}) on Unity", group.Name, group.Id);
 						}
+						else if (IsAlreadyRegisteredError(response.Error))
+						{
+							// Already registered on Unity — treat as success.
+							registeredGroups++;
+							Logger.Information("Group {Name} (ID={Id}) was already registered on Unity — treating as success",
+								group.Name, group.Id);
+						}
 						else
 						{
-							apiWarnings++;
-							Logger.Warning("Failed to register group {Id}: {Error}", group.Id, response.Error?.Message);
+							apiErrors++;
+							Logger.Error("Failed to register group {Id}: {Error}", group.Id, response.Error?.Message);
 						}
 					}
 					else
@@ -247,8 +254,8 @@ public class ReconciliationService
 						}
 						else
 						{
-							apiWarnings++;
-							Logger.Warning("Failed to unregister group {Id}: {Error}", group.Id, response.Error?.Message);
+							apiErrors++;
+							Logger.Error("Failed to unregister group {Id}: {Error}", group.Id, response.Error?.Message);
 						}
 					}
 				}
@@ -292,10 +299,17 @@ public class ReconciliationService
 							Logger.Information("Registered officer {Name} for position {Position} on Unity",
 								officerName, positionName);
 						}
+						else if (IsAlreadyRegisteredError(response.Error))
+						{
+							// Officer already registered for this position — treat as success.
+							registeredPositions++;
+							Logger.Information("Officer {Name} for position {Position} was already registered on Unity — treating as success",
+								officerName, positionName);
+						}
 						else
 						{
-							apiWarnings++;
-							Logger.Warning("Failed to register officer for position {Id}: {Error}",
+							apiErrors++;
+							Logger.Error("Failed to register officer for position {Id}: {Error}",
 								position.Id, response.Error?.Message);
 						}
 					}
@@ -313,8 +327,8 @@ public class ReconciliationService
 						}
 						else
 						{
-							apiWarnings++;
-							Logger.Warning("Failed to unregister officer {Id}: {Error}",
+							apiErrors++;
+							Logger.Error("Failed to unregister officer {Id}: {Error}",
 								officerId, response.Error?.Message);
 						}
 					}
@@ -449,5 +463,21 @@ public class ReconciliationService
 		}
 
 		return result;
+	}
+
+	/// <summary>
+	/// Returns true when the API error indicates the group/position is already
+	/// registered for this meeting. Treated as success on register-calls so the
+	/// user can still proceed to Completed and purge the database.
+	/// </summary>
+	private static bool IsAlreadyRegisteredError(ApiError? error)
+	{
+		if (error is null) return false;
+
+		var code = error.Code?.ToLowerInvariant() ?? string.Empty;
+		var msg = error.Message?.ToLowerInvariant() ?? string.Empty;
+
+		return code.Contains("already") || code.Contains("duplicate") || code.Contains("exists")
+			|| msg.Contains("already registered") || msg.Contains("already exists");
 	}
 }

@@ -263,6 +263,23 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 					 created, modified, registered, errors, warnings) =
 					await _dataService.ImportWithReconciliationAsync(Token);
 
+				// If any non-recoverable errors occurred, stay in Finishing phase
+				// so the user sees Retry Sync. Purge is only available after a
+				// fully clean reconciliation. Note: "already registered" responses
+				// from Unity are treated as success in ReconciliationService and
+				// do not count as errors here.
+				if (errors > 0)
+				{
+					HasFinishSyncError = true;
+					ShowStatus(
+						$"Reconciliation completed with {errors} error(s). Tap Retry Sync to try again.",
+						true);
+					Logger.Warning(
+						"Finish Meeting reconciliation reported {Errors} errors — staying in Finishing phase",
+						errors);
+					return;
+				}
+
 				// Clear the active meeting
 				await _configService.SaveActiveIntergroupMeetingAsync(null);
 				ActiveMeetingId = null;
