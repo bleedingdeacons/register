@@ -69,7 +69,7 @@
             <!-- Row 0: Header -->
             <Label Grid.Row="0"
                    Text="Attendance Register 👆"
-                   FontSize="Header"
+                   FontSize="Title"
                    FontAttributes="Bold"
                    HorizontalOptions="Center"/>
 

@@ -19,6 +19,11 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		private const string UNITY_ACTIVE_MEETING_KEY = "unity_active_meeting_id";
 		private const string BETTERSTACK_SOURCE_TOKEN_KEY = "betterstack_source_token";
 
+#if USE_DEV_CREDENTIALS
+		private const string DEV_CREDENTIALS_RESOURCE =
+			"TheBleedingDeacons.Intergroup.Register.devsettings.json";
+#endif
+
 		private readonly IConfiguration _configuration;
 		private readonly string _configFilePath;
 		private readonly string _unityConfigFilePath;
@@ -141,12 +146,15 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 
 		public async Task<UnityConfiguration> LoadUnityConfigurationAsync()
 		{
-#if DEBUG
-			var baseUrl = "https://aa-bristol.org/amber";
-			var apiKey = "int_e06b3e3bd06dc1f320d2f3d3d45e206be83da39c5a25e18feb33fb1bd9b7a5a2";
+			string baseUrl;
+			string apiKey;
+
+#if USE_DEV_CREDENTIALS
+			(baseUrl, apiKey) = LoadEmbeddedDevCredentials(
+				"UnitySettings", "BaseUrl", "ApiKey");
 #else
-			var baseUrl = await ReadJsonPropertyAsync(_unityConfigFilePath, "UnitySettings", "BaseUrl", "Unity settings");
-			var apiKey = await GetSecretAsync(UNITY_API_KEY, "Unity API key");
+			baseUrl = await ReadJsonPropertyAsync(_unityConfigFilePath, "UnitySettings", "BaseUrl", "Unity settings");
+			apiKey = await GetSecretAsync(UNITY_API_KEY, "Unity API key");
 #endif
 
 			int? activeIntergroupMeetingId = null;
@@ -200,6 +208,10 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			if (_cachedBetterStackConfig != null)
 				return _cachedBetterStackConfig;
 
+#if USE_DEV_CREDENTIALS
+			var (endpoint, sourceToken) = LoadEmbeddedDevCredentials(
+				"BetterStack", "Endpoint", "SourceToken");
+#else
 			var endpoint = ReadJsonProperty(_betterStackConfigFilePath, "BetterStack", "Endpoint", "Better Stack settings");
 
 			// Fall back to embedded appsettings.json
@@ -207,6 +219,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 				endpoint = _configuration.GetSection("BetterStack")["Endpoint"] ?? "";
 
 			var sourceToken = GetSecretSync(BETTERSTACK_SOURCE_TOKEN_KEY, "Better Stack source token");
+#endif
 
 			_cachedBetterStackConfig = new BetterStackConfiguration
 			{
@@ -226,12 +239,20 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 
 		public async Task<BetterStackConfiguration> LoadBetterStackConfigurationAsync()
 		{
-			var endpoint = await ReadJsonPropertyAsync(_betterStackConfigFilePath, "BetterStack", "Endpoint", "Better Stack settings");
+			string endpoint;
+			string sourceToken;
+
+#if USE_DEV_CREDENTIALS
+			(endpoint, sourceToken) = LoadEmbeddedDevCredentials(
+				"BetterStack", "Endpoint", "SourceToken");
+#else
+			endpoint = await ReadJsonPropertyAsync(_betterStackConfigFilePath, "BetterStack", "Endpoint", "Better Stack settings");
 
 			if (string.IsNullOrWhiteSpace(endpoint))
 				endpoint = _configuration.GetSection("BetterStack")["Endpoint"] ?? "";
 
-			var sourceToken = await GetSecretAsync(BETTERSTACK_SOURCE_TOKEN_KEY, "Better Stack source token");
+			sourceToken = await GetSecretAsync(BETTERSTACK_SOURCE_TOKEN_KEY, "Better Stack source token");
+#endif
 
 			_cachedBetterStackConfig = new BetterStackConfiguration
 			{
@@ -308,6 +329,53 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			var json = JsonSerializer.Serialize(wrapper, WriteOptions);
 			await File.WriteAllTextAsync(filePath, json);
 		}
+
+#if USE_DEV_CREDENTIALS
+		/// <summary>
+		/// Reads two properties from a named section of the embedded
+		/// devsettings.json resource. Only present in builds where
+		/// USE_DEV_CREDENTIALS is defined (i.e. any build that isn't run
+		/// with -p:UseDevCredentials=false). Returns empty strings on
+		/// failure so callers produce an "invalid" config and skip setup
+		/// rather than throw on startup.
+		/// </summary>
+		private static (string First, string Second) LoadEmbeddedDevCredentials(
+			string sectionName, string firstProperty, string secondProperty)
+		{
+			var assembly = Assembly.GetExecutingAssembly();
+			using var stream = assembly.GetManifestResourceStream(DEV_CREDENTIALS_RESOURCE);
+			if (stream == null)
+			{
+				Logger.Error(
+					"Embedded resource {Resource} not found. Dev credentials for {Section} will be empty. " +
+					"Ensure devsettings.json exists in the project root and " +
+					"UseDevCredentials=true when building.",
+					DEV_CREDENTIALS_RESOURCE, sectionName);
+				return ("", "");
+			}
+
+			try
+			{
+				using var doc = JsonDocument.Parse(stream);
+				if (doc.RootElement.TryGetProperty(sectionName, out var section))
+				{
+					var first = section.TryGetProperty(firstProperty, out var a) ? a.GetString() ?? "" : "";
+					var second = section.TryGetProperty(secondProperty, out var b) ? b.GetString() ?? "" : "";
+					return (first, second);
+				}
+
+				Logger.Warning(
+					"Section {Section} missing from embedded {Resource}",
+					sectionName, DEV_CREDENTIALS_RESOURCE);
+			}
+			catch (Exception ex)
+			{
+				Logger.Error(ex, "Failed to parse embedded {Resource}", DEV_CREDENTIALS_RESOURCE);
+			}
+
+			return ("", "");
+		}
+#endif
 
 		// =================================================================
 		// Shared helpers — SecureStorage

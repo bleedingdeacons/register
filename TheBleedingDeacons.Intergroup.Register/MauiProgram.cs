@@ -263,15 +263,20 @@ public static class MauiProgram
 		// used for Unity API calls — sharing the TLS stack ensures log uploads
 		// aren't blocked by edge WAFs that allow the rest of the app through
 		// (see CreateHttpClient for the JA3/JA4 rationale).
-#if DEBUG
-		ReconfigureSerilogWithBetterStack(
-			new BetterStackConfiguration
-			{
-				Endpoint = "https://in.logs.betterstack.com",
-				SourceToken = "goJkiJqUCb4qSJdFEpLx6hkw"
-			},
-			mauiapp.Services.GetRequiredService<HttpClient>());
-#else
+
+		// ── Reconfigure Serilog with Better Stack settings ────────────
+		// SetupSerilog runs before DI is built, so it cannot read from
+		// ConfigurationService. We layer the durable HTTP sink on here,
+		// once the container (and SecureStorage) are available.
+		//
+		// ConfigurationService handles the dev/prod split itself —
+		// dev builds read from the embedded unitysettings.dev.json,
+		// production builds read from user-saved settings.
+		//
+		// The HttpClient we resolve here is the same platform-native instance
+		// used for Unity API calls — sharing the TLS stack ensures log uploads
+		// aren't blocked by edge WAFs that allow the rest of the app through
+		// (see CreateHttpClient for the JA3/JA4 rationale).
 		using (var scope = mauiapp.Services.CreateScope())
 		{
 			var configService = scope.ServiceProvider.GetRequiredService<IConfigurationService>();
@@ -279,8 +284,6 @@ public static class MauiProgram
 			var httpClient = scope.ServiceProvider.GetRequiredService<HttpClient>();
 			ReconfigureSerilogWithBetterStack(betterStackConfig, httpClient);
 		}
-#endif
-
 		return mauiapp;
 	}
 
@@ -314,8 +317,18 @@ public static class MauiProgram
 			.WriteTo.File(Path.Combine(logPath, $"{appName.ToLower()}-debug-.log"),
 				rollingInterval: RollingInterval.Day,
 				retainedFileCountLimit: 21)
-			.WriteTo.Console()
 			.WriteTo.Debug();
+
+		// The Serilog console sink calls Console.set_ForegroundColor to apply its
+		// colour theme, which throws PlatformNotSupportedException on Android and
+		// iOS (System.Console has no ANSI terminal there). Every log event then
+		// hits SelfLog with a stack trace, drowning real diagnostics.
+		//
+		// On mobile the Debug sink above already surfaces logs to the IDE's
+		// output window, so Console adds nothing. Scope it to desktop only.
+	#if WINDOWS || MACCATALYST
+		config.WriteTo.Console();
+	#endif
 #else
         config.WriteTo.File(Path.Combine(logPath, $"{appName.ToLower()}-.log"),
             rollingInterval: RollingInterval.Day,
@@ -368,7 +381,7 @@ public static class MauiProgram
 			// a batch is successfully acknowledged. Even a hard process
 			// kill (OOM on Android, force-stop, device reboot) cannot lose
 			// events that made it to the buffer file.
-			var betterStackHttpClient = new BetterStackDurable.BetterStackHttpClient(
+			var betterStackHttpClient = new Support.BetterStackDurable.BetterStackHttpClient(
 				betterStackConfig.SourceToken,
 				httpClient);
 
@@ -406,7 +419,7 @@ public static class MauiProgram
 					// How often to check the buffer for new events to ship.
 					period:                  TimeSpan.FromSeconds(5),
 					textFormatter:           new Serilog.Formatting.Json.JsonFormatter(renderMessage: true),
-					batchFormatter:          new BetterStackDurable.BetterStackNdjsonBatchFormatter(),
+					batchFormatter:          new Support.BetterStackDurable.BetterStackNdjsonBatchFormatter(),
 					httpClient:              betterStackHttpClient)
 				.CreateLogger();
 

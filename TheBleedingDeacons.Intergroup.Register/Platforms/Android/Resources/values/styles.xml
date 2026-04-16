@@ -1,7 +1,14 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <resources>
-	<style name="Maui.SplashTheme" parent="Theme.Splash">
+	<style name="Maui.SplashTheme" parent="Theme.SplashScreen">
+		<item name="windowSplashScreenBackground">#F4F7FA</item>
+		<item name="windowSplashScreenAnimatedIcon">@drawable/splashscreen</item>
+		<item name="windowSplashScreenIconBackgroundColor">#F4F7FA</item>
+		<item name="postSplashScreenTheme">@style/Maui.MainTheme</item>
+		<item name="android:windowSplashScreenIconBackgroundColor">#F4F7FA</item>
+	</style>
+	<!--<style name="Maui.SplashTheme" parent="Theme.Splash">
 		<item name="android:windowBackground">@color/maui_splash_color</item>
 		<item name="android:statusBarColor">@color/maui_splash_color</item>
-	</style>
+	</style>-->
 </resources>

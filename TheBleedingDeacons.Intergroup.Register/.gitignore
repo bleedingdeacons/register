@@ -426,3 +426,6 @@ secrets.json
 bundleconfig.json
 launchSettings.json
 Properties/launchSettings.json
+
+# Register dev configuration
+**/devsettings.json

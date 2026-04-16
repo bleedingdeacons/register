@@ -157,6 +157,16 @@ public partial class EditGroupViewModel : BaseViewModel
 			PopulateMemberLists();
 			UpdateTitle();
 		}
+
+		if (query.TryGetValue("addMember", out var addObj) &&
+		addObj is bool addMember && addMember)
+		{
+			MainThread.BeginInvokeOnMainThread(async () =>
+			{
+				// Replace this with whatever your existing Add button does
+				await AddNewMember();
+			});
+		}
 	}
 
 	#endregion

@@ -34,6 +34,11 @@
 		<AndroidSigningKeyStore>register.keystore</AndroidSigningKeyStore>
 	</PropertyGroup>
 
+	<PropertyGroup>
+		<UseDevCredentials Condition="'$(UseDevCredentials)' == ''">true</UseDevCredentials>
+		<DefineConstants Condition="'$(UseDevCredentials)' == 'true'">$(DefineConstants);USE_DEV_CREDENTIALS</DefineConstants>
+	</PropertyGroup>
+
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net9.0-android|AnyCPU'">
 		<ApplicationDisplayVersion>1.0.4</ApplicationDisplayVersion>
 	</PropertyGroup>
@@ -92,6 +97,14 @@
 		<EmbeddedResource Include="appsettings.json" />
 		<None Remove="appsettings.json" />
 	</ItemGroup>
+
+	<!-- Dev credentials: only embedded when UseDevCredentials=true (the default).
+	     Production builds pass -p:UseDevCredentials=false so this file is never
+	     touched and cannot leak into the APK. -->
+	<ItemGroup Condition="'$(UseDevCredentials)' == 'true'">
+		<EmbeddedResource Include="devsettings.json" />
+	</ItemGroup>
+
 
 	<ItemGroup>
 		<PackageReference Include="libphonenumber-csharp" Version="9.0.28" />

@@ -63,6 +63,9 @@ public partial class VerifyGroupViewModel : BaseViewModel
 	[ObservableProperty]
 	private bool isLoading;
 
+	[ObservableProperty]
+	private string noButtonText = "No";
+
 	/// <summary>
 	/// Active GSR members for the group, displayed as a list.
 	/// </summary>
@@ -174,6 +177,12 @@ public partial class VerifyGroupViewModel : BaseViewModel
 		{
 			["group"] = Group
 		};
+
+		// If no GSRs exist, skip straight to the add-member flow on the edit page
+		if (!HasActiveGsrs)
+		{
+			parameters["addMember"] = true;
+		}
 
 		await ShowFeedback();
 
@@ -290,6 +299,7 @@ public partial class VerifyGroupViewModel : BaseViewModel
 		}
 
 		HasActiveGsrs = ActiveGsrs.Count > 0;
+		NoButtonText = HasActiveGsrs ? "No" : "Register";
 
 		var count = ActiveGsrs.Count;
 		GsrCountText = count switch
