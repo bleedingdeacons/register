@@ -162,6 +162,8 @@ public static class MauiProgram
 
 		builder.Services.AddScoped<IPopupNotification, PopupNotificationService>();
 
+		builder.Services.AddSingleton<IPhoneNumberService, PhoneNumberService>();
+
 		// Register Email Templates
 		builder.Services.AddSingleton<IEmailTemplateService>(provider =>
 		{

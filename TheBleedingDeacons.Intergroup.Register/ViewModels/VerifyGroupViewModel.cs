@@ -175,6 +175,8 @@ public partial class VerifyGroupViewModel : BaseViewModel
 			["group"] = Group
 		};
 
+		await ShowFeedback();
+
 		await Shell.Current.GoToAsync(nameof(GroupEditPage), parameters);
 	}
 
@@ -189,6 +191,8 @@ public partial class VerifyGroupViewModel : BaseViewModel
 			Logger.Warning("Cannot register - Group is null");
 			return;
 		}
+
+		await ShowFeedback();
 
 		try
 		{

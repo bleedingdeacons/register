@@ -34,6 +34,7 @@ public partial class EditGroupViewModel : BaseViewModel
 
 	private readonly IDbContextFactory<UnityDbContext> _contextFactory;
 	private readonly IPopupNotification _popupService;
+	private readonly IPhoneNumberService _phoneService;
 
 	// The group whose GSRs are being managed
 	private Group? _group;
@@ -128,10 +129,12 @@ public partial class EditGroupViewModel : BaseViewModel
 
 	public EditGroupViewModel(
 		IDbContextFactory<UnityDbContext> contextFactory,
-		IPopupNotification popupService)
+		IPopupNotification popupService,
+		IPhoneNumberService phoneService)
 	{
 		_contextFactory = contextFactory;
 		_popupService = popupService;
+		_phoneService = phoneService;
 
 		ValidateForm();
 	}
@@ -210,9 +213,11 @@ public partial class EditGroupViewModel : BaseViewModel
 	/// Select a member from the list to begin editing their details.
 	/// </summary>
 	[RelayCommand]
-	private void SelectMember(Member member)
+	private async Task SelectMember(Member member)
 	{
 		if (member == null) return;
+
+		await ShowFeedback();
 
 		SelectedMember = member;
 		IsCreatingNew = false;
@@ -234,8 +239,10 @@ public partial class EditGroupViewModel : BaseViewModel
 	/// Begin creating a new member for this group.
 	/// </summary>
 	[RelayCommand]
-	private void AddNewMember()
+	private async Task AddNewMember()
 	{
+		await ShowFeedback();
+
 		SelectedMember = null;
 		IsCreatingNew = true;
 		IsEditing = true;
@@ -274,6 +281,8 @@ public partial class EditGroupViewModel : BaseViewModel
 
 		try
 		{
+			await ShowFeedback();
+
 			IsLoading = true;
 
 			using var context = _contextFactory.CreateDbContext();
@@ -363,9 +372,11 @@ public partial class EditGroupViewModel : BaseViewModel
 	/// until the user taps OK (<see cref="Done"/>). Cancel reverts all removals.
 	/// </summary>
 	[RelayCommand]
-	private void RemoveMember(Member member)
+	private async Task RemoveMember(Member member)
 	{
 		if (member == null) return;
+
+		await ShowFeedback();
 
 		ActiveMembers.Remove(member);
 		PendingRemovals.Add(member);
@@ -392,9 +403,11 @@ public partial class EditGroupViewModel : BaseViewModel
 	/// to the active list.
 	/// </summary>
 	[RelayCommand]
-	private void UndoRemoveMember(Member member)
+	private async Task UndoRemoveMember(Member member)
 	{
 		if (member == null) return;
+
+		await ShowFeedback();
 
 		PendingRemovals.Remove(member);
 		ActiveMembers.Add(member);
@@ -415,6 +428,8 @@ public partial class EditGroupViewModel : BaseViewModel
 	private async Task CancelEdit()
 	{
 		if (IsLoading) return;
+
+		await ShowFeedback();
 
 		if (HasUnsavedChanges)
 		{
@@ -450,6 +465,8 @@ public partial class EditGroupViewModel : BaseViewModel
 
 		try
 		{
+			await ShowFeedback();
+
 			using var context = _contextFactory.CreateDbContext();
 
 			// Commit all pending removals to the database
@@ -508,6 +525,8 @@ public partial class EditGroupViewModel : BaseViewModel
 			if (!shouldLeave) return;
 		}
 
+		await ShowFeedback();
+		
 		// Revert pending removals — move them back to ActiveMembers
 		foreach (var member in PendingRemovals)
 		{
@@ -656,11 +675,9 @@ public partial class EditGroupViewModel : BaseViewModel
 		catch { return false; }
 	}
 
-	private static bool IsValidPhoneFormat(string phone)
+	private bool IsValidPhoneFormat(string phone)
 	{
-		if (string.IsNullOrWhiteSpace(phone)) return false;
-		var digits = new string(phone.Where(char.IsDigit).ToArray());
-		return digits.Length >= 7 && digits.Length <= 15;
+		return _phoneService.Validate(phone).IsValid;
 	}
 
 	#endregion

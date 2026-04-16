@@ -143,7 +143,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		{
 #if DEBUG
 			var baseUrl = "https://aa-bristol.org/amber";
-			var apiKey = "int_4b8edd62928c4458f9994711b378f827c8e588ccd051c814d9ab290e190e835e";
+			var apiKey = "int_e06b3e3bd06dc1f320d2f3d3d45e206be83da39c5a25e18feb33fb1bd9b7a5a2";
 #else
 			var baseUrl = await ReadJsonPropertyAsync(_unityConfigFilePath, "UnitySettings", "BaseUrl", "Unity settings");
 			var apiKey = await GetSecretAsync(UNITY_API_KEY, "Unity API key");

@@ -26,6 +26,10 @@ public partial class BaseViewModel : ObservableObject, IQueryAttributable, IDisp
 	{
 
 	}
+	protected async Task ShowFeedback()
+	{
+		await Task.Delay(100);
+	}
 
 	public void Dispose()
 	{

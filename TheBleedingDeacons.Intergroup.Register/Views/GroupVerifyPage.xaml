@@ -14,56 +14,40 @@
                                    StatusBarStyle="{AppThemeBinding Light=DarkContent, Dark=LightContent}" />
     </ContentPage.Behaviors>
 
-    <Grid>
-        <!-- Loading Indicator -->
-        <ActivityIndicator IsVisible="{Binding IsLoading}" 
-                          IsRunning="{Binding IsLoading}"
-                          HorizontalOptions="Center"
-                          VerticalOptions="Center"
-                          Scale="1.5"
-                          Color="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"/>
+    <!-- Outer Grid: scrollable content on top, fixed buttons at bottom -->
+    <Grid RowDefinitions="*,Auto" Padding="30,30,30,50">
 
-        <!-- Main Content -->
-        <ScrollView IsVisible="{Binding IsLoading, Converter={StaticResource InvertedBoolConverter}}">
-            <StackLayout Padding="20" Spacing="10">
+        <!-- Scrollable content (Row 0) -->
+            <StackLayout Grid.Row="0" Spacing="10">
 
-                <!-- Group Name -->
                 <Label Text="{Binding Group.Name}"
                        Style="{StaticResource HeaderLabelStyle}"/>
 
-                <!-- GSR Count -->
                 <Label Text="{Binding GsrCountText}"
                        FontSize="18"
                        FontAttributes="Italic"
                        TextColor="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource Gray400}}"
                        Margin="0,0,0,5"/>
 
-                <!-- GSR Member List -->
                 <CollectionView ItemsSource="{Binding ActiveGsrs}"
                                 SelectionMode="None"
-                                IsVisible="{Binding HasActiveGsrs}">
+                                IsVisible="{Binding HasActiveGsrs}" HorizontalOptions="Center">
                     <CollectionView.ItemsLayout>
-                        <LinearItemsLayout Orientation="Vertical" ItemSpacing="5" />
+                        <LinearItemsLayout Orientation="Horizontal" ItemSpacing="5" />
                     </CollectionView.ItemsLayout>
                     <CollectionView.ItemTemplate>
                         <DataTemplate x:DataType="entities:Member">
-                            <Border Style="{StaticResource MemberCardStyle}">
+                            <Border Style="{StaticResource MemberCardStyle}"
+                                    MinimumWidthRequest="500"
+                                    MinimumHeightRequest="180">
                                 <StackLayout Spacing="4">
-                                    <!-- Member Name -->
-                                    <Label Text="Name"
-                                           Style="{StaticResource FieldLabelStyle}"/>
-                                    <Label Text="{Binding AnonymousName}"
-                                           Style="{StaticResource ValueLabelStyle}"/>
+                                    <Label Text="Name" Style="{StaticResource FieldLabelStyle}"/>
+                                    <Label Text="{Binding AnonymousName}" Style="{StaticResource ValueLabelStyle}"/>
 
-                                    <!-- Member Email -->
-                                    <Label Text="Personal Email"
-                                           Style="{StaticResource FieldLabelStyle}"/>
-                                    <Label Text="{Binding PersonalEmail}"
-                                           Style="{StaticResource ValueLabelStyle}"/>
+                                    <Label Text="Personal Email" Style="{StaticResource FieldLabelStyle}"/>
+                                    <Label Text="{Binding PersonalEmail}" Style="{StaticResource ValueLabelStyle}"/>
 
-                                    <!-- Member Phone (Obscured) -->
-                                    <Label Text="Mobile Phone"
-                                           Style="{StaticResource FieldLabelStyle}"/>
+                                    <Label Text="Mobile Phone" Style="{StaticResource FieldLabelStyle}"/>
                                     <Label Text="{Binding MobileNumber, Converter={StaticResource ObscurePhoneNumber}}"
                                            Style="{StaticResource ValueLabelStyle}"/>
                                 </StackLayout>
@@ -72,7 +56,6 @@
                     </CollectionView.ItemTemplate>
                 </CollectionView>
 
-                <!-- Empty State: no active GSRs -->
                 <Border IsVisible="{Binding HasActiveGsrs, Converter={StaticResource InvertedBoolConverter}}"
                         Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}"
                         StrokeThickness="1"
@@ -94,82 +77,95 @@
                     </StackLayout>
                 </Border>
 
-                <!-- Standing In Section with Border — only shown when group has a registered GSR -->
-                <Border IsVisible="{Binding HasActiveGsrs}"
-                        Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}"
-                        StrokeThickness="2"
-                        StrokeShape="RoundRectangle 10"
-                        Padding="15"
-                        Margin="0,10,0,15"
-                        BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray900}}">
-                    <StackLayout Spacing="10">
-                        <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="10">
-                            <Label Text="Are Standing In?" 
-                                   FontSize="20"
-                                   FontAttributes="Bold"
-                                   TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}"
-                                   VerticalOptions="Center"
-                                   Margin="0"
-                                   Grid.Column="0"/>
-                            <CheckBox x:Name="StandingInCheckBox" 
-                                      IsChecked="{Binding StandingIn, Mode=TwoWay}"
-                                      Grid.Column="1"
-                                      VerticalOptions="Center"/>
-                        </Grid>
+            <Border IsVisible="{Binding HasActiveGsrs}"
+        Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}"
+        StrokeThickness="2"
+        StrokeShape="RoundRectangle 10"
+        Padding="15"
+        Margin="0,10,0,15"
+        HorizontalOptions="Center"
+        BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray900}}">
+                <StackLayout Spacing="10" x:Name="StandingIn" HorizontalOptions="Center">
+                    <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="10" HorizontalOptions="Center">
+                        <Label Text="Are Standing In?" 
+                   FontSize="20"
+                   FontAttributes="Bold"
+                   TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}"
+                   VerticalOptions="Center"
+                   Grid.Column="0"/>
+                        <CheckBox x:Name="StandingInCheckBox" 
+                      IsChecked="{Binding StandingIn, Mode=TwoWay}"
+                      Grid.Column="1"
+                      VerticalOptions="Center"/>
+                    </Grid>
 
-                        <!-- Stand-in Name and Email Entries -->
-                        <StackLayout IsVisible="{Binding Source={x:Reference StandingInCheckBox}, Path=IsChecked}"
-                                    Spacing="5">
-                            <Label Text="Your Name" 
-                                   FontSize="20"
-                                   FontAttributes="Bold"
-                                   TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}"
-                                   Margin="0"/>
-                            <controls:ClearableEntry x:Name="StandingInNameEntry"
-                                       Text="{Binding StandinName}"
-                                       Placeholder="Enter your name"
-                                       Keyboard="Text"
-                                       FontSize="18"
-                                       BackgroundColor="{AppThemeBinding Light=White, Dark={StaticResource Gray800}}"
-                                       TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"/>
-                        </StackLayout>
+                    <StackLayout IsVisible="{Binding Source={x:Reference StandingInCheckBox}, Path=IsChecked}"
+                     Spacing="5"
+                     HorizontalOptions="Center">
+                        <Label Text="Your Name" 
+                   FontSize="20"
+                   FontAttributes="Bold"
+                   HorizontalOptions="Center"
+                   TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}"/>
+                        <controls:ClearableEntry x:Name="StandingInNameEntry"
+                       Text="{Binding StandinName}"
+                       Placeholder="Enter your name"
+                       Keyboard="Text"
+                       FontSize="18"
+                       WidthRequest="300"
+                       BackgroundColor="{AppThemeBinding Light=White, Dark={StaticResource Gray800}}"
+                       TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"/>
                     </StackLayout>
-                </Border>
+                </StackLayout>
+            </Border>
 
-                <Label FontSize="32"
-                       FontAttributes="Bold"
-                       Text="Is this correct?"
-                       HorizontalOptions="Center"
-                       Margin="0,10,0,0"/>
-
-                <!-- Verify Mode Action Buttons -->
-                <FlexLayout Direction="Row" 
-                            JustifyContent="SpaceEvenly" 
-                            AlignItems="Center"
-                            Margin="0,20,0,0">
-
-                    <Button Text="Yes" 
-                            Command="{Binding YesCommand}"
-                            IsEnabled="{Binding CanRegister}"
-                            Style="{StaticResource PrimaryButtonStyle}"
-                            TextColor="White"
-                            CornerRadius="25"
-                            HeightRequest="100"
-                            FlexLayout.Grow="1"
-                            Margin="0,0,7.5,0"/>
-
-                    <Button Text="No" 
-                            Command="{Binding NoCommand}"
-                            Style="{StaticResource PrimaryButtonStyle}"
-                            TextColor="White"
-                            CornerRadius="25"
-                            HeightRequest="100"
-                            FlexLayout.Grow="1"
-                            Margin="7.5,0,0,0"/>
-                </FlexLayout>
-
+            
             </StackLayout>
-        </ScrollView>
+        
+        <!-- Fixed action buttons at base of page (Row 1) -->
+        <FlexLayout Grid.Row="1"
+                    Direction="Row"
+                    JustifyContent="SpaceEvenly"
+                    AlignItems="Center"
+                    IsVisible="{Binding IsLoading, Converter={StaticResource InvertedBoolConverter}}">
+
+            <Label FontSize="Medium"
+           FontAttributes="Bold"
+           Text="Is this correct?"
+           HorizontalOptions="Center"
+           Margin="0,10,0,10"/>
+
+
+            <Button Text="Yes" 
+                    Command="{Binding YesCommand}"
+                    IsEnabled="{Binding CanRegister}"
+                    Style="{StaticResource PrimaryButtonStyle}"
+                    TextColor="White"
+                    CornerRadius="25"
+                    HeightRequest="100"
+                    FlexLayout.Grow="1"
+                    Margin="0,0,7.5,0"/>
+
+            <Button Text="No" 
+                    Command="{Binding NoCommand}"
+                    Style="{StaticResource PrimaryButtonStyle}"
+                    TextColor="White"
+                    CornerRadius="25"
+                    HeightRequest="100"
+                    FlexLayout.Grow="1"
+                    Margin="7.5,0,0,0"/>
+        </FlexLayout>
+
+        <!-- Loading Indicator spans both rows -->
+        <ActivityIndicator Grid.RowSpan="2"
+                           IsVisible="{Binding IsLoading}" 
+                           IsRunning="{Binding IsLoading}"
+                           HorizontalOptions="Center"
+                           VerticalOptions="Center"
+                           Scale="1.5"
+                           Color="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"/>
+
+
     </Grid>
 
 </ContentPage>

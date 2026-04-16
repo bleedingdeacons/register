@@ -48,9 +48,6 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 			// Navigate back to the previous page
 			await Shell.Current.GoToAsync("..");
 		}
-		private async Task ShowFeedback()
-		{
-			await Task.Delay(100);
-		}
+		
 	}
 }

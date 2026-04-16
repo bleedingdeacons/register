@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using TheBleedingDeacons.Unity.Client;
 using TheBleedingDeacons.Unity.Intergroup.Data;
 using UnityModels = TheBleedingDeacons.Unity.Models;
@@ -14,11 +15,13 @@ public class UnitySyncService
 {
 	private readonly UnityDbContext _db;
 	private readonly Func<Task<UnityRestSharp>> _clientFactory;
+	private readonly ILogger<UnitySyncService> _logger;
 
-	public UnitySyncService(UnityDbContext db, Func<Task<UnityRestSharp>> clientFactory)
+	public UnitySyncService(UnityDbContext db, Func<Task<UnityRestSharp>> clientFactory, ILogger<UnitySyncService> logger)
 	{
 		_db = db;
 		_clientFactory = clientFactory;
+		_logger = logger;
 	}
 
 	public record SyncResult(int Groups, int Meetings, int Positions, int Members, int Contacts, int IntergroupMeetings);
@@ -60,6 +63,30 @@ public class UnitySyncService
 		var positions = MapPositions(allPositions);
 		var intergroupMeetings = MapIntergroupMeetings(allIntergroupMeetings);
 
+		// ── Sanitise FK references ───────────────────────────────────
+		// The Unity API may return members whose HomeGroupId or
+		// IntergroupPositionId points to an entity outside the
+		// fetched dataset (e.g. a group in another district).
+		// Null-out any dangling references so SQLite FK checks pass.
+
+		var groupIds = new HashSet<int>(groups.Select(g => g.Id));
+		var positionIds = new HashSet<int>(positions.Select(p => p.Id));
+
+		foreach (var m in members)
+		{
+			if (m.HomeGroupId.HasValue && !groupIds.Contains(m.HomeGroupId.Value))
+				m.HomeGroupId = null;
+
+			if (m.IntergroupPositionId.HasValue && !positionIds.Contains(m.IntergroupPositionId.Value))
+				m.IntergroupPositionId = null;
+		}
+
+		foreach (var mtg in meetings)
+		{
+			if (mtg.GroupId.HasValue && !groupIds.Contains(mtg.GroupId.Value))
+				mtg.GroupId = null;
+		}
+
 		// ── Replace local data inside a transaction ────────────────────
 		// If the app crashes between delete and insert, the transaction
 		// rolls back and the previous data is preserved.
@@ -84,20 +111,52 @@ public class UnitySyncService
 			// Sync data comes directly from Unity — don't stamp Updated timestamps.
 			_db.SuppressUpdatedStamp = true;
 
+			// Insert principals before dependents to satisfy FK constraints:
+			//   Groups   ← referenced by Members (HomeGroupId), Meetings (GroupId), Contacts (GroupId)
+			//   Positions ← referenced by Members (IntergroupPositionId)
 			await _db.Groups.AddRangeAsync(groups, ct);
+			await _db.Positions.AddRangeAsync(positions, ct);
 			await _db.Members.AddRangeAsync(members, ct);
 			await _db.Meetings.AddRangeAsync(meetings, ct);
 			await _db.Contacts.AddRangeAsync(contacts, ct);
-			await _db.Positions.AddRangeAsync(positions, ct);
 			await _db.IntergroupMeetings.AddRangeAsync(intergroupMeetings, ct);
 
 			await _db.SaveChangesAsync(ct);
 			await transaction.CommitAsync(ct);
 		}
-		catch
+		catch (DbUpdateException ex)
 		{
-			// Transaction rolls back automatically on dispose if not committed.
-			// Re-throw so the caller knows the sync failed.
+			// Log every member whose HomeGroupId or IntergroupPositionId
+			// doesn't match a group/position we're about to insert —
+			// these are the most likely cause of the FK violation.
+			var danglingHome = members
+				.Where(m => m.HomeGroupId.HasValue && !groupIds.Contains(m.HomeGroupId.Value))
+				.ToList();
+
+			var danglingPosition = members
+				.Where(m => m.IntergroupPositionId.HasValue && !positionIds.Contains(m.IntergroupPositionId.Value))
+				.ToList();
+
+			foreach (var m in danglingHome)
+			{
+				_logger.LogError(
+					"Member {MemberId} ({MemberName}) has invalid HomeGroupId {HomeGroupId} — no matching group in sync data",
+					m.Id, m.AnonymousName, m.HomeGroupId);
+			}
+
+			foreach (var m in danglingPosition)
+			{
+				_logger.LogError(
+					"Member {MemberId} ({MemberName}) has invalid IntergroupPositionId {PositionId} — no matching position in sync data",
+					m.Id, m.AnonymousName, m.IntergroupPositionId);
+			}
+
+			if (danglingHome.Count == 0 && danglingPosition.Count == 0)
+			{
+				_logger.LogError(ex,
+					"FK constraint failed during sync but no dangling member references were detected — check meeting/contact GroupIds");
+			}
+
 			throw;
 		}
 		finally

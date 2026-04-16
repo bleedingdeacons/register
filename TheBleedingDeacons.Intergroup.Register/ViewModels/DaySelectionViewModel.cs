@@ -44,6 +44,7 @@ public partial class DaySelectionViewModel : BaseViewModel
 	[RelayCommand]
 	async Task SelectDay(DayItem day)
 	{
+		await ShowFeedback();
 
 		var criteria = new MeetingCriteria() { MeetingType = MeetingType, Day = day.Name };
 
