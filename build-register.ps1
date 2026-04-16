@@ -1,15 +1,22 @@
 param(
     [Parameter(Mandatory=$true)]
-    [string]$KeyStorePassword,
-
-    [Parameter(Mandatory=$true)]
-    [string]$Production = "no"
+    [string]$KeyStorePassword
 )
 
-# ── Resolve production flag ───────────────────────────────────────────
-# The parameter is mandatory so the operator is always prompted, but
-# defaults to "no" so hitting Enter produces a dev build.
-$isProduction = $Production -ieq 'yes'
+# ── Always prompt for production flag ─────────────────────────────────
+# PowerShell's Mandatory + default don't play well together, so we
+# prompt manually. Pressing Enter without typing anything defaults to no.
+$productionInput = Read-Host "Production build? (yes/no) [no]"
+if ([string]::IsNullOrWhiteSpace($productionInput)) {
+    $productionInput = 'no'
+}
+
+if ($productionInput -inotin @('yes','no')) {
+    Write-Host "Invalid input '$productionInput'. Must be 'yes' or 'no'." -ForegroundColor Yellow
+    exit 1
+}
+
+$isProduction = $productionInput -ieq 'yes'
 
 if ($isProduction) {
     $answer = Read-Host "PRODUCTION build requested. Type 'YES' to confirm"
