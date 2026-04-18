@@ -114,15 +114,28 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 				}
 
 				var config = CreateConfigFromForm();
+
+				// Persist first — if this fails, the running MailKitService is untouched
+				// and the user's old settings remain in effect.
 				await _configService.SaveSmtpConfigurationAsync(config);
+
+				// Push the new config into the running singleton so it takes effect
+				// immediately instead of waiting for app restart. UpdateConfigurationAsync
+				// also resets the circuit breaker (see MailKitService) so the next
+				// queue tick will attempt delivery with the fresh credentials.
+				await _mailService.UpdateConfigurationAsync(config);
+
+				Logger.Information("SMTP configuration updated for {Host}:{Port}",
+					config.ToLogSafe().Host, config.ToLogSafe().Port);
 
 				ShowStatus("✅ SMTP settings saved successfully!", false);
 
-				// Optional: Navigate back or notify parent
-				WeakReferenceMessenger.Default.Send(new SettingsSavedMessage());
+				// Notify any subscribers (e.g. status pages) that settings changed.
+				WeakReferenceMessenger.Default.Send(new SettingsSavedMessage { Configuration = config });
 			}
 			catch (Exception ex)
 			{
+				Logger.Error(ex, "Failed to save SMTP settings");
 				ShowStatus($"❌ Failed to save settings: {ex.Message}", true);
 			}
 			finally
