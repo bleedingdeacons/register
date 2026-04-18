@@ -429,34 +429,5 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 				Logger.Warning(ex, "SecureStorage unavailable for {Description}", description);
 			}
 		}
-
-		/// <summary>
-		/// One-time migration: removes SMTP settings that a previous version
-		/// stored in plain-text <see cref="Preferences"/> (including the password).
-		/// Called once from the constructor on every app launch; the check is
-		/// essentially free when the keys don't exist.
-		/// </summary>
-		private static void RemoveStaleSmtpPreferencesKeys()
-		{
-			string[] staleKeys =
-			[
-				"smtp_host",
-				"smtp_port",
-				"smtp_username",
-				"smtp_password",   // ← the critical one (was plaintext)
-				"smtp_enable_ssl",
-				"smtp_timeout",
-				"smtp_max_retries"
-			];
-
-			foreach (var key in staleKeys)
-			{
-				if (Preferences.ContainsKey(key))
-				{
-					Preferences.Remove(key);
-					Logger.Information("Removed stale plaintext Preferences key: {Key}", key);
-				}
-			}
-		}
 	}
 }
