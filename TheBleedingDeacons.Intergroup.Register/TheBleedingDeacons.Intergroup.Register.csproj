@@ -108,7 +108,7 @@
 
 	<ItemGroup>
 		<PackageReference Include="libphonenumber-csharp" Version="9.0.28" />
-		<PackageReference Include="MailKit" Version="4.14.0" />
+		<PackageReference Include="MailKit" Version="4.16.0" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.9" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="9.0.9">
 			<PrivateAssets>all</PrivateAssets>
@@ -143,6 +143,7 @@
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
 		<PackageReference Include="System.Formats.Asn1" Version="9.0.9" />
+		<PackageReference Include="System.Security.Cryptography.Xml" Version="9.0.15" />
 		<PackageReference Include="System.Text.Json" Version="9.0.9" />
 	</ItemGroup>
 	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">
