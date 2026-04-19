@@ -39,28 +39,6 @@ public class DataService
     // Import (Sync) Methods
     // ====================================================================
 
-    public async Task<(int Meetings, int Positions, int Members, int Groups, int Contacts, int IntergroupMeetings)> ImportFromUnityAsync(
-        CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            Logger.Information("Starting sync from Unity API");
-
-            var result = await _syncService.SyncAsync(cancellationToken);
-
-            Logger.Information(
-                "Unity sync complete: {Groups} groups, {Meetings} meetings, {Members} members, {Positions} positions, {Contacts} contacts, {IntergroupMeetings} intergroup meetings",
-                result.Groups, result.Meetings, result.Members, result.Positions, result.Contacts, result.IntergroupMeetings);
-
-            return (result.Meetings, result.Positions, result.Members, result.Groups, result.Contacts, result.IntergroupMeetings);
-        }
-        catch (Exception ex)
-        {
-            Logger.Error(ex, "Sync from Unity API failed");
-            throw;
-        }
-    }
-
     /// <summary>
     /// Performs the initial Unity sync and captures a baseline snapshot.
     /// Call this at the start of a session (e.g. app launch or before an
