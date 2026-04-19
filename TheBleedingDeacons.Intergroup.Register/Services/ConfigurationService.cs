@@ -56,11 +56,6 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 
 			_configuration = builder.Build();
 
-			// One-time migration: a previous version of EmailSettingsViewModel
-			// stored SMTP credentials (including the password) in plain-text
-			// Preferences. Scrub those keys so the password is only ever held
-			// in SecureStorage going forward.
-			RemoveStaleSmtpPreferencesKeys();
 		}
 
 		// =================================================================

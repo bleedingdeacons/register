@@ -27,12 +27,17 @@ public static class MauiProgram
 	public const string UNITY_DATABASE_NAME = "unity.db";
 	public const string MAIL_DATABASE_NAME = "emails.db";
 
-	// Resolved once in SetupSerilog, reused by ReconfigureSerilogWithBetterStack
-	// so both loggers carry identical Application / Environment properties.
+	// Resolved once in SetupSerilog.
 	private const string DefaultAppName = "Badi";
 	private const string DefaultEnvironment = "Development";
 	private static string _resolvedAppName = DefaultAppName;
 	private static string _resolvedEnvironment = DefaultEnvironment;
+
+	// Factory that produces a fresh base-logger configuration (file/console/debug
+	// sinks + enrichers). Captured during SetupSerilog so BetterStackLoggerController
+	// can rebuild the whole pipeline on demand when the user edits Better Stack
+	// settings at runtime. Null until SetupSerilog runs.
+	private static Func<LoggerConfiguration>? _baseLoggerFactory;
 
 	public static MauiApp CreateMauiApp()
 	{
@@ -118,6 +123,22 @@ public static class MauiProgram
 		// AutomaticDecompression is enabled where supported so every request sends
 		// Accept-Encoding and the response is transparently decompressed.
 		builder.Services.AddSingleton<HttpClient>(_ => CreateHttpClient());
+
+		// Better Stack logger controller — rebuilds the Serilog pipeline on
+		// demand when Better Stack settings change. Captures the base-logger
+		// factory from SetupSerilog so every reconfigure composes a fresh
+		// pipeline (base sinks + optional Better Stack sink) rather than
+		// stacking sinks on top of the previous configuration. Singleton so
+		// all callers share the serialisation lock inside the controller.
+		builder.Services.AddSingleton<IBetterStackLoggerController>(sp =>
+		{
+			if (_baseLoggerFactory is null)
+				throw new InvalidOperationException(
+					"Serilog base-logger factory was not captured. SetupSerilog must run before the DI container is built.");
+
+			var httpClient = sp.GetRequiredService<HttpClient>();
+			return new BetterStackLoggerController(_baseLoggerFactory, httpClient);
+		});
 
 		// Unity REST client factory — always reads the latest credentials from config + SecureStorage.
 		// Used by UnitySyncService so each sync call gets a fresh client.
@@ -254,35 +275,23 @@ public static class MauiProgram
 			System.Diagnostics.Debug.WriteLine("Unity and Mail databases initialized.");
 		}
 
-		// ── Reconfigure Serilog with user-saved Better Stack settings ─
+		// ── Attach Better Stack sink using user-saved settings ────────
 		// SetupSerilog runs before DI is built, so it cannot read from
-		// ConfigurationService. We layer the durable HTTP sink on here,
-		// once the container (and SecureStorage) are available.
+		// ConfigurationService. Once the container is available we ask the
+		// IBetterStackLoggerController to layer the durable HTTP sink onto
+		// the base pipeline. The same controller is injected into
+		// BetterStackSettingsViewModel so runtime settings changes go through
+		// the same code path and tear down the previous sink cleanly.
 		//
-		// The HttpClient we resolve here is the same platform-native instance
-		// used for Unity API calls — sharing the TLS stack ensures log uploads
-		// aren't blocked by edge WAFs that allow the rest of the app through
-		// (see CreateHttpClient for the JA3/JA4 rationale).
-
-		// ── Reconfigure Serilog with Better Stack settings ────────────
-		// SetupSerilog runs before DI is built, so it cannot read from
-		// ConfigurationService. We layer the durable HTTP sink on here,
-		// once the container (and SecureStorage) are available.
-		//
-		// ConfigurationService handles the dev/prod split itself —
-		// dev builds read from the embedded unitysettings.dev.json,
-		// production builds read from user-saved settings.
-		//
-		// The HttpClient we resolve here is the same platform-native instance
-		// used for Unity API calls — sharing the TLS stack ensures log uploads
-		// aren't blocked by edge WAFs that allow the rest of the app through
-		// (see CreateHttpClient for the JA3/JA4 rationale).
+		// ConfigurationService handles the dev/prod split itself — dev builds
+		// read from the embedded devsettings.json, production builds read from
+		// user-saved settings.
 		using (var scope = mauiapp.Services.CreateScope())
 		{
 			var configService = scope.ServiceProvider.GetRequiredService<IConfigurationService>();
 			var betterStackConfig = configService.GetBetterStackConfiguration();
-			var httpClient = scope.ServiceProvider.GetRequiredService<HttpClient>();
-			ReconfigureSerilogWithBetterStack(betterStackConfig, httpClient);
+			var controller = scope.ServiceProvider.GetRequiredService<IBetterStackLoggerController>();
+			controller.Reconfigure(betterStackConfig);
 		}
 		return mauiapp;
 	}
@@ -295,12 +304,42 @@ public static class MauiProgram
 		var appName = builder.Configuration["App:Name"] ?? DefaultAppName;
 		var environment = builder.Configuration["App:Environment"] ?? DefaultEnvironment;
 
-		// Persist for ReconfigureSerilogWithBetterStack (which runs after DI is built).
+		// Persist for the Better Stack controller which rebuilds the pipeline
+		// when settings change at runtime — it calls back into the factory below.
 		_resolvedAppName = appName;
 		_resolvedEnvironment = environment;
 
-		var config = new LoggerConfiguration()
-			.ReadFrom.Configuration(builder.Configuration)
+		// Capture the base-logger factory so the Better Stack controller can
+		// rebuild a fresh pipeline on demand. We capture `builder.Configuration`
+		// here because it won't be in scope once DI is built.
+		var configRef = builder.Configuration;
+		_baseLoggerFactory = () => BuildBaseLoggerConfiguration(configRef, logPath, appName, environment);
+
+		Log.Logger = _baseLoggerFactory().CreateLogger();
+
+		Log.Information("Application {AppName} v{Version} starting on {Platform}",
+			appName, AppInfo.VersionString, DeviceInfo.Platform);
+	}
+
+	/// <summary>
+	/// Builds a fresh <see cref="LoggerConfiguration"/> containing only the
+	/// sinks that are fixed for the lifetime of the process — file, Debug, and
+	/// (on desktop) console — plus all standard enrichers. The durable Better
+	/// Stack sink is layered on separately by <see cref="BetterStackLoggerController"/>
+	/// because it can be toggled/reconfigured at runtime from the settings page.
+	///
+	/// Returning a configuration rather than a built logger lets the controller
+	/// chain <c>.WriteTo.DurableHttp...</c> before calling <c>CreateLogger()</c>,
+	/// giving one unified pipeline rather than nested ones.
+	/// </summary>
+	private static LoggerConfiguration BuildBaseLoggerConfiguration(
+		Microsoft.Extensions.Configuration.IConfiguration config,
+		string logPath,
+		string appName,
+		string environment)
+	{
+		var cfg = new LoggerConfiguration()
+			.ReadFrom.Configuration(config)
 			.Enrich.WithProperty("Application", appName)
 			.Enrich.WithProperty("Environment", environment)
 			.Enrich.WithProperty("Platform", DeviceInfo.Platform.ToString())
@@ -313,7 +352,7 @@ public static class MauiProgram
 			.Enrich.With<ExceptionEnricher>();
 
 #if DEBUG
-		config
+		cfg = cfg
 			.WriteTo.File(Path.Combine(logPath, $"{appName.ToLower()}-debug-.log"),
 				rollingInterval: RollingInterval.Day,
 				retainedFileCountLimit: 21)
@@ -326,122 +365,17 @@ public static class MauiProgram
 		//
 		// On mobile the Debug sink above already surfaces logs to the IDE's
 		// output window, so Console adds nothing. Scope it to desktop only.
-	#if WINDOWS || MACCATALYST
-		config.WriteTo.Console();
-	#endif
+#if WINDOWS || MACCATALYST
+		cfg = cfg.WriteTo.Console();
+#endif
 #else
-        config.WriteTo.File(Path.Combine(logPath, $"{appName.ToLower()}-.log"),
+        cfg = cfg.WriteTo.File(Path.Combine(logPath, $"{appName.ToLower()}-.log"),
             rollingInterval: RollingInterval.Day,
             retainedFileCountLimit: 7,
             restrictedToMinimumLevel: LogEventLevel.Information);
 #endif
 
-		Log.Logger = config.CreateLogger();
-
-		Log.Information("Application {AppName} v{Version} starting on {Platform}",
-			appName, AppInfo.VersionString, DeviceInfo.Platform);
-	}
-
-	private static void ReconfigureSerilogWithBetterStack(
-		BetterStackConfiguration betterStackConfig,
-		HttpClient httpClient)
-	{
-		if (!betterStackConfig.IsValid())
-		{
-			Log.Information("Better Stack configuration is not set or invalid — skipping Better Stack sink");
-			return;
-		}
-
-		// Reuse the same values resolved during SetupSerilog.
-		var appName = _resolvedAppName;
-		var environment = _resolvedEnvironment;
-
-		// ── Durable buffer path ───────────────────────────────────────
-		// Sits alongside the existing text log files in AppDataDirectory.
-		// • On Android / iOS this is private per-app storage, wiped on uninstall.
-		// • It is backed by the platform's normal data dir, so buffered events
-		//   survive process kills, reboots, and long offline stretches.
-		// Serilog.Sinks.Http creates a bookmark file next to this base name
-		// to track which buffered events have already been shipped.
-		var bufferDir = Path.Combine(FileSystem.AppDataDirectory, "logs", "betterstack-buffer");
-		Directory.CreateDirectory(bufferDir);
-		var bufferBaseFileName = Path.Combine(bufferDir, "buffer");
-
-		// Build the new logger into a local variable first. If CreateLogger()
-		// or the durable sink setup throws, Log.Logger keeps the original
-		// file/console/debug sinks untouched. Only swap after success.
-		try
-		{
-			var previousLogger = Log.Logger;
-
-			// ── Why DurableHttpUsingFileSizeRolledBuffers? ────────────
-			// The durable sink writes each event to a rolling file *before*
-			// attempting the HTTP POST. If the device is offline, the POST
-			// just fails and is retried later — events stay on disk until
-			// a batch is successfully acknowledged. Even a hard process
-			// kill (OOM on Android, force-stop, device reboot) cannot lose
-			// events that made it to the buffer file.
-			var betterStackHttpClient = new Support.BetterStackDurable.BetterStackHttpClient(
-				betterStackConfig.SourceToken,
-				httpClient);
-
-			var newLogger = new LoggerConfiguration()
-				.Enrich.WithProperty("Application", appName)
-				.Enrich.WithProperty("Environment", environment)
-				.Enrich.WithProperty("Platform", DeviceInfo.Platform.ToString())
-				.Enrich.WithProperty("PlatformVersion", DeviceInfo.VersionString)
-				.Enrich.WithProperty("AppVersion", AppInfo.VersionString)
-				.Enrich.WithProperty("DeviceModel", DeviceInfo.Model)
-				.Enrich.WithProperty("DeviceName", DeviceInfo.Name)
-				.Enrich.WithProperty("ProcessId", Environment.ProcessId)
-				.Enrich.WithProperty("MachineName", Environment.MachineName)
-				.Enrich.With<ExceptionEnricher>()
-				// Keep the existing file/console/debug sinks working exactly as before.
-				.WriteTo.Logger(previousLogger)
-				.WriteTo.DurableHttpUsingFileSizeRolledBuffers(
-					requestUri:              betterStackConfig.Endpoint,
-					bufferBaseFileName:      bufferBaseFileName,
-					// Per-file roll limit. Smaller files mean faster recovery after a
-					// crash (the sink replays the current file on startup). 8 MB gives
-					// plenty of events per file without making replay slow.
-					bufferFileSizeLimitBytes: 8L * 1024 * 1024,
-					// Keep at most 16 rolled files (~128 MB). A phone that's been
-					// offline for weeks will eventually hit this ceiling; older events
-					// are discarded rather than filling the device. Tune upward if
-					// long-offline retention matters more than disk footprint.
-					retainedBufferFileCountLimit: 16,
-					// Events per batch. Better Stack accepts up to 10 MiB per request;
-					// 500 events with our enriched payloads stays well under that.
-					logEventsInBatchLimit:   500,
-					// Cap compressed batch size at 5 MiB to leave comfortable headroom
-					// under Better Stack's 10 MiB request limit.
-					batchSizeLimitBytes:     5L * 1024 * 1024,
-					// How often to check the buffer for new events to ship.
-					period:                  TimeSpan.FromSeconds(5),
-					textFormatter:           new Serilog.Formatting.Json.JsonFormatter(renderMessage: true),
-					batchFormatter:          new Support.BetterStackDurable.BetterStackNdjsonBatchFormatter(),
-					httpClient:              betterStackHttpClient)
-				.CreateLogger();
-
-			// Only swap after the new logger is fully constructed.
-			Log.Logger = newLogger;
-
-			// Enable Serilog's SelfLog during the first few seconds so any sink
-			// setup errors are visible in Debug output — this is how you catch
-			// typos in the endpoint, a revoked source token, or a malformed
-			// buffer path without having to instrument anything further.
-			Serilog.Debugging.SelfLog.Enable(msg => System.Diagnostics.Debug.WriteLine($"[Serilog] {msg}"));
-
-			Log.Information(
-				"Durable Better Stack sink attached to {Endpoint} (buffer: {BufferPath})",
-				betterStackConfig.ToLogSafe().Endpoint,
-				bufferBaseFileName);
-		}
-		catch (Exception ex)
-		{
-			// Log.Logger still points to the original — file/console/debug sinks intact.
-			Log.Warning(ex, "Failed to attach durable Better Stack sink — continuing with existing sinks");
-		}
+		return cfg;
 	}
 
 	private static void RegisterGlobalExceptionHandlers()
@@ -517,5 +451,3 @@ public static class MauiProgram
 		};
 	}
 }
-
-
