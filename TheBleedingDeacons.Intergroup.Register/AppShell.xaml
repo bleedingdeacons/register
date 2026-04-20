@@ -10,6 +10,11 @@
                   ContentTemplate="{DataTemplate local:MainPage}"
                   Route="MainPage" />
 
+    <ShellContent Title="Registrations"
+                  Icon="home.png"
+                  ContentTemplate="{DataTemplate local:RegistrationOverviewPage}"
+                  Route="RegistrationOverviewPage" />
+
     <ShellContent Title="Admin"
           Icon="admin.png"
           ContentTemplate="{DataTemplate local:AdminPage}"
@@ -35,9 +40,7 @@
     <ShellContent Title="Email Status"
       Icon="settings.png"
       ContentTemplate="{DataTemplate local:EmailStatusPage}"
-      Route="EmailStatusPage" 
+      Route="EmailStatusPage"
       IsVisible="False" />
-
-
 
 </Shell>

@@ -239,6 +239,7 @@ public static class MauiProgram
 		builder.Services.AddTransient<UnitySettingsPage>();
 		builder.Services.AddTransient<BetterStackSettingsPage>();
 		builder.Services.AddTransient<AdminPage>();
+		builder.Services.AddTransient<RegistrationOverviewPage>();
 
 		// ── ViewModels ────────────────────────────────────────────────
 		builder.Services.AddTransient<MailSettingsViewModel>();
@@ -258,6 +259,7 @@ public static class MauiProgram
 		builder.Services.AddTransient<AdminViewModel>();
 		builder.Services.AddTransient<VerifyPositionViewModel>();
 		builder.Services.AddTransient<PositionVerifyPage>();
+		builder.Services.AddTransient<RegistrationOverviewViewModel>();
 
 #if DEBUG
 		builder.Services.AddLogging();

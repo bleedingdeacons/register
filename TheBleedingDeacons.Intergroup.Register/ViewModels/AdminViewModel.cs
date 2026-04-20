@@ -6,6 +6,7 @@ using System.Collections.ObjectModel;
 using TheBleedingDeacons.Intergroup.Register.Services;
 using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Support;
+using TheBleedingDeacons.Intergroup.Register.Views;
 using TheBleedingDeacons.Unity.Intergroup.Data;
 using TheBleedingDeacons.Unity.Intergroup.Entities;
 using TheBleedingDeacons.Unity.Intergroup.Repositories.Interfaces;

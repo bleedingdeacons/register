@@ -12,22 +12,53 @@ using TheBleedingDeacons.Intergroup.Register.Support;
 
 namespace TheBleedingDeacons.Intergroup.Register.Services
 {
-    
-    public class PopupNotificationService : IPopupNotification
-    {
-        private static readonly ILogger Logger = AppLogger.ForContext<PopupNotificationService>();
 
-        public async Task ShowCountdownPopupAsync(string title, string message, Func<Task> navigationAction)
-        {
-            var popup = new CountdownPopup(title, message, navigationAction);
+	public class PopupNotificationService : IPopupNotification
+	{
+		private static readonly ILogger Logger = AppLogger.ForContext<PopupNotificationService>();
 
-            // Use the Windows collection to obtain the active Page instead of the deprecated MainPage property
-            var currentPage = Application.Current?.Windows?.FirstOrDefault()?.Page;
+		public async Task ShowCountdownPopupAsync(string title, string message, Func<Task> navigationAction)
+		{
+			var popup = new CountdownPopup(title, message, navigationAction);
 
-            if (currentPage is Page page)
-            {
-                await page.ShowPopupAsync(popup);
-            }
-        }
-    }
+			// Use the Windows collection to obtain the active Page instead of the deprecated MainPage property
+			var currentPage = Application.Current?.Windows?.FirstOrDefault()?.Page;
+
+			if (currentPage is Page page)
+			{
+				await page.ShowPopupAsync(popup);
+			}
+		}
+
+		public async Task ShowErrorAsync(string title, string message)
+		{
+			// Resolve the currently-active Page the same way
+			// ShowCountdownPopupAsync does, rather than going through
+			// Shell.Current — works on pages that aren't inside Shell
+			// (popups, modals) and avoids a NullReferenceException if
+			// Shell hasn't initialised yet.
+			var currentPage = Application.Current?.Windows?.FirstOrDefault()?.Page;
+
+			if (currentPage is null)
+			{
+				// Nothing to attach a dialog to — log and swallow. Throwing
+				// from an error-reporting path just turns one failure into two.
+				Logger.Warning(
+					"ShowErrorAsync called with no active page. Title={Title}, Message={Message}",
+					title, message);
+				return;
+			}
+
+			try
+			{
+				await currentPage.DisplayAlert(title, message, "OK");
+			}
+			catch (Exception ex)
+			{
+				// DisplayAlert can throw if the page is torn down between
+				// resolution and the call. Log, don't propagate.
+				Logger.Warning(ex, "Failed to display error dialog: {Title} / {Message}", title, message);
+			}
+		}
+	}
 }

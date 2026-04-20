@@ -1,0 +1,294 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage x:Class="TheBleedingDeacons.Intergroup.Register.Views.RegistrationOverviewPage"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
+             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+             x:DataType="vm:RegistrationOverviewViewModel"
+             Title="Registrations">
+
+    <ContentPage.Behaviors>
+        <toolkit:StatusBarBehavior StatusBarColor="{AppThemeBinding Light=White, Dark=Black}"
+                                   StatusBarStyle="{AppThemeBinding Light=DarkContent, Dark=LightContent}" />
+    </ContentPage.Behaviors>
+
+    <Grid RowDefinitions="Auto,*">
+
+        <!-- ═══════════════════════════════════════════════════════════
+             Tab bar
+             ═══════════════════════════════════════════════════════════ -->
+        <Grid Grid.Row="0"
+              ColumnDefinitions="*,*"
+              BackgroundColor="{AppThemeBinding Light=#F5F5F5, Dark=#1E1E1E}"
+              Padding="0"
+              ColumnSpacing="0">
+
+            <Button Grid.Column="0"
+                    Text="Groups"
+                    Command="{Binding ShowGroupsTabCommand}"
+                    FontSize="16"
+                    CornerRadius="0"
+                    HeightRequest="48"
+                    BorderWidth="0">
+                <Button.Style>
+                    <Style TargetType="Button">
+                        <Setter Property="BackgroundColor" Value="Transparent"/>
+                        <Setter Property="TextColor"
+                                Value="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}"/>
+                        <Setter Property="FontAttributes" Value="None"/>
+                        <Style.Triggers>
+                            <DataTrigger TargetType="Button"
+                                         Binding="{Binding IsGroupsTabSelected}"
+                                         Value="True">
+                                <Setter Property="BackgroundColor"
+                                        Value="{AppThemeBinding Light=White, Dark=#2D2D30}"/>
+                                <Setter Property="TextColor"
+                                        Value="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"/>
+                                <Setter Property="FontAttributes" Value="Bold"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+
+            <Button Grid.Column="1"
+                    Text="Positions"
+                    Command="{Binding ShowPositionsTabCommand}"
+                    FontSize="16"
+                    CornerRadius="0"
+                    HeightRequest="48"
+                    BorderWidth="0">
+                <Button.Style>
+                    <Style TargetType="Button">
+                        <Setter Property="BackgroundColor" Value="Transparent"/>
+                        <Setter Property="TextColor"
+                                Value="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}"/>
+                        <Setter Property="FontAttributes" Value="None"/>
+                        <Style.Triggers>
+                            <DataTrigger TargetType="Button"
+                                         Binding="{Binding IsPositionsTabSelected}"
+                                         Value="True">
+                                <Setter Property="BackgroundColor"
+                                        Value="{AppThemeBinding Light=White, Dark=#2D2D30}"/>
+                                <Setter Property="TextColor"
+                                        Value="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"/>
+                                <Setter Property="FontAttributes" Value="Bold"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+        </Grid>
+
+        <!-- ═══════════════════════════════════════════════════════════
+             Content
+             ═══════════════════════════════════════════════════════════ -->
+        <Grid Grid.Row="1">
+
+            <!-- Loading spinner -->
+            <ActivityIndicator IsRunning="{Binding IsLoading}"
+                               IsVisible="{Binding IsLoading}"
+                               VerticalOptions="Center"
+                               HorizontalOptions="Center"
+                               Scale="1.5"
+                               Color="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"/>
+
+            <!-- ─────────────── GROUPS TAB ─────────────── -->
+            <Grid RowDefinitions="Auto,*"
+                  IsVisible="{Binding IsGroupsTabSelected}">
+
+                <Label Grid.Row="0"
+                       Text="{Binding GroupsSummary}"
+                       FontSize="14"
+                       TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}"
+                       Padding="20,12,20,4"/>
+
+                <RefreshView Grid.Row="1"
+                             Command="{Binding LoadCommand}"
+                             IsRefreshing="{Binding IsLoading, Mode=OneWay}">
+                    <CollectionView ItemsSource="{Binding Groups}"
+                                    SelectionMode="None">
+                        <CollectionView.EmptyView>
+                            <StackLayout Padding="40" VerticalOptions="Center">
+                                <Label Text="No groups in the local database."
+                                       FontSize="15"
+                                       HorizontalOptions="Center"
+                                       TextColor="{StaticResource Gray400}"/>
+                            </StackLayout>
+                        </CollectionView.EmptyView>
+                        <CollectionView.ItemsLayout>
+                            <LinearItemsLayout Orientation="Vertical" ItemSpacing="6"/>
+                        </CollectionView.ItemsLayout>
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="vm:OverviewGroup">
+                                <Border StrokeShape="RoundRectangle 8"
+                                        StrokeThickness="1"
+                                        Stroke="{AppThemeBinding Light=#E0E0E0, Dark=#424242}"
+                                        BackgroundColor="{AppThemeBinding Light=White, Dark=#2D2D30}"
+                                        Margin="16,0"
+                                        Padding="14,10">
+                                    <Grid ColumnDefinitions="Auto,*,Auto,Auto"
+                                          ColumnSpacing="12"
+                                          RowDefinitions="Auto,Auto">
+
+                                        <!-- Registered tick/empty -->
+                                        <Label Grid.Row="0" Grid.Column="0"
+                                               Grid.RowSpan="2"
+                                               VerticalOptions="Center"
+                                               FontSize="22">
+                                            <Label.Triggers>
+                                                <DataTrigger TargetType="Label"
+                                                             Binding="{Binding IsRegistered}"
+                                                             Value="True">
+                                                    <Setter Property="Text" Value="✅"/>
+                                                </DataTrigger>
+                                                <DataTrigger TargetType="Label"
+                                                             Binding="{Binding IsRegistered}"
+                                                             Value="False">
+                                                    <Setter Property="Text" Value="⬜"/>
+                                                </DataTrigger>
+                                            </Label.Triggers>
+                                        </Label>
+
+                                        <!-- Group name -->
+                                        <Label Grid.Row="0" Grid.Column="1"
+                                               Text="{Binding Entity.Name}"
+                                               FontSize="16"
+                                               FontAttributes="Bold"
+                                               LineBreakMode="TailTruncation"/>
+
+                                        <!-- GSR / proxy name -->
+                                        <Label Grid.Row="1" Grid.Column="1"
+                                               Text="{Binding DisplayGsr}"
+                                               FontSize="13"
+                                               TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}"
+                                               LineBreakMode="TailTruncation"/>
+
+                                        <!-- Switch -->
+                                        <Switch Grid.Row="0" Grid.Column="2"
+                                                Grid.RowSpan="2"
+                                                VerticalOptions="Center"
+                                                IsToggled="{Binding IsRegistered, Mode=TwoWay}"/>
+
+                                        <!-- Details button -->
+                                        <Button Grid.Row="0" Grid.Column="3"
+                                                Grid.RowSpan="2"
+                                                Text="Details"
+                                                FontSize="13"
+                                                Padding="14,0"
+                                                HeightRequest="36"
+                                                VerticalOptions="Center"
+                                                BackgroundColor="Transparent"
+                                                TextColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
+                                                BorderColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
+                                                BorderWidth="1"
+                                                CornerRadius="6"
+                                                Command="{Binding Source={RelativeSource AncestorType={x:Type vm:RegistrationOverviewViewModel}}, Path=OpenGroupDetailsCommand}"
+                                                CommandParameter="{Binding .}"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </RefreshView>
+            </Grid>
+
+            <!-- ─────────────── POSITIONS TAB ─────────────── -->
+            <Grid RowDefinitions="Auto,*"
+                  IsVisible="{Binding IsPositionsTabSelected}">
+
+                <Label Grid.Row="0"
+                       Text="{Binding PositionsSummary}"
+                       FontSize="14"
+                       TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}"
+                       Padding="20,12,20,4"/>
+
+                <RefreshView Grid.Row="1"
+                             Command="{Binding LoadCommand}"
+                             IsRefreshing="{Binding IsLoading, Mode=OneWay}">
+                    <CollectionView ItemsSource="{Binding Positions}"
+                                    SelectionMode="None">
+                        <CollectionView.EmptyView>
+                            <StackLayout Padding="40" VerticalOptions="Center">
+                                <Label Text="No positions in the local database."
+                                       FontSize="15"
+                                       HorizontalOptions="Center"
+                                       TextColor="{StaticResource Gray400}"/>
+                            </StackLayout>
+                        </CollectionView.EmptyView>
+                        <CollectionView.ItemsLayout>
+                            <LinearItemsLayout Orientation="Vertical" ItemSpacing="6"/>
+                        </CollectionView.ItemsLayout>
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="vm:OverviewPosition">
+                                <Border StrokeShape="RoundRectangle 8"
+                                        StrokeThickness="1"
+                                        Stroke="{AppThemeBinding Light=#E0E0E0, Dark=#424242}"
+                                        BackgroundColor="{AppThemeBinding Light=White, Dark=#2D2D30}"
+                                        Margin="16,0"
+                                        Padding="14,10">
+                                    <Grid ColumnDefinitions="Auto,*,Auto,Auto"
+                                          ColumnSpacing="12"
+                                          RowDefinitions="Auto,Auto">
+
+                                        <Label Grid.Row="0" Grid.Column="0"
+                                               Grid.RowSpan="2"
+                                               VerticalOptions="Center"
+                                               FontSize="22">
+                                            <Label.Triggers>
+                                                <DataTrigger TargetType="Label"
+                                                             Binding="{Binding IsRegistered}"
+                                                             Value="True">
+                                                    <Setter Property="Text" Value="✅"/>
+                                                </DataTrigger>
+                                                <DataTrigger TargetType="Label"
+                                                             Binding="{Binding IsRegistered}"
+                                                             Value="False">
+                                                    <Setter Property="Text" Value="⬜"/>
+                                                </DataTrigger>
+                                            </Label.Triggers>
+                                        </Label>
+
+                                        <Label Grid.Row="0" Grid.Column="1"
+                                               Text="{Binding Entity.ShortDescription}"
+                                               FontSize="16"
+                                               FontAttributes="Bold"
+                                               LineBreakMode="TailTruncation"/>
+
+                                        <Label Grid.Row="1" Grid.Column="1"
+                                               Text="{Binding DisplayHolder}"
+                                               FontSize="13"
+                                               TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}"
+                                               LineBreakMode="TailTruncation"/>
+
+                                        <Switch Grid.Row="0" Grid.Column="2"
+                                                Grid.RowSpan="2"
+                                                VerticalOptions="Center"
+                                                IsToggled="{Binding IsRegistered, Mode=TwoWay}"/>
+
+                                        <Button Grid.Row="0" Grid.Column="3"
+                                                Grid.RowSpan="2"
+                                                Text="Details"
+                                                FontSize="13"
+                                                Padding="14,0"
+                                                HeightRequest="36"
+                                                VerticalOptions="Center"
+                                                BackgroundColor="Transparent"
+                                                TextColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
+                                                BorderColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
+                                                BorderWidth="1"
+                                                CornerRadius="6"
+                                                Command="{Binding Source={RelativeSource AncestorType={x:Type vm:RegistrationOverviewViewModel}}, Path=OpenPositionDetailsCommand}"
+                                                CommandParameter="{Binding .}"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </RefreshView>
+            </Grid>
+
+        </Grid>
+    </Grid>
+
+</ContentPage>
