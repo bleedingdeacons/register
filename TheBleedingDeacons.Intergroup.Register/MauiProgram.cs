@@ -96,19 +96,23 @@ public static class MauiProgram
 
 		// ── Unity.Data: DbContext + Repositories ──────────────────────
 		var unityDbPath = Path.Combine(FileSystem.AppDataDirectory, UNITY_DATABASE_NAME);
-		builder.Services.AddDbContext<UnityDbContext>((sp, options) =>
+		//builder.Services.AddDbContext<UnityDbContext>((sp, options) =>
+		//	options
+		//		.UseSqlite($"Data Source={unityDbPath}")
+		//		.AddInterceptors(sp.GetRequiredService<SqlitePragmaInterceptor>()));
+
+		builder.Services.AddDbContextFactory<UnityDbContext>((sp, options) =>
 			options
 				.UseSqlite($"Data Source={unityDbPath}")
 				.AddInterceptors(sp.GetRequiredService<SqlitePragmaInterceptor>()));
 
-
-		// Factory for ViewModels — each transient ViewModel creates its own
-		// short-lived DbContext, avoiding stale-entity tracking bleed between pages.
-		builder.Services.AddDbContextFactory<UnityDbContext>((sp, options) =>
-			options
-				.UseSqlite($"Data Source={unityDbPath}")
-				.AddInterceptors(sp.GetRequiredService<SqlitePragmaInterceptor>()),
-			ServiceLifetime.Singleton);
+		//// Factory for ViewModels — each transient ViewModel creates its own
+		//// short-lived DbContext, avoiding stale-entity tracking bleed between pages.
+		//builder.Services.AddDbContextFactory<UnityDbContext>((sp, options) =>
+		//	options
+		//		.UseSqlite($"Data Source={unityDbPath}")
+		//		.AddInterceptors(sp.GetRequiredService<SqlitePragmaInterceptor>()),
+		//	ServiceLifetime.Singleton);
 
 		Log.Logger.Information("Unity Db {databasePath}", unityDbPath);
 

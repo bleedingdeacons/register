@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Serilog;
 using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Support;
@@ -26,9 +27,10 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 	/// touched, so we can't end up with a logged registration that was
 	/// never actually applied.
 	///
-	/// <see cref="ReconciliationService"/> detects these local changes (via
-	/// snapshot diffing) and pushes them to the Unity API in the correct
-	/// dependency order at reconciliation time.
+	/// <b>Context lifetime</b>: each register/unregister creates its own
+	/// short-lived DbContext via <see cref="IDbContextFactory{TContext}"/>,
+	/// then disposes it. This removes the race hazard of sharing a scoped
+	/// context with ViewModels that also write to the same tables.
 	/// </summary>
 	public class AttendanceService : IAttendanceRegistration<Position>, IAttendanceRegistration<Group>, IDisposable
 	{
@@ -36,7 +38,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 
 		private readonly IEmailService _emailService;
 		private readonly IEmailTemplateService _emailTemplate;
-		private readonly UnityDbContext _dbContext;
+		private readonly IDbContextFactory<UnityDbContext> _dbContextFactory;
 		private readonly RegistrationEventLog _eventLog;
 		private readonly IConfigurationService _configService;
 
@@ -47,13 +49,13 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		public AttendanceService(
 			IEmailTemplateService emailTemplate,
 			IEmailService emailService,
-			UnityDbContext dbContext,
+			IDbContextFactory<UnityDbContext> dbContextFactory,
 			RegistrationEventLog eventLog,
 			IConfigurationService configService)
 		{
 			_emailService = emailService;
 			_emailTemplate = emailTemplate;
-			_dbContext = dbContext;
+			_dbContextFactory = dbContextFactory;
 			_eventLog = eventLog;
 			_configService = configService;
 
@@ -98,7 +100,12 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			// ── Primary store: SQLite ────────────────────────────────
 			try
 			{
-				var group = await _dbContext.Groups.FindAsync(new object[] { groupId }, ct);
+				// Fresh context per call — no shared state with other
+				// services or ViewModels, so no risk of stale-entity
+				// overwrites via EF's change tracker.
+				await using var dbContext = await _dbContextFactory.CreateDbContextAsync(ct);
+
+				var group = await dbContext.Groups.FindAsync(new object[] { groupId }, ct);
 				if (group is null)
 				{
 					Logger.Warning("SetGroupRegisteredAsync: group {GroupId} not found", groupId);
@@ -108,7 +115,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 				group.Registered = registered;
 				group.GsrProxy = gsrProxy;
 				group.GsrProxyName = gsrProxy ? gsrProxyName : null;
-				await _dbContext.SaveChangesAsync(ct);
+				await dbContext.SaveChangesAsync(ct);
 			}
 			catch (Exception ex)
 			{
@@ -134,7 +141,9 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			// ── Primary store: SQLite ────────────────────────────────
 			try
 			{
-				var position = await _dbContext.Positions.FindAsync(new object[] { positionId }, ct);
+				await using var dbContext = await _dbContextFactory.CreateDbContextAsync(ct);
+
+				var position = await dbContext.Positions.FindAsync(new object[] { positionId }, ct);
 				if (position is null)
 				{
 					Logger.Warning("SetPositionRegisteredAsync: position {PositionId} not found", positionId);
@@ -142,7 +151,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 				}
 
 				position.Registered = registered;
-				await _dbContext.SaveChangesAsync(ct);
+				await dbContext.SaveChangesAsync(ct);
 			}
 			catch (Exception ex)
 			{

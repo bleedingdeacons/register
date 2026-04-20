@@ -10,16 +10,24 @@ namespace TheBleedingDeacons.Unity.Intergroup.Services;
 /// <summary>
 /// Fetches Groups, Meetings, Positions, Members and Intergroup Meetings
 /// from the Unity API and replaces the local SQLite data with a fresh snapshot.
+///
+/// <b>Context lifetime</b>: <see cref="SyncAsync"/> owns a single DbContext
+/// for the duration of the call. All the replace-local-data work happens
+/// inside one transaction on one context. This avoids sharing a change
+/// tracker with AttendanceService / ViewModels.
 /// </summary>
 public class UnitySyncService
 {
-	private readonly UnityDbContext _db;
+	private readonly IDbContextFactory<UnityDbContext> _dbContextFactory;
 	private readonly Func<Task<UnityRestSharp>> _clientFactory;
 	private readonly ILogger<UnitySyncService> _logger;
 
-	public UnitySyncService(UnityDbContext db, Func<Task<UnityRestSharp>> clientFactory, ILogger<UnitySyncService> logger)
+	public UnitySyncService(
+		IDbContextFactory<UnityDbContext> dbContextFactory,
+		Func<Task<UnityRestSharp>> clientFactory,
+		ILogger<UnitySyncService> logger)
 	{
-		_db = db;
+		_dbContextFactory = dbContextFactory;
 		_clientFactory = clientFactory;
 		_logger = logger;
 	}
@@ -88,40 +96,43 @@ public class UnitySyncService
 		}
 
 		// ── Replace local data inside a transaction ────────────────────
-		// If the app crashes between delete and insert, the transaction
-		// rolls back and the previous data is preserved.
+		// Open a fresh context for this sync — no shared change tracker
+		// with other services or ViewModels. If the app crashes between
+		// delete and insert, the transaction rolls back and the previous
+		// data is preserved.
 
-		await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+		await using var db = await _dbContextFactory.CreateDbContextAsync(ct);
+		await using var transaction = await db.Database.BeginTransactionAsync(ct);
 		try
 		{
 			// Delete dependents first, then principals
-			await _db.Meetings.ExecuteDeleteAsync(ct);
-			await _db.Contacts.ExecuteDeleteAsync(ct);
-			await _db.IntergroupMeetings.ExecuteDeleteAsync(ct);
-			await _db.Positions.ExecuteDeleteAsync(ct);
-			await _db.Members.ExecuteDeleteAsync(ct);
-			await _db.Groups.ExecuteDeleteAsync(ct);
+			await db.Meetings.ExecuteDeleteAsync(ct);
+			await db.Contacts.ExecuteDeleteAsync(ct);
+			await db.IntergroupMeetings.ExecuteDeleteAsync(ct);
+			await db.Positions.ExecuteDeleteAsync(ct);
+			await db.Members.ExecuteDeleteAsync(ct);
+			await db.Groups.ExecuteDeleteAsync(ct);
 
 			// Also clear snapshot bookkeeping table so stale data
 			// doesn't confuse a subsequent reconciliation cycle.
-			await _db.EntitySnapshots.ExecuteDeleteAsync(ct);
+			await db.EntitySnapshots.ExecuteDeleteAsync(ct);
 
-			_db.ChangeTracker.Clear();
+			db.ChangeTracker.Clear();
 
 			// Sync data comes directly from Unity — don't stamp Updated timestamps.
-			_db.SuppressUpdatedStamp = true;
+			db.SuppressUpdatedStamp = true;
 
 			// Insert principals before dependents to satisfy FK constraints:
 			//   Groups   ← referenced by Members (HomeGroupId), Meetings (GroupId), Contacts (GroupId)
 			//   Positions ← referenced by Members (IntergroupPositionId)
-			await _db.Groups.AddRangeAsync(groups, ct);
-			await _db.Positions.AddRangeAsync(positions, ct);
-			await _db.Members.AddRangeAsync(members, ct);
-			await _db.Meetings.AddRangeAsync(meetings, ct);
-			await _db.Contacts.AddRangeAsync(contacts, ct);
-			await _db.IntergroupMeetings.AddRangeAsync(intergroupMeetings, ct);
+			await db.Groups.AddRangeAsync(groups, ct);
+			await db.Positions.AddRangeAsync(positions, ct);
+			await db.Members.AddRangeAsync(members, ct);
+			await db.Meetings.AddRangeAsync(meetings, ct);
+			await db.Contacts.AddRangeAsync(contacts, ct);
+			await db.IntergroupMeetings.AddRangeAsync(intergroupMeetings, ct);
 
-			await _db.SaveChangesAsync(ct);
+			await db.SaveChangesAsync(ct);
 			await transaction.CommitAsync(ct);
 		}
 		catch (DbUpdateException ex)
@@ -161,7 +172,7 @@ public class UnitySyncService
 		}
 		finally
 		{
-			_db.SuppressUpdatedStamp = false;
+			db.SuppressUpdatedStamp = false;
 		}
 
 		return new SyncResult(groups.Count, meetings.Count, positions.Count, members.Count, contacts.Count, intergroupMeetings.Count);

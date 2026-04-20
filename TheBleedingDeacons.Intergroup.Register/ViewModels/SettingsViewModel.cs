@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using System.Threading.Tasks;
+using TheBleedingDeacons.Intergroup.Register.Services;
 using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Support;
 using TheBleedingDeacons.Intergroup.Register.Views;
@@ -16,6 +17,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 
 		private readonly IConfigurationService _configService;
 		private readonly IDbContextFactory<UnityDbContext> _dbContextFactory;
+		private readonly RegistrationEventLog _eventLog;
 
 		[ObservableProperty]
 		private bool isPurging;
@@ -31,10 +33,12 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 
 		public SettingsViewModel(
 			IConfigurationService configService,
-			IDbContextFactory<UnityDbContext> dbContextFactory)
+			IDbContextFactory<UnityDbContext> dbContextFactory,
+			RegistrationEventLog eventLog)
 		{
 			_configService = configService;
 			_dbContextFactory = dbContextFactory;
+			_eventLog = eventLog;
 		}
 
 		// =================================================================
@@ -100,20 +104,29 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 		}
 
 		// =================================================================
-		// Purge Database
+		// Reset Device
 		// =================================================================
 
 		/// <summary>
-		/// Purges all data from the local database.
-		/// Reuses the same <see cref="UnityDbContext.PurgeDatabaseAsync"/> method as AdminViewModel.
+		/// Resets the device: purges all data from the local database AND
+		/// deletes the registration event log if present. The two actions
+		/// are logically paired — leaving the log behind after a database
+		/// purge would cause the next startup replay to resurrect rows
+		/// that no longer have corresponding groups/positions, producing
+		/// "missing entity" warnings at best and data corruption at worst.
+		///
+		/// Command / property names are kept as <c>PurgeDatabase*</c> for
+		/// backward compatibility with existing XAML bindings; the
+		/// user-visible surface ("Reset Device") is handled in
+		/// <see cref="Views.SettingsPage"/> and the dialog text below.
 		/// </summary>
 		[RelayCommand]
 		private async Task PurgeDatabase()
 		{
 			bool confirmed = await Shell.Current.DisplayAlert(
-				"Purge Database",
-				"This will permanently delete ALL local data including groups, members, meetings, positions, and snapshots.\n\nThis action cannot be undone. Are you sure?",
-				"Yes, Purge Everything",
+				"Reset Device",
+				"This will permanently delete ALL local data including groups, members, meetings, positions, and snapshots, and clear the registration event log.\n\nThis action cannot be undone. Are you sure?",
+				"Yes, Reset Device",
 				"No, Keep Data");
 
 			if (!confirmed) return;
@@ -121,22 +134,54 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 			try
 			{
 				IsPurging = true;
-				ShowPurgeStatus("Purging database...", false);
+				ShowPurgeStatus("Resetting device...", false);
 
 				using var dbContext = _dbContextFactory.CreateDbContext();
 				await dbContext.PurgeDatabaseAsync();
 
-				ShowPurgeStatus("Database purged successfully.", false);
-				Logger.Information("Database purged successfully from Settings");
+				// Delete the registration event log if it exists. We do
+				// this after the DB purge succeeds, not before — if the
+				// DB purge throws, the log is still a useful forensic
+				// record of what the previous database contained.
+				//
+				// A failure here is logged but does NOT flip the status
+				// to error: the database — the primary state — has
+				// already been successfully wiped, and reporting "reset
+				// failed" would mislead the operator into retrying a
+				// destructive action that already completed.
+				TryDeleteRegistrationLog();
+
+				ShowPurgeStatus("Device reset successfully.", false);
+				Logger.Information("Device reset successfully from Settings");
 			}
 			catch (Exception ex)
 			{
-				Logger.Error(ex, "Database purge failed from Settings");
-				ShowPurgeStatus($"Purge failed: {ex.Message}", true);
+				Logger.Error(ex, "Device reset failed from Settings");
+				ShowPurgeStatus($"Reset failed: {ex.Message}", true);
 			}
 			finally
 			{
 				IsPurging = false;
+			}
+		}
+
+		private void TryDeleteRegistrationLog()
+		{
+			try
+			{
+				var path = _eventLog.LogPath;
+				if (File.Exists(path))
+				{
+					File.Delete(path);
+					Logger.Information("Registration event log deleted as part of device reset: {Path}", path);
+				}
+			}
+			catch (Exception ex)
+			{
+				// Swallow — see comment in PurgeDatabase. The DB has
+				// already been purged; surfacing this as a user-facing
+				// failure would do more harm than good.
+				Logger.Warning(ex, "Failed to delete registration event log during device reset");
 			}
 		}
 

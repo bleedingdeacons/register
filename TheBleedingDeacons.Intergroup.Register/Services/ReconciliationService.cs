@@ -34,12 +34,16 @@ namespace TheBleedingDeacons.Intergroup.Register.Services;
 /// <b>Dependency ordering</b>: locally-created members (negative temp IDs)
 /// must be created on Unity first so a real ID is returned. That real ID
 /// is then used for any subsequent registration calls that reference
-/// the member. This is the core problem that the old fire-and-forget
-/// queue could not solve.
+/// the member.
 ///
 /// <b>Durability ordering</b>: the event log is purged only AFTER a clean
 /// reconcile (no API errors) and a fresh snapshot. If anything goes wrong
 /// the log is preserved so the next attempt can replay it.
+///
+/// <b>Context lifetime</b>: <see cref="ReconcileAsync"/> owns a single
+/// DbContext for the duration of the call — reconciliation is a unit of
+/// work with a consistent view of the DB. The detect helpers receive
+/// that context as a parameter rather than opening their own.
 /// </summary>
 public class ReconciliationService
 {
@@ -49,7 +53,7 @@ public class ReconciliationService
 	private readonly UnitySyncService _syncService;
 	private readonly IConfigurationService _configService;
 	private readonly Func<Task<UnityRestSharp>> _clientFactory;
-	private readonly UnityDbContext _db;
+	private readonly IDbContextFactory<UnityDbContext> _dbContextFactory;
 	private readonly RegistrationEventLog _eventLog;
 
 	public ReconciliationService(
@@ -57,14 +61,14 @@ public class ReconciliationService
 		UnitySyncService syncService,
 		IConfigurationService configService,
 		Func<Task<UnityRestSharp>> clientFactory,
-		UnityDbContext db,
+		IDbContextFactory<UnityDbContext> dbContextFactory,
 		RegistrationEventLog eventLog)
 	{
 		_snapshotService = snapshotService;
 		_syncService = syncService;
 		_configService = configService;
 		_clientFactory = clientFactory;
-		_db = db;
+		_dbContextFactory = dbContextFactory;
 		_eventLog = eventLog;
 	}
 
@@ -95,6 +99,10 @@ public class ReconciliationService
 	/// </summary>
 	public async Task<ReconcileResult> ReconcileAsync(CancellationToken ct = default)
 	{
+		// One context for the whole reconcile — detect / push / stamp
+		// all share a consistent view of local state.
+		await using var db = await _dbContextFactory.CreateDbContextAsync(ct);
+
 		// ── Pre-phase: replay event log ──────────────────────────────
 		// If the DB was lost or corrupted between a registration and now,
 		// this rebuilds the Registered flags so the snapshot diff below
@@ -103,7 +111,7 @@ public class ReconciliationService
 		if (_eventLog.HasPendingEntries())
 		{
 			Logger.Information("ReconcileAsync: registration log has pending entries — replaying before diff");
-			var replay = await _eventLog.ReplayIntoDatabaseAsync(_db, ct);
+			var replay = await _eventLog.ReplayIntoDatabaseAsync(db, ct);
 			Logger.Information(
 				"Replay applied {Groups} group(s), {Positions} position(s); {Missing} skipped (entity not in DB)",
 				replay.GroupsApplied, replay.PositionsApplied, replay.MissingEntities);
@@ -115,18 +123,9 @@ public class ReconciliationService
 			Logger.Warning("ReconcileAsync: no snapshot exists — performing plain sync + snapshot");
 			var sync = await _syncService.SyncAsync(ct);
 			var snap = await _snapshotService.CaptureAsync(ct);
-
-			// No diff was performed and nothing was pushed, but a fresh
-			// sync means anything currently in the log is authoritative
-			// on the server already (it must be, because without a
-			// snapshot we couldn't have detected a change to push). The
-			// safe choice is to keep the log — the user can retry a real
-			// reconcile and the log will replay then.
 			return new ReconcileResult(0, 0, 0, 0, 0, 0, 0, 0, sync, snap);
 		}
 
-		// Use the DI-registered factory so we always get the latest credentials,
-		// consistent with how UnitySyncService creates its client.
 		using var client = await _clientFactory();
 
 		int createdMembers = 0, modifiedMembers = 0;
@@ -140,7 +139,7 @@ public class ReconciliationService
 
 		// ── Phase 1: Create new members on Unity ─────────────────────
 		// These have negative temporary IDs assigned by TemporaryIdGenerator.
-		var newMembers = await _db.Members
+		var newMembers = await db.Members
 			.Where(m => m.Id < 0)
 			.Include(m => m.HomeGroup)
 			.Include(m => m.IntergroupPosition)
@@ -187,7 +186,7 @@ public class ReconciliationService
 		}
 
 		// ── Phase 2: Push modified members to Unity ──────────────────
-		var modifiedMemberChanges = await DetectModifiedMembersAsync(ct);
+		var modifiedMemberChanges = await DetectModifiedMembersAsync(db, ct);
 		foreach (var (member, changedProps) in modifiedMemberChanges)
 		{
 			// Skip temp members — they were just created above
@@ -236,7 +235,7 @@ public class ReconciliationService
 			var meetingId = config.ActiveIntergroupMeetingId.Value;
 
 			// Group registrations
-			var groupChanges = await DetectGroupRegistrationChangesAsync(ct);
+			var groupChanges = await DetectGroupRegistrationChangesAsync(db, ct);
 			foreach (var (group, registered) in groupChanges)
 			{
 				try
@@ -244,7 +243,7 @@ public class ReconciliationService
 					if (registered)
 					{
 						// Find the GSR for this group — resolve temp IDs
-						var gsr = await _db.Members
+						var gsr = await db.Members
 							.Where(m => m.HomeGroupId == group.Id && m.IsGsr)
 							.FirstOrDefaultAsync(ct);
 
@@ -264,7 +263,6 @@ public class ReconciliationService
 						}
 						else if (IsAlreadyRegisteredError(response.Error))
 						{
-							// Already registered on Unity — treat as success.
 							registeredGroups++;
 							Logger.Information("Group {Name} (ID={Id}) was already registered on Unity — treating as success",
 								group.Name, group.Id);
@@ -298,13 +296,13 @@ public class ReconciliationService
 			}
 
 			// Position / officer registrations
-			var positionChanges = await DetectPositionRegistrationChangesAsync(ct);
+			var positionChanges = await DetectPositionRegistrationChangesAsync(db, ct);
 			foreach (var (position, registered) in positionChanges)
 			{
 				try
 				{
 					// Find the holder for this position — resolve temp IDs
-					var holder = await _db.Members
+					var holder = await db.Members
 						.Where(m => m.IntergroupPositionId == position.Id)
 						.FirstOrDefaultAsync(ct);
 
@@ -332,7 +330,6 @@ public class ReconciliationService
 						}
 						else if (IsAlreadyRegisteredError(response.Error))
 						{
-							// Officer already registered for this position — treat as success.
 							registeredPositions++;
 							Logger.Information("Officer {Name} for position {Position} was already registered on Unity — treating as success",
 								officerName, positionName);
@@ -384,9 +381,6 @@ public class ReconciliationService
 		var snapshotResult = await _snapshotService.CaptureAsync(ct);
 
 		// ── Phase 6: Purge the durability log ────────────────────────
-		// Only safe once Unity has confirmed every change AND a fresh
-		// snapshot exists. If anything errored we keep the log so the
-		// next reconcile attempt can replay it.
 		if (apiErrors == 0)
 		{
 			try
@@ -395,10 +389,6 @@ public class ReconciliationService
 			}
 			catch (Exception ex)
 			{
-				// A failed purge is not catastrophic — next startup will
-				// replay these entries, which is a no-op because the DB
-				// already reflects them and the snapshot already matches.
-				// But it IS worth surfacing so we know to investigate.
 				Logger.Error(ex, "Reconciliation succeeded but failed to purge registration log");
 			}
 		}
@@ -428,6 +418,9 @@ public class ReconciliationService
 
 	// =====================================================================
 	// Change detection — diff current entities against snapshot
+	//
+	// These receive the DbContext as a parameter so they share
+	// ReconcileAsync's unit-of-work context.
 	// =====================================================================
 
 	/// <summary>
@@ -435,19 +428,18 @@ public class ReconciliationService
 	/// locally, along with the names of the properties that changed.
 	/// </summary>
 	private async Task<List<(Member Member, HashSet<string> ChangedProperties)>>
-		DetectModifiedMembersAsync(CancellationToken ct)
+		DetectModifiedMembersAsync(UnityDbContext db, CancellationToken ct)
 	{
 		var snapshots = await _snapshotService.GetSnapshotsAsync("Member", ct);
 		var snapshotMap = snapshots.ToDictionary(
 			s => s.EntityKey,
 			s => SnapshotService.Deserialise<Member>(s));
 
-		var currentMembers = await _db.Members.AsNoTracking().ToListAsync(ct);
+		var currentMembers = await db.Members.AsNoTracking().ToListAsync(ct);
 		var result = new List<(Member, HashSet<string>)>();
 
 		foreach (var member in currentMembers)
 		{
-			// Skip newly created (not in snapshot)
 			if (!snapshotMap.TryGetValue(member.Id, out var original) || original == null)
 				continue;
 
@@ -474,14 +466,14 @@ public class ReconciliationService
 	/// Returns groups whose <c>Registered</c> flag changed since the snapshot.
 	/// </summary>
 	private async Task<List<(Group Group, bool Registered)>>
-		DetectGroupRegistrationChangesAsync(CancellationToken ct)
+		DetectGroupRegistrationChangesAsync(UnityDbContext db, CancellationToken ct)
 	{
 		var snapshots = await _snapshotService.GetSnapshotsAsync("Group", ct);
 		var snapshotMap = snapshots.ToDictionary(
 			s => s.EntityKey,
 			s => SnapshotService.Deserialise<Group>(s));
 
-		var currentGroups = await _db.Groups.AsNoTracking().ToListAsync(ct);
+		var currentGroups = await db.Groups.AsNoTracking().ToListAsync(ct);
 		var result = new List<(Group, bool)>();
 
 		foreach (var group in currentGroups)
@@ -500,14 +492,14 @@ public class ReconciliationService
 	/// Returns positions whose <c>Registered</c> flag changed since the snapshot.
 	/// </summary>
 	private async Task<List<(Position Position, bool Registered)>>
-		DetectPositionRegistrationChangesAsync(CancellationToken ct)
+		DetectPositionRegistrationChangesAsync(UnityDbContext db, CancellationToken ct)
 	{
 		var snapshots = await _snapshotService.GetSnapshotsAsync("Position", ct);
 		var snapshotMap = snapshots.ToDictionary(
 			s => s.EntityKey,
 			s => SnapshotService.Deserialise<Position>(s));
 
-		var currentPositions = await _db.Positions.AsNoTracking().ToListAsync(ct);
+		var currentPositions = await db.Positions.AsNoTracking().ToListAsync(ct);
 		var result = new List<(Position, bool)>();
 
 		foreach (var position in currentPositions)
