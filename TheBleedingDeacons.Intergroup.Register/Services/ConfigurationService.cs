@@ -67,32 +67,20 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			if (_cachedSmtpConfig != null)
 				return _cachedSmtpConfig;
 
-			var section = _configuration.GetSection("SmtpSettings");
+#if USE_DEV_CREDENTIALS
+			var (_, password) = LoadEmbeddedDevCredentials(
+				"SmtpSettings", "Host", "Password");
+#else
 			var password = GetSecretSync(SMTP_PASSWORD_KEY, "SMTP password");
+#endif
 
-			_cachedSmtpConfig = new SmtpConfiguration
-			{
-				Host = section["Host"] ?? "",
-				Port = int.TryParse(section["Port"], out int port) ? port : 587,
-				Username = section["Username"] ?? "",
-				Password = password,
-				EnableSsl = bool.TryParse(section["EnableSsl"], out bool ssl) ? ssl : true,
-				FromDisplayName = section["FromDisplayName"] ?? "",
-				TimeoutSeconds = int.TryParse(section["TimeoutSeconds"], out int timeout) ? timeout : 30
-			};
-
+			_cachedSmtpConfig = BuildSmtpConfiguration(password);
 			return _cachedSmtpConfig;
-		}
-
-		public void UpdateSmtpConfiguration(SmtpConfiguration config)
-		{
-			_cachedSmtpConfig = config;
 		}
 
 		public async Task SaveSmtpConfigurationAsync(SmtpConfiguration config)
 		{
 			await SaveSecretAsync(SMTP_PASSWORD_KEY, config.Password, "SMTP password");
-
 			await SaveJsonSettingsAsync(_configFilePath, "SmtpSettings", new
 			{
 				config.Host,
@@ -100,32 +88,36 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 				config.Username,
 				config.EnableSsl,
 				config.FromDisplayName,
-				config.TimeoutSeconds,
-				config.MaxRetries
+				config.TimeoutSeconds
 			});
-
 			_cachedSmtpConfig = config;
 		}
 
 		public async Task<SmtpConfiguration> LoadSmtpConfigurationAsync()
 		{
-			_cachedSmtpConfig = null;
-
-			var section = _configuration.GetSection("SmtpSettings");
+#if USE_DEV_CREDENTIALS
+			var (_, password) = LoadEmbeddedDevCredentials(
+				"SmtpSettings", "Host", "Password");
+#else
 			var password = await GetSecretAsync(SMTP_PASSWORD_KEY, "SMTP password");
+#endif
 
-			_cachedSmtpConfig = new SmtpConfiguration
-			{
-				Host = section["Host"] ?? "",
-				Port = int.TryParse(section["Port"], out int port) ? port : 587,
-				Username = section["Username"] ?? "",
-				Password = password,
-				EnableSsl = bool.TryParse(section["EnableSsl"], out bool ssl) ? ssl : true,
-				FromDisplayName = section["FromDisplayName"] ?? "",
-				TimeoutSeconds = int.TryParse(section["TimeoutSeconds"], out int timeout) ? timeout : 30
-			};
-
+			_cachedSmtpConfig = BuildSmtpConfiguration(password);
 			return _cachedSmtpConfig;
+		}
+
+		/// <summary>
+		/// Binds the SmtpSettings section straight onto a new configuration
+		/// object and fills in the password (which is stored separately in
+		/// SecureStorage). IConfiguration's typed binding handles Port/EnableSsl/
+		/// TimeoutSeconds conversion, so no manual TryParse is needed.
+		/// </summary>
+		private SmtpConfiguration BuildSmtpConfiguration(string password)
+		{
+			var config = new SmtpConfiguration();
+			_configuration.GetSection("SmtpSettings").Bind(config);
+			config.Password = password;
+			return config;
 		}
 
 		// =================================================================

@@ -9,18 +9,33 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 	/// <summary>
 	/// Manages attendance registration state locally.
 	///
-	/// All changes are written to the local <see cref="UnityDbContext"/> only.
-	/// The <see cref="ReconciliationService"/> is responsible for detecting
-	/// these changes (via snapshot diffing) and pushing them to the Unity API
-	/// in the correct dependency order at reconciliation time.
+	/// Each registration is written to TWO durable layers:
+	///
+	///   1. The SQLite database (<see cref="UnityDbContext"/>) — primary store,
+	///      read by reconciliation's snapshot diff.
+	///
+	///   2. The <see cref="RegistrationEventLog"/> — crash-durable fsync'd
+	///      append-only log, used to rebuild the DB if it's lost or corrupted
+	///      between a registration and the end-of-meeting reconcile.
+	///
+	/// The DB is written first. If the DB write succeeds but the log write
+	/// fails, the registration is still safe — the log is defence in depth,
+	/// not the primary record. If the DB write fails, the log is never
+	/// touched, so we can't end up with a logged registration that was
+	/// never actually applied.
+	///
+	/// <see cref="ReconciliationService"/> detects these local changes (via
+	/// snapshot diffing) and pushes them to the Unity API in the correct
+	/// dependency order at reconciliation time.
 	/// </summary>
 	public class AttendanceService : IAttendanceRegistration<Position>, IAttendanceRegistration<Group>, IDisposable
 	{
 		private static readonly ILogger Logger = AppLogger.ForContext<AttendanceService>();
 
-		private readonly IMailService _mailService;
+		private readonly IEmailService _emailService;
 		private readonly IEmailTemplateService _emailTemplate;
 		private readonly UnityDbContext _dbContext;
+		private readonly RegistrationEventLog _eventLog;
 
 		private readonly EventHandler<EmailSentEventArgs> _emailSentHandler;
 		private readonly EventHandler<EmailFailedEventArgs> _emailFailedHandler;
@@ -28,18 +43,20 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 
 		public AttendanceService(
 			IEmailTemplateService emailTemplate,
-			IMailService mailService,
-			UnityDbContext dbContext)
+			IEmailService emailService,
+			UnityDbContext dbContext,
+			RegistrationEventLog eventLog)
 		{
-			_mailService = mailService;
+			_emailService = emailService;
 			_emailTemplate = emailTemplate;
 			_dbContext = dbContext;
+			_eventLog = eventLog;
 
 			_emailSentHandler = (s, e) => Logger.Information("Email sent to {Recipient}", e.Email.To);
 			_emailFailedHandler = (s, e) => Logger.Warning("Email failed for {Recipient}: {Error}", e.Email.To, e.Error);
 
-			_mailService.EmailSent += _emailSentHandler;
-			_mailService.EmailFailed += _emailFailedHandler;
+			_emailService.EmailSent += _emailSentHandler;
+			_emailService.EmailFailed += _emailFailedHandler;
 		}
 
 		public async Task Register(Position entity)
@@ -66,48 +83,74 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			await SetGroupRegisteredAsync(entity.Id, false);
 		}
 
-		private async Task SetGroupRegisteredAsync(int groupId, bool registered, bool gsrProxy = false, string? gsrProxyName = null, CancellationToken ct = default)
+		private async Task SetGroupRegisteredAsync(
+			int groupId,
+			bool registered,
+			bool gsrProxy = false,
+			string? gsrProxyName = null,
+			CancellationToken ct = default)
 		{
+			// ── Primary store: SQLite ────────────────────────────────
 			try
 			{
 				var group = await _dbContext.Groups.FindAsync(new object[] { groupId }, ct);
-				if (group != null)
+				if (group is null)
 				{
-					group.Registered = registered;
-					group.GsrProxy = gsrProxy;
-					group.GsrProxyName = gsrProxy ? gsrProxyName : null;
-					await _dbContext.SaveChangesAsync(ct);
+					Logger.Warning("SetGroupRegisteredAsync: group {GroupId} not found", groupId);
+					return;
 				}
+
+				group.Registered = registered;
+				group.GsrProxy = gsrProxy;
+				group.GsrProxyName = gsrProxy ? gsrProxyName : null;
+				await _dbContext.SaveChangesAsync(ct);
 			}
 			catch (Exception ex)
 			{
+				// DB write failed — do NOT write to the log. A log entry
+				// without a corresponding DB state would be resurrected on
+				// next startup as if the registration had happened.
 				Logger.Warning(ex, "Failed to persist Registered state for group {GroupId}", groupId);
+				return;
 			}
+
+			// ── Durability layer: append-only log ───────────────────
+			// Failures are swallowed inside AppendGroupAsync so they don't
+			// mask the successful DB write above.
+			await _eventLog.AppendGroupAsync(groupId, registered, gsrProxy, gsrProxyName, ct);
 		}
 
 		private async Task SetPositionRegisteredAsync(int positionId, bool registered, CancellationToken ct = default)
 		{
+			// ── Primary store: SQLite ────────────────────────────────
 			try
 			{
 				var position = await _dbContext.Positions.FindAsync(new object[] { positionId }, ct);
-				if (position != null)
+				if (position is null)
 				{
-					position.Registered = registered;
-					await _dbContext.SaveChangesAsync(ct);
+					Logger.Warning("SetPositionRegisteredAsync: position {PositionId} not found", positionId);
+					return;
 				}
+
+				position.Registered = registered;
+				await _dbContext.SaveChangesAsync(ct);
 			}
 			catch (Exception ex)
 			{
 				Logger.Warning(ex, "Failed to persist Registered state for position {PositionId}", positionId);
+				return;
 			}
+
+			// ── Durability layer: append-only log ───────────────────
+			await _eventLog.AppendPositionAsync(positionId, registered, ct);
 		}
 
 		public void Dispose()
 		{
 			if (!_disposed)
 			{
-				_mailService.EmailSent -= _emailSentHandler;
-				_mailService.EmailFailed -= _emailFailedHandler;
+				_emailService.EmailSent -= _emailSentHandler;
+				_emailService.EmailFailed -= _emailFailedHandler;
 				_disposed = true;
 			}
 		}

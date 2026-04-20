@@ -9,17 +9,17 @@ using TheBleedingDeacons.Intergroup.Register.Support;
 
 namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 {
-	public partial class MailSettingsViewModel : ObservableObject
+	public partial class MailSettingsViewModel : BaseViewModel
 	{
 		private static readonly ILogger Logger = AppLogger.ForContext<MailSettingsViewModel>();
 
 		private readonly IConfigurationService _configService;
-		private readonly IMailService _mailService;
+		private readonly IEmailService _emailService;
 
-		public MailSettingsViewModel(IConfigurationService configService, IMailService mailService)
+		public MailSettingsViewModel(IConfigurationService configService, IEmailService emailService)
 		{
 			_configService = configService;
-			_mailService = mailService;
+			_emailService = emailService;
 
 			LoadConfigurationAsync().SafeFireAndForget("LoadMailConfig");
 		}
@@ -78,7 +78,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 				}
 
 				var tempConfig = CreateConfigFromForm();
-				var testResult = await _mailService.TestSmtpConnectionAsync(tempConfig);
+				var testResult = await _emailService.TestSmtpConnectionAsync(tempConfig);
 
 				if (testResult)
 				{
@@ -115,15 +115,15 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 
 				var config = CreateConfigFromForm();
 
-				// Persist first — if this fails, the running MailKitService is untouched
+				// Persist first — if this fails, the running EmailService is untouched
 				// and the user's old settings remain in effect.
 				await _configService.SaveSmtpConfigurationAsync(config);
 
 				// Push the new config into the running singleton so it takes effect
 				// immediately instead of waiting for app restart. UpdateConfigurationAsync
-				// also resets the circuit breaker (see MailKitService) so the next
+				// also resets the circuit breaker (see EmailService) so the next
 				// queue tick will attempt delivery with the fresh credentials.
-				await _mailService.UpdateConfigurationAsync(config);
+				await _emailService.UpdateConfigurationAsync(config);
 
 				Logger.Information("SMTP configuration updated for {Host}:{Port}",
 					config.ToLogSafe().Host, config.ToLogSafe().Port);

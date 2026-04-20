@@ -2,7 +2,7 @@
 
 namespace TheBleedingDeacons.Intergroup.Register.Services.Interfaces
 {
-	public interface IMailService
+	public interface IEmailService
 	{
 		// Properties
 		bool IsOfflineMode { get; set; }
@@ -22,6 +22,13 @@ namespace TheBleedingDeacons.Intergroup.Register.Services.Interfaces
 		event EventHandler<EmailSentEventArgs> EmailSent;
 		event EventHandler<EmailFailedEventArgs> EmailFailed;
 		event EventHandler<QueueProcessedEventArgs> QueueProcessed;
+
+		/// <summary>
+		/// Fires when the background-queue circuit breaker transitions between
+		/// open (paused) and closed (running). Raised from background threads —
+		/// marshal to the UI thread in handlers if you touch bindable state.
+		/// </summary>
+		event EventHandler<CircuitStateChangedEventArgs> CircuitStateChanged;
 
 		// Core email sending methods
 		Task<bool> SendEmailAsync(string to, string subject, string body, bool isHtml = false, string? cc = null, string? bcc = null);
@@ -43,6 +50,16 @@ namespace TheBleedingDeacons.Intergroup.Register.Services.Interfaces
 
 		// Testing and utility methods
 		Task<bool> TestSmtpConnectionAsync(SmtpConfiguration config);
+
+		/// <summary>
+		/// Lightweight probe: connects and authenticates against the SMTP server
+		/// using the given configuration, without sending any email. Use to
+		/// distinguish "network is reachable but SMTP broken" from "no network"
+		/// without dropping a test email into the user's inbox.
+		/// Returns a structured result so the UI can show the precise failure
+		/// reason (auth, timeout, DNS, TLS, etc.).
+		/// </summary>
+		Task<SmtpReachabilityResult> TestSmtpReachabilityAsync(SmtpConfiguration config, CancellationToken cancellationToken = default);
 
 		// Offline mode methods
 		void EnableOfflineMode();
@@ -179,6 +196,94 @@ namespace TheBleedingDeacons.Intergroup.Register.Services.Interfaces
 			: 0.0;
 	}
 
+	/// <summary>
+	/// Event arguments for circuit-breaker state transitions.
+	/// Fired when the background queue pauses due to repeated failures
+	/// (<see cref="IsOpen"/> = true) and when it resumes after a reset
+	/// or SMTP config update (<see cref="IsOpen"/> = false).
+	/// </summary>
+	public class CircuitStateChangedEventArgs : EventArgs
+	{
+		/// <summary>
+		/// True when the breaker is now open (background processing paused);
+		/// false when it has just been reset (processing will resume on the
+		/// next timer tick).
+		/// </summary>
+		public bool IsOpen { get; set; }
+
+		/// <summary>
+		/// Number of consecutive queue-processing failures recorded at the
+		/// moment of the transition. Zero for close transitions.
+		/// </summary>
+		public int ConsecutiveFailures { get; set; }
+
+		/// <summary>
+		/// The most recent error message observed by the background queue
+		/// processor, or <c>null</c> if none. Useful for surfacing the
+		/// underlying cause (SMTP auth failure, DNS failure, etc.) in the UI.
+		/// </summary>
+		public string? LastError { get; set; }
+
+		/// <summary>
+		/// UTC timestamp when the breaker opened, or <c>null</c> for close
+		/// transitions.
+		/// </summary>
+		public DateTime? OpenedAt { get; set; }
+	}
+
+	/// <summary>
+	/// Outcome of a lightweight SMTP reachability probe. The kind field lets
+	/// the UI choose the right message ("check your password" vs "check your
+	/// connection") rather than showing a raw exception string.
+	/// </summary>
+	public sealed class SmtpReachabilityResult
+	{
+		/// <summary>True when connect + authenticate both succeeded.</summary>
+		public bool IsReachable { get; init; }
+
+		/// <summary>Categorised failure kind (or <see cref="SmtpReachabilityKind.Success"/>).</summary>
+		public SmtpReachabilityKind Kind { get; init; }
+
+		/// <summary>Human-readable detail: the exception message, or a success confirmation.</summary>
+		public string Message { get; init; } = string.Empty;
+
+		/// <summary>Underlying exception on failure, for logging.</summary>
+		public Exception? Exception { get; init; }
+
+		public static SmtpReachabilityResult Success() =>
+			new() { IsReachable = true, Kind = SmtpReachabilityKind.Success, Message = "SMTP server is reachable and credentials are valid." };
+
+		public static SmtpReachabilityResult Failure(SmtpReachabilityKind kind, string message, Exception? ex = null) =>
+			new() { IsReachable = false, Kind = kind, Message = message, Exception = ex };
+	}
+
+	/// <summary>
+	/// Coarse failure categories from a reachability probe. Used by callers
+	/// to decide whether to count a failure toward the circuit breaker
+	/// (Auth/Config = yes, Network/Timeout = no) and to show the user a
+	/// meaningful hint rather than a raw stack trace.
+	/// </summary>
+	public enum SmtpReachabilityKind
+	{
+		/// <summary>Connect + authenticate both succeeded.</summary>
+		Success,
+
+		/// <summary>No network route, DNS resolution failed, or TCP connect refused.</summary>
+		Network,
+
+		/// <summary>Connection opened but the operation timed out.</summary>
+		Timeout,
+
+		/// <summary>TCP connection refused, TLS handshake failed, or certificate invalid.</summary>
+		Tls,
+
+		/// <summary>Server reachable but credentials were rejected.</summary>
+		Auth,
+
+		/// <summary>Everything else (protocol errors, unexpected exceptions).</summary>
+		Other
+	}
+
 	#endregion
 
 	#region Extended Interface (Optional - for advanced implementations)
@@ -187,7 +292,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services.Interfaces
 	/// Extended mail service interface with additional advanced features.
 	/// Implement this if you need features like templates, attachments, or bulk operations.
 	/// </summary>
-	public interface IAdvancedMailService : IMailService
+	public interface IAdvancedMailService : IEmailService
 	{
 		#region Template Support
 
@@ -455,7 +560,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services.Interfaces
 		/// <summary>
 		/// Sends a simple text email.
 		/// </summary>
-		public static Task<bool> SendTextEmailAsync(this IMailService mailService,
+		public static Task<bool> SendTextEmailAsync(this IEmailService mailService,
 			string to, string subject, string body)
 		{
 			return mailService.SendEmailAsync(to, subject, body, isHtml: false);
@@ -464,7 +569,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services.Interfaces
 		/// <summary>
 		/// Sends a simple HTML email.
 		/// </summary>
-		public static Task<bool> SendHtmlEmailAsync(this IMailService mailService,
+		public static Task<bool> SendHtmlEmailAsync(this IEmailService mailService,
 			string to, string subject, string htmlBody)
 		{
 			return mailService.SendEmailAsync(to, subject, htmlBody, isHtml: true);
@@ -473,7 +578,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services.Interfaces
 		/// <summary>
 		/// Queues a simple text email.
 		/// </summary>
-		public static Task QueueTextEmailAsync(this IMailService mailService,
+		public static Task QueueTextEmailAsync(this IEmailService mailService,
 			string to, string subject, string body)
 		{
 			return mailService.QueueEmailAsync(to, subject, body, isHtml: false);
@@ -482,7 +587,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services.Interfaces
 		/// <summary>
 		/// Queues a simple HTML email.
 		/// </summary>
-		public static Task QueueHtmlEmailAsync(this IMailService mailService,
+		public static Task QueueHtmlEmailAsync(this IEmailService mailService,
 			string to, string subject, string htmlBody)
 		{
 			return mailService.QueueEmailAsync(to, subject, htmlBody, isHtml: true);
@@ -491,7 +596,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services.Interfaces
 		/// <summary>
 		/// Gets count of emails by status.
 		/// </summary>
-		public static async Task<Dictionary<EmailStatus, int>> GetEmailCountsByStatusAsync(this IMailService mailService)
+		public static async Task<Dictionary<EmailStatus, int>> GetEmailCountsByStatusAsync(this IEmailService mailService)
 		{
 			var counts = new Dictionary<EmailStatus, int>();
 
@@ -507,7 +612,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services.Interfaces
 		/// <summary>
 		/// Checks if the service is healthy (can connect and authenticate).
 		/// </summary>
-		public static async Task<bool> IsHealthyAsync(this IMailService mailService, SmtpConfiguration config)
+		public static async Task<bool> IsHealthyAsync(this IEmailService mailService, SmtpConfiguration config)
 		{
 			try
 			{

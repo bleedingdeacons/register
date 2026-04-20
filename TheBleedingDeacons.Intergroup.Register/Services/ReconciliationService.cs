@@ -22,17 +22,24 @@ namespace TheBleedingDeacons.Intergroup.Register.Services;
 ///   2. <b>During session</b> — the Register app edits entities freely.
 ///      Every <see cref="UnityDbContext.SaveChangesAsync"/> call stamps
 ///      <c>Updated = DateTime.UtcNow</c> on touched entities.
+///      Registrations are additionally written to
+///      <see cref="RegistrationEventLog"/> for crash durability.
 ///
 ///   3. <b>End of session / refresh</b> — <see cref="ReconcileAsync"/>:
-///      Detect what changed locally (by diffing current state against
-///      the snapshot), push those changes to the Unity API in the correct
-///      dependency order, then re-sync and re-snapshot.
+///      Replay the event log (if any pending entries) → detect what changed
+///      locally (by diffing current state against the snapshot) → push those
+///      changes to the Unity API in the correct dependency order → re-sync
+///      and re-snapshot → purge the event log.
 ///
 /// <b>Dependency ordering</b>: locally-created members (negative temp IDs)
 /// must be created on Unity first so a real ID is returned. That real ID
 /// is then used for any subsequent registration calls that reference
 /// the member. This is the core problem that the old fire-and-forget
 /// queue could not solve.
+///
+/// <b>Durability ordering</b>: the event log is purged only AFTER a clean
+/// reconcile (no API errors) and a fresh snapshot. If anything goes wrong
+/// the log is preserved so the next attempt can replay it.
 /// </summary>
 public class ReconciliationService
 {
@@ -43,19 +50,22 @@ public class ReconciliationService
 	private readonly IConfigurationService _configService;
 	private readonly Func<Task<UnityRestSharp>> _clientFactory;
 	private readonly UnityDbContext _db;
+	private readonly RegistrationEventLog _eventLog;
 
 	public ReconciliationService(
 		SnapshotService snapshotService,
 		UnitySyncService syncService,
 		IConfigurationService configService,
 		Func<Task<UnityRestSharp>> clientFactory,
-		UnityDbContext db)
+		UnityDbContext db,
+		RegistrationEventLog eventLog)
 	{
 		_snapshotService = snapshotService;
 		_syncService = syncService;
 		_configService = configService;
 		_clientFactory = clientFactory;
 		_db = db;
+		_eventLog = eventLog;
 	}
 
 	// =====================================================================
@@ -85,12 +95,33 @@ public class ReconciliationService
 	/// </summary>
 	public async Task<ReconcileResult> ReconcileAsync(CancellationToken ct = default)
 	{
+		// ── Pre-phase: replay event log ──────────────────────────────
+		// If the DB was lost or corrupted between a registration and now,
+		// this rebuilds the Registered flags so the snapshot diff below
+		// will detect them exactly as if the user had just made the
+		// changes in the current session. No-op when the log is empty.
+		if (_eventLog.HasPendingEntries())
+		{
+			Logger.Information("ReconcileAsync: registration log has pending entries — replaying before diff");
+			var replay = await _eventLog.ReplayIntoDatabaseAsync(_db, ct);
+			Logger.Information(
+				"Replay applied {Groups} group(s), {Positions} position(s); {Missing} skipped (entity not in DB)",
+				replay.GroupsApplied, replay.PositionsApplied, replay.MissingEntities);
+		}
+
 		var hasSnapshot = await _snapshotService.HasSnapshotAsync(ct);
 		if (!hasSnapshot)
 		{
 			Logger.Warning("ReconcileAsync: no snapshot exists — performing plain sync + snapshot");
 			var sync = await _syncService.SyncAsync(ct);
 			var snap = await _snapshotService.CaptureAsync(ct);
+
+			// No diff was performed and nothing was pushed, but a fresh
+			// sync means anything currently in the log is authoritative
+			// on the server already (it must be, because without a
+			// snapshot we couldn't have detected a change to push). The
+			// safe choice is to keep the log — the user can retry a real
+			// reconcile and the log will replay then.
 			return new ReconcileResult(0, 0, 0, 0, 0, 0, 0, 0, sync, snap);
 		}
 
@@ -351,6 +382,32 @@ public class ReconciliationService
 
 		// ── Phase 5: Capture fresh snapshot ──────────────────────────
 		var snapshotResult = await _snapshotService.CaptureAsync(ct);
+
+		// ── Phase 6: Purge the durability log ────────────────────────
+		// Only safe once Unity has confirmed every change AND a fresh
+		// snapshot exists. If anything errored we keep the log so the
+		// next reconcile attempt can replay it.
+		if (apiErrors == 0)
+		{
+			try
+			{
+				await _eventLog.PurgeAsync(ct);
+			}
+			catch (Exception ex)
+			{
+				// A failed purge is not catastrophic — next startup will
+				// replay these entries, which is a no-op because the DB
+				// already reflects them and the snapshot already matches.
+				// But it IS worth surfacing so we know to investigate.
+				Logger.Error(ex, "Reconciliation succeeded but failed to purge registration log");
+			}
+		}
+		else
+		{
+			Logger.Warning(
+				"Reconciliation had {Errors} API error(s) — keeping registration log for next reconcile attempt",
+				apiErrors);
+		}
 
 		Logger.Information(
 			"Reconciliation complete: {Created} created, {Modified} modified, " +

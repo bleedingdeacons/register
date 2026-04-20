@@ -10,7 +10,6 @@ namespace TheBleedingDeacons.Intergroup.Register.Services.Interfaces
 	public interface IConfigurationService
 	{
 		SmtpConfiguration GetSmtpConfiguration();
-		void UpdateSmtpConfiguration(SmtpConfiguration config);
 		Task SaveSmtpConfigurationAsync(SmtpConfiguration config);
 		Task<SmtpConfiguration> LoadSmtpConfigurationAsync();
 

@@ -1,4 +1,5 @@
-﻿using MailKit.Net.Smtp;
+﻿using MailKit;
+using MailKit.Net.Smtp;
 using MailKit.Security;
 using Microsoft.EntityFrameworkCore;
 using MimeKit;
@@ -12,9 +13,9 @@ using TheBleedingDeacons.Intergroup.Register.Support;
 
 namespace TheBleedingDeacons.Intergroup.Register.Services
 {
-	public class MailKitService : IMailService, IDisposable
+	public class EmailService : IEmailService, IDisposable
 	{
-		private static readonly ILogger Logger = AppLogger.ForContext<MailKitService>();
+		private static readonly ILogger Logger = AppLogger.ForContext<EmailService>();
 
 		#region Private Fields        
 		private readonly IDbContextFactory<MailDbContext> _dbContextFactory;
@@ -88,12 +89,13 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		public event EventHandler<EmailSentEventArgs> EmailSent;
 		public event EventHandler<EmailFailedEventArgs> EmailFailed;
 		public event EventHandler<QueueProcessedEventArgs> QueueProcessed;
+		public event EventHandler<CircuitStateChangedEventArgs>? CircuitStateChanged;
 
 		#endregion
 
 		#region Constructor
 
-		public MailKitService(IDbContextFactory<MailDbContext> dbContextFactory,
+		public EmailService(IDbContextFactory<MailDbContext> dbContextFactory,
 			string smtpHost, int smtpPort, string username, string password, bool enableSsl = true,
 			int timeoutSeconds = 30, int maxRetries = 10)
 		{
@@ -111,7 +113,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			_backgroundTimer = new Timer(async _ => await ProcessQueueInBackground(),
 				null, ServiceConstants.EmailTimerInitialDelay, ServiceConstants.EmailTimerInterval);
 
-			Logger.Information("MailKitService initialized with host: {Host}:{Port}, SSL: {EnableSsl}, MaxRetries: {MaxRetries}",
+			Logger.Information("EmailService initialized with host: {Host}:{Port}, SSL: {EnableSsl}, MaxRetries: {MaxRetries}",
 				_smtpHost, _smtpPort, _enableSsl, _maxRetries);
 		}
 
@@ -755,7 +757,12 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 				}
 				else
 				{
-					RecordQueueFailure("Queue processing returned false (offline, no network, or semaphore contention)");
+					// ProcessQueueAsync returned false. The three documented causes
+					// (offline mode, no network, semaphore contention) are all
+					// transient and NOT our SMTP config's fault — they should not
+					// count toward tripping the breaker. Log at Debug so we still
+					// have the trail if something weird happens.
+					Logger.Debug("Background queue processing skipped (offline, no network, or concurrent run)");
 				}
 			}
 			catch (ObjectDisposedException)
@@ -765,9 +772,104 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			}
 			catch (Exception ex)
 			{
-				RecordQueueFailure(ex.Message);
-				Logger.Error(ex, "Error in background queue processing (failure {Count}/{Threshold})",
-					_consecutiveQueueFailures, CircuitBreakerThreshold);
+				// ProcessQueueAsync threw after passing the offline/network guards.
+				// Probe reachability to decide whether this is "the network died
+				// mid-send" (transient — don't trip the breaker) vs "SMTP is
+				// broken" (persistent — do trip it). The probe is cheap — one
+				// connect + auth, no email sent.
+				var countsTowardBreaker = await ClassifyFailureAsync(ex);
+
+				if (countsTowardBreaker)
+				{
+					RecordQueueFailure(ex.Message);
+					Logger.Error(ex, "Error in background queue processing (failure {Count}/{Threshold})",
+						_consecutiveQueueFailures, CircuitBreakerThreshold);
+				}
+				else
+				{
+					Logger.Warning(ex,
+						"Background queue processing failed, but SMTP is unreachable — treating as transient, not counting toward breaker");
+				}
+			}
+		}
+
+		/// <summary>
+		/// Decides whether a ProcessQueueAsync exception should count toward
+		/// tripping the circuit breaker. Returns true for failures that indicate
+		/// the user's SMTP configuration is actually broken (auth, TLS, etc.)
+		/// and false for transient network issues (captive portal, intermittent
+		/// connectivity) — those resolve on their own and shouldn't cause the
+		/// breaker to pause legitimate delivery.
+		/// </summary>
+		private async Task<bool> ClassifyFailureAsync(Exception originalException)
+		{
+			// Fast-path classifications based on the exception type alone. For
+			// clear-cut auth failures we don't need to probe — the server told
+			// us the credentials are bad.
+			if (originalException is ServiceNotAuthenticatedException
+								  or MailKit.Security.AuthenticationException)
+			{
+				return true;
+			}
+
+			// For ambiguous exceptions (SocketException, IOException, timeouts)
+			// run a short reachability probe to decide. If we can connect and
+			// authenticate right now, the earlier failure was a transient hiccup
+			// during the batch — still worth counting (SMTP may be flaky). If
+			// we can't even reach the server, it's a network-level problem and
+			// pausing our background would punish the user for poor connectivity.
+			try
+			{
+				var (host, port, username, password, enableSsl) = await GetCurrentConfigAsync();
+				var probeConfig = new SmtpConfiguration
+				{
+					Host = host,
+					Port = port,
+					Username = username,
+					Password = password,
+					EnableSsl = enableSsl,
+					// Shorter timeout for the probe than for real sends — we want
+					// a fast "can I reach this?" answer, not a thorough test.
+					TimeoutSeconds = 10,
+				};
+
+				using var probeCts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+				var probe = await TestSmtpReachabilityAsync(probeConfig, probeCts.Token);
+
+				return probe.Kind switch
+				{
+					// SMTP is up → the earlier send failure was either spurious
+					// or a server-side problem. Count toward breaker so a broken
+					// configuration is eventually caught.
+					SmtpReachabilityKind.Success => true,
+
+					// Credentials bad — definitely count.
+					SmtpReachabilityKind.Auth => true,
+
+					// TLS problems typically indicate a configuration error
+					// (wrong port, SSL mismatch). Count.
+					SmtpReachabilityKind.Tls => true,
+
+					// Network problems (DNS, refused, I/O) — don't count. The
+					// phone is probably offline or on a captive portal. It will
+					// self-resolve.
+					SmtpReachabilityKind.Network => false,
+
+					// Timeouts are ambiguous. Lean toward "don't count" to avoid
+					// false positives on slow networks.
+					SmtpReachabilityKind.Timeout => false,
+
+					// Unknown — conservatively count so a genuinely broken
+					// config doesn't hide forever behind the probe.
+					_ => true,
+				};
+			}
+			catch (Exception probeEx)
+			{
+				// If even the probe can't run, treat the outer failure as real
+				// (conservative). We still log the probe failure for diagnosis.
+				Logger.Debug(probeEx, "Reachability probe itself failed — treating original error as breaker-worthy");
+				return true;
 			}
 		}
 
@@ -785,6 +887,8 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 					"Circuit breaker OPEN — background email processing paused after {Count} consecutive failures. " +
 					"Last error: {Error}. Call ResetCircuitBreaker() or update SMTP settings to resume.",
 					count, _lastQueueError);
+
+				RaiseCircuitStateChanged(isOpen: true, count, _lastQueueError, _circuitOpenedAt);
 			}
 		}
 
@@ -792,15 +896,53 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		/// Resets the circuit breaker, clears the failure counter, and resumes
 		/// background queue processing on the next timer tick. Call this after
 		/// updating SMTP configuration or resolving the underlying issue.
+		/// Idempotent — safe to call when the breaker is already closed.
 		/// </summary>
 		public void ResetCircuitBreaker()
 		{
+			// Capture before clearing so we only fire the event on a real transition.
+			var wasOpen = _circuitOpen;
+
 			_circuitOpen = false;
 			_circuitOpenedAt = null;
 			Interlocked.Exchange(ref _consecutiveQueueFailures, 0);
 			_lastQueueError = null;
 
 			Logger.Information("Circuit breaker reset — background email processing will resume");
+
+			if (wasOpen)
+			{
+				RaiseCircuitStateChanged(isOpen: false, 0, null, null);
+			}
+		}
+
+		/// <summary>
+		/// Invokes CircuitStateChanged on a background thread so subscriber work
+		/// (typically UI updates) runs off the thread that tripped the breaker.
+		/// Any exception thrown by a subscriber is logged and swallowed — a buggy
+		/// handler must never bring the email service down.
+		/// </summary>
+		private void RaiseCircuitStateChanged(bool isOpen, int consecutiveFailures, string? lastError, DateTime? openedAt)
+		{
+			var handler = CircuitStateChanged;
+			if (handler is null) return;
+
+			var args = new CircuitStateChangedEventArgs
+			{
+				IsOpen = isOpen,
+				ConsecutiveFailures = consecutiveFailures,
+				LastError = lastError,
+				OpenedAt = openedAt
+			};
+
+			try
+			{
+				handler.Invoke(this, args);
+			}
+			catch (Exception ex)
+			{
+				Logger.Warning(ex, "CircuitStateChanged subscriber threw");
+			}
 		}
 
 		// All other queue management methods remain the same as the original implementation
@@ -1046,6 +1188,95 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			}
 		}
 
+		/// <summary>
+		/// Lightweight SMTP probe — connects and authenticates but does NOT
+		/// send a test email. Used by:
+		///   • The Email Status page "Test Connection" button, so users can
+		///     check credentials without spamming their own inbox.
+		///   • ProcessQueueInBackground, to distinguish network-level failures
+		///     (not the user's fault → don't count toward the breaker) from
+		///     SMTP-level failures (the user's config is broken → count).
+		///
+		/// Classifies the failure into a small set of actionable kinds rather
+		/// than dumping raw exception text — see <see cref="SmtpReachabilityKind"/>.
+		/// </summary>
+		public async Task<SmtpReachabilityResult> TestSmtpReachabilityAsync(
+			SmtpConfiguration config, CancellationToken cancellationToken = default)
+		{
+			if (config is null)
+				throw new ArgumentNullException(nameof(config));
+
+			if (!config.IsValid())
+				return SmtpReachabilityResult.Failure(
+					SmtpReachabilityKind.Other,
+					"SMTP configuration is incomplete.");
+
+			using var client = new SmtpClient { Timeout = config.TimeoutSeconds * 1000 };
+
+			// Hard ceiling on total probe time. +5s over the SmtpClient timeout
+			// to allow the inner timeout to surface its own diagnostic error.
+			using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+			cts.CancelAfter(TimeSpan.FromSeconds(config.TimeoutSeconds + 5));
+
+			var secureSocketOptions = ResolveSecureSocketOptions(config.EnableSsl, config.Port);
+
+			try
+			{
+				await client.ConnectAsync(config.Host, config.Port, secureSocketOptions, cts.Token);
+				await client.AuthenticateAsync(config.Username, config.Password, cts.Token);
+				await client.DisconnectAsync(quit: true, cts.Token);
+				return SmtpReachabilityResult.Success();
+			}
+			catch (ServiceNotAuthenticatedException ex)
+			{
+				return SmtpReachabilityResult.Failure(SmtpReachabilityKind.Auth,
+					"Authentication failed — check username and password.", ex);
+			}
+			catch (AuthenticationException ex)
+			{
+				// MailKit's AuthenticationException wraps auth failures from the server.
+				return SmtpReachabilityResult.Failure(SmtpReachabilityKind.Auth,
+					ex.Message, ex);
+			}
+			catch (System.Security.Authentication.AuthenticationException ex)
+			{
+				// Distinct from MailKit's — this is TLS cert / handshake.
+				return SmtpReachabilityResult.Failure(SmtpReachabilityKind.Tls,
+					$"TLS handshake failed: {ex.Message}", ex);
+			}
+			catch (OperationCanceledException ex) when (cts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+			{
+				return SmtpReachabilityResult.Failure(SmtpReachabilityKind.Timeout,
+					$"Probe timed out after {config.TimeoutSeconds + 5}s.", ex);
+			}
+			catch (System.Net.Sockets.SocketException ex)
+			{
+				return SmtpReachabilityResult.Failure(SmtpReachabilityKind.Network,
+					$"Could not reach {config.Host}:{config.Port} — {ex.SocketErrorCode}.", ex);
+			}
+			catch (System.IO.IOException ex)
+			{
+				// Usually TLS negotiation over a blocked port, or mid-stream disconnect.
+				return SmtpReachabilityResult.Failure(SmtpReachabilityKind.Network,
+					$"Network I/O error: {ex.Message}", ex);
+			}
+			catch (SmtpProtocolException ex)
+			{
+				return SmtpReachabilityResult.Failure(SmtpReachabilityKind.Other,
+					$"SMTP protocol error: {ex.Message}", ex);
+			}
+			catch (Exception ex)
+			{
+				return SmtpReachabilityResult.Failure(SmtpReachabilityKind.Other,
+					ex.Message, ex);
+			}
+			finally
+			{
+				// SmtpClient is IDisposable; we created it above.
+				client.Dispose();
+			}
+		}
+
 		private Task<bool> IsNetworkAvailableAsync()
 		{
 			try
@@ -1123,16 +1354,16 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 					_queueSemaphore?.Dispose();
 					_configSemaphore?.Dispose();
 
-					Logger.Information("MailKitService disposed successfully");
+					Logger.Information("EmailService disposed successfully");
 				}
 				catch (Exception ex)
 				{
-					Logger.Error(ex, "Error during MailKitService disposal");
+					Logger.Error(ex, "Error during EmailService disposal");
 				}
 			}
 		}
 
-		~MailKitService()
+		~EmailService()
 		{
 			Dispose(false);
 		}

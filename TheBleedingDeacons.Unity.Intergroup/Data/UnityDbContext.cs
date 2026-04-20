@@ -26,9 +26,9 @@ public class UnityDbContext : DbContext
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
-//#if DEBUG
-//        optionsBuilder.EnableSensitiveDataLogging();
-//#endif
+#if DEBUG
+        optionsBuilder.EnableSensitiveDataLogging();
+#endif
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

@@ -87,6 +87,8 @@ public static class MauiProgram
 		// Ensure Serilog is flushed on unhandled / fatal errors
 		RegisterGlobalExceptionHandlers();
 
+		builder.Services.AddSingleton<RegistrationEventLog>();
+
 		// Add configuration service
 		builder.Services.AddSingleton<IConfigurationService, ConfigurationService>();
 
@@ -191,19 +193,19 @@ public static class MauiProgram
 			return new EmailTemplateService(Assembly.GetExecutingAssembly(), "Templates");
 		});
 
-		// Register the mail service as singleton — MailKitService owns a background
+		// Register the email service as singleton — EmailService owns a background
 		// Timer for queue processing that must live for the entire app lifetime.
 		// This is safe because the service only uses IDbContextFactory<MailDbContext>
 		// (which is registered as singleton) rather than a scoped DbContext directly.
 		// SMTP configuration changes are applied via UpdateConfigurationAsync().
-		builder.Services.AddSingleton<IMailService>(provider =>
+		builder.Services.AddSingleton<IEmailService>(provider =>
 		{
 			var dbContextFactory = provider.GetRequiredService<IDbContextFactory<MailDbContext>>();
 			var configService = provider.GetRequiredService<IConfigurationService>();
 
 			var smtpConfig = configService.GetSmtpConfiguration();
 
-			return new MailKitService(
+			return new EmailService(
 				dbContextFactory,
 				smtpConfig.Host,
 				smtpConfig.Port,
