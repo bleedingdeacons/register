@@ -22,5 +22,20 @@ namespace TheBleedingDeacons.Intergroup.Register.Services.Interfaces
 		BetterStackConfiguration GetBetterStackConfiguration();
 		Task SaveBetterStackConfigurationAsync(BetterStackConfiguration config);
 		Task<BetterStackConfiguration> LoadBetterStackConfigurationAsync();
+
+		/// <summary>
+		/// When true, each registration action is also appended to the
+		/// crash-durable registration event log. When false, the log is
+		/// not written — but any existing log file is still replayed on
+		/// the next reconcile, and purge still runs on success.
+		/// Defaults to true; callers should treat a missing value as true.
+		/// </summary>
+		bool IsRegistrationEventLogEnabled { get; }
+
+		/// <summary>
+		/// Persists the registration event log toggle. Takes effect on the
+		/// next registration action; no restart required.
+		/// </summary>
+		void SetRegistrationEventLogEnabled(bool enabled);
 	}
 }

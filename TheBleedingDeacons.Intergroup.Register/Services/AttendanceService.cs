@@ -9,7 +9,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 	/// <summary>
 	/// Manages attendance registration state locally.
 	///
-	/// Each registration is written to TWO durable layers:
+	/// Each registration is written to up to TWO durable layers:
 	///
 	///   1. The SQLite database (<see cref="UnityDbContext"/>) — primary store,
 	///      read by reconciliation's snapshot diff.
@@ -17,6 +17,8 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 	///   2. The <see cref="RegistrationEventLog"/> — crash-durable fsync'd
 	///      append-only log, used to rebuild the DB if it's lost or corrupted
 	///      between a registration and the end-of-meeting reconcile.
+	///      Gated by <see cref="IConfigurationService.IsRegistrationEventLogEnabled"/>;
+	///      when disabled the DB is still written, just without the belt-and-braces.
 	///
 	/// The DB is written first. If the DB write succeeds but the log write
 	/// fails, the registration is still safe — the log is defence in depth,
@@ -36,6 +38,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		private readonly IEmailTemplateService _emailTemplate;
 		private readonly UnityDbContext _dbContext;
 		private readonly RegistrationEventLog _eventLog;
+		private readonly IConfigurationService _configService;
 
 		private readonly EventHandler<EmailSentEventArgs> _emailSentHandler;
 		private readonly EventHandler<EmailFailedEventArgs> _emailFailedHandler;
@@ -45,12 +48,14 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			IEmailTemplateService emailTemplate,
 			IEmailService emailService,
 			UnityDbContext dbContext,
-			RegistrationEventLog eventLog)
+			RegistrationEventLog eventLog,
+			IConfigurationService configService)
 		{
 			_emailService = emailService;
 			_emailTemplate = emailTemplate;
 			_dbContext = dbContext;
 			_eventLog = eventLog;
+			_configService = configService;
 
 			_emailSentHandler = (s, e) => Logger.Information("Email sent to {Recipient}", e.Email.To);
 			_emailFailedHandler = (s, e) => Logger.Warning("Email failed for {Recipient}: {Error}", e.Email.To, e.Error);
@@ -114,10 +119,14 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 				return;
 			}
 
-			// ── Durability layer: append-only log ───────────────────
-			// Failures are swallowed inside AppendGroupAsync so they don't
-			// mask the successful DB write above.
-			await _eventLog.AppendGroupAsync(groupId, registered, gsrProxy, gsrProxyName, ct);
+			// ── Durability layer: append-only log (feature-gated) ───
+			// Toggle is checked per-call so ops can flip it mid-session
+			// without restart. Reads are cheap — Preferences lookup is
+			// a dictionary hit.
+			if (_configService.IsRegistrationEventLogEnabled)
+			{
+				await _eventLog.AppendGroupAsync(groupId, registered, gsrProxy, gsrProxyName, ct);
+			}
 		}
 
 		private async Task SetPositionRegisteredAsync(int positionId, bool registered, CancellationToken ct = default)
@@ -141,8 +150,11 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 				return;
 			}
 
-			// ── Durability layer: append-only log ───────────────────
-			await _eventLog.AppendPositionAsync(positionId, registered, ct);
+			// ── Durability layer: append-only log (feature-gated) ───
+			if (_configService.IsRegistrationEventLogEnabled)
+			{
+				await _eventLog.AppendPositionAsync(positionId, registered, ct);
+			}
 		}
 
 		public void Dispose()

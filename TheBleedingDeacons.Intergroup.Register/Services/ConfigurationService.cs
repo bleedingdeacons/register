@@ -18,6 +18,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		private const string UNITY_API_KEY = "unity_api_key";
 		private const string UNITY_ACTIVE_MEETING_KEY = "unity_active_meeting_id";
 		private const string BETTERSTACK_SOURCE_TOKEN_KEY = "betterstack_source_token";
+		private const string REGISTRATION_LOG_ENABLED_KEY = "registration_log_enabled";
 
 #if USE_DEV_CREDENTIALS
 		private const string DEV_CREDENTIALS_RESOURCE =
@@ -55,7 +56,6 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			}
 
 			_configuration = builder.Build();
-
 		}
 
 		// =================================================================
@@ -248,6 +248,53 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			};
 
 			return _cachedBetterStackConfig;
+		}
+
+		// =================================================================
+		// Registration Event Log Toggle
+		// =================================================================
+
+		/// <summary>
+		/// Reads the toggle from Preferences. Defaults to <c>true</c> when
+		/// the preference has never been written, which means fresh installs
+		/// get the durability layer automatically. A user who explicitly
+		/// disables it persists as "false"; there's no way to end up
+		/// accidentally off due to a missing key.
+		/// </summary>
+		public bool IsRegistrationEventLogEnabled
+		{
+			get
+			{
+				try
+				{
+					// Preferences has no first-class bool accessor, so we
+					// store the string "true"/"false". Missing key →
+					// default true (safe / on by default).
+					var raw = Preferences.Get(REGISTRATION_LOG_ENABLED_KEY, string.Empty);
+					if (string.IsNullOrEmpty(raw)) return true;
+					return bool.TryParse(raw, out var value) ? value : true;
+				}
+				catch (Exception ex)
+				{
+					// If Preferences is unavailable (extremely rare — only
+					// on a broken install), fail safe by treating the log as on.
+					Logger.Warning(ex, "Failed to read registration log toggle — defaulting to enabled");
+					return true;
+				}
+			}
+		}
+
+		public void SetRegistrationEventLogEnabled(bool enabled)
+		{
+			try
+			{
+				Preferences.Set(REGISTRATION_LOG_ENABLED_KEY, enabled ? "true" : "false");
+				Logger.Information("Registration event log {State}", enabled ? "ENABLED" : "DISABLED");
+			}
+			catch (Exception ex)
+			{
+				Logger.Warning(ex, "Failed to save registration log toggle");
+			}
 		}
 
 		// =================================================================

@@ -37,6 +37,33 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 			_dbContextFactory = dbContextFactory;
 		}
 
+		// =================================================================
+		// Registration event log toggle
+		// =================================================================
+
+		/// <summary>
+		/// Two-way bound to a Switch on SettingsPage. Reads/writes the
+		/// underlying Preference via IConfigurationService so the value
+		/// is shared with AttendanceService without any additional plumbing.
+		/// Not an [ObservableProperty] because the backing store is
+		/// Preferences, not a field — we don't need an INotifyPropertyChanged
+		/// field holding stale state.
+		/// </summary>
+		public bool IsRegistrationEventLogEnabled
+		{
+			get => _configService.IsRegistrationEventLogEnabled;
+			set
+			{
+				if (_configService.IsRegistrationEventLogEnabled == value) return;
+				_configService.SetRegistrationEventLogEnabled(value);
+				OnPropertyChanged();
+			}
+		}
+
+		// =================================================================
+		// Navigation
+		// =================================================================
+
 		[RelayCommand]
 		private async Task NavigateToMailSetting()
 		{
@@ -71,6 +98,10 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 			await ShowFeedback();
 			await Shell.Current.GoToAsync(nameof(EmailStatusPage));
 		}
+
+		// =================================================================
+		// Purge Database
+		// =================================================================
 
 		/// <summary>
 		/// Purges all data from the local database.
