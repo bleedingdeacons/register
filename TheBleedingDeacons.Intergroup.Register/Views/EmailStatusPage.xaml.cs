@@ -1,4 +1,6 @@
+using TheBleedingDeacons.Intergroup.Register.Support;
 using TheBleedingDeacons.Intergroup.Register.ViewModels;
+using TaskExtensions = TheBleedingDeacons.Intergroup.Register.Support.TaskExtensions;
 
 namespace TheBleedingDeacons.Intergroup.Register.Views;
 
@@ -36,7 +38,9 @@ public partial class EmailStatusPage : ContentPage
 		// Refresh data when page appears
 		if (BindingContext is EmailStatusViewModel viewModel)
 		{
-			_ = Task.Run(async () => await viewModel.LoadEmailsCommand.ExecuteAsync(null));
+			TaskExtensions.RunSafeFireAndForget(
+				() => viewModel.LoadEmailsCommand.ExecuteAsync(null),
+				nameof(EmailStatusPage) + "." + nameof(OnAppearing));
 		}
 	}
 
