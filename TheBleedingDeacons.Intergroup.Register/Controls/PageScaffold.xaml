@@ -1,0 +1,95 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+             x:Class="TheBleedingDeacons.Intergroup.Register.Controls.PageScaffold"
+             x:Name="Root">
+
+    <!--
+    ════════════════════════════════════════════════════════════════════
+    PageScaffold — Material 3 page shell.
+
+    Exposes four content slots:
+      • ContextHeader   (Auto)  optional tinted context strip below the shell bar
+      • Content         (*)     the scrollable page body on PageBackground
+      • ActionBar       (Auto)  optional fixed bottom action row
+      • LoadingContent  overlay spinner + message (visible when IsBusy=True)
+
+    Configure via BindableProperties on the ContentView:
+      HasActionBar          default false
+      ContextHeaderText     shown centred inside the tinted strip
+      ContextHeaderIsVisible
+      IsBusy                shows the loading overlay
+      BusyMessage           optional text under the spinner
+      ContentPadding        defaults 16 — override if a page needs edge-to-edge
+
+    Pages NEVER set their own root padding / background / status bar.
+    ════════════════════════════════════════════════════════════════════
+    -->
+
+    <Grid RowDefinitions="Auto,*,Auto"
+          BackgroundColor="{AppThemeBinding Light={StaticResource PageBackground}, Dark={StaticResource PageBackgroundDim}}">
+
+        <!-- ═══ Row 0: Context header (optional) ═══ -->
+        <Border Grid.Row="0"
+                StrokeThickness="0"
+                BackgroundColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
+                Padding="16,12"
+                IsVisible="{Binding ContextHeaderIsVisible, Source={x:Reference Root}}">
+            <Label Text="{Binding ContextHeaderText, Source={x:Reference Root}}"
+                   TextColor="White"
+                   FontSize="16"
+                   FontAttributes="Bold"
+                   HorizontalOptions="Center"
+                   VerticalOptions="Center"
+                   HorizontalTextAlignment="Center"/>
+        </Border>
+
+        <!-- ═══ Row 1: Scrollable body ═══ -->
+        <ContentView Grid.Row="1"
+                     x:Name="BodyHost"
+                     Padding="{Binding ContentPadding, Source={x:Reference Root}}"
+                     Content="{Binding ContentBody, Source={x:Reference Root}}"/>
+
+        <!-- ═══ Row 2: Action bar (optional) ═══ -->
+        <Border Grid.Row="2"
+                StrokeThickness="0"
+                BackgroundColor="{AppThemeBinding Light={StaticResource Surface}, Dark={StaticResource Gray900}}"
+                Padding="16,12,16,16"
+                IsVisible="{Binding HasActionBar, Source={x:Reference Root}}">
+            <Border.Shadow>
+                <Shadow Brush="Black" Opacity="0.12" Radius="8" Offset="0,-2"/>
+            </Border.Shadow>
+            <ContentView Content="{Binding ActionBarBody, Source={x:Reference Root}}"/>
+        </Border>
+
+        <!-- ═══ Loading overlay (spans all rows) ═══ -->
+        <Grid Grid.Row="0"
+              Grid.RowSpan="3"
+              IsVisible="{Binding IsBusy, Source={x:Reference Root}}"
+              BackgroundColor="{AppThemeBinding Light=#AAFFFFFF, Dark=#AA000000}">
+            <VerticalStackLayout VerticalOptions="Center"
+                                 HorizontalOptions="Center"
+                                 Spacing="12">
+                <ActivityIndicator IsRunning="{Binding IsBusy, Source={x:Reference Root}}"
+                                   Color="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
+                                   Scale="1.3"/>
+                <Label Text="{Binding BusyMessage, Source={x:Reference Root}}"
+                       FontSize="15"
+                       HorizontalOptions="Center"
+                       TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}">
+                    <Label.Triggers>
+                        <!-- Hide the label if there is no message -->
+                        <DataTrigger TargetType="Label"
+                                     Binding="{Binding BusyMessage, Source={x:Reference Root}}"
+                                     Value="">
+                            <Setter Property="IsVisible" Value="False"/>
+                        </DataTrigger>
+                    </Label.Triggers>
+                </Label>
+            </VerticalStackLayout>
+        </Grid>
+
+    </Grid>
+
+</ContentView>

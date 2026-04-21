@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
+﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage x:Class="TheBleedingDeacons.Intergroup.Register.Views.GroupVerifyPage"
              xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:controls="clr-namespace:TheBleedingDeacons.Intergroup.Register.Controls"
@@ -10,173 +10,162 @@
              Title="{Binding Title}">
 
     <ContentPage.Behaviors>
-        <toolkit:StatusBarBehavior StatusBarColor="{AppThemeBinding Light=White, Dark=Black}" 
-                                   StatusBarStyle="{AppThemeBinding Light=DarkContent, Dark=LightContent}" />
+        <toolkit:StatusBarBehavior StatusBarColor="{AppThemeBinding Light=White, Dark=Black}"
+                                   StatusBarStyle="{AppThemeBinding Light=DarkContent, Dark=LightContent}"/>
     </ContentPage.Behaviors>
 
-    <!-- Outer Grid: scrollable content on top, fixed buttons at bottom -->
-    <Grid RowDefinitions="*,Auto" Padding="30,30,30,50">
+    <controls:PageScaffold IsBusy="{Binding IsLoading}"
+                           BusyMessage="Loading..."
+                           HasActionBar="True">
 
-        <!-- Scrollable content (Row 0) -->
-        <StackLayout Grid.Row="0" Spacing="10">
+        <!-- ═══ Body ═══ -->
+        <controls:PageScaffold.ContentBody>
+            <ScrollView>
+                <VerticalStackLayout Spacing="16">
 
-            <Label Text="{Binding Group.Name}"
-                       Style="{StaticResource HeaderLabelStyle}"/>
-
-            <Label Text="{Binding GsrCountText}"
-                       FontSize="18"
-                       FontAttributes="Italic"
-                       TextColor="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource Gray400}}"
-                       Margin="0,0,0,5"/>
-
-            <CollectionView ItemsSource="{Binding ActiveGsrs}"
-                                SelectionMode="None"
-                                IsVisible="{Binding HasActiveGsrs}" HorizontalOptions="Center">
-                <CollectionView.ItemsLayout>
-                    <LinearItemsLayout Orientation="Horizontal" ItemSpacing="5" />
-                </CollectionView.ItemsLayout>
-                <CollectionView.ItemTemplate>
-                    <DataTemplate x:DataType="entities:Member">
-                        <Border Style="{StaticResource MemberCardStyle}"
-                                    MinimumWidthRequest="500"
-                                    MinimumHeightRequest="180">
-                            <StackLayout Spacing="4">
-                                <Label Text="Name" Style="{StaticResource FieldLabelStyle}"/>
-                                <Label Text="{Binding AnonymousName}" Style="{StaticResource ValueLabelStyle}"/>
-
-                                <Label Text="Personal Email" Style="{StaticResource FieldLabelStyle}"/>
-                                <controls:MaskedRevealLabel Value="{Binding PersonalEmail}"
-                                                                MaskType="Email"
-                                                                FontSize="18"
-                                                                Margin="0,0,0,8"
-                                                                BackgroundColor="{AppThemeBinding Light=White, Dark={StaticResource Gray800}}"
-                                                                TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"/>
-
-                                <Label Text="Mobile Phone" Style="{StaticResource FieldLabelStyle}"/>
-                                <controls:MaskedRevealLabel Value="{Binding MobileNumber}"
-                                                                MaskType="Mobile"
-                                                                FontSize="18"
-                                                                Margin="0,0,0,8"
-                                                                BackgroundColor="{AppThemeBinding Light=White, Dark={StaticResource Gray800}}"
-                                                                TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"/>
-                            </StackLayout>
-                        </Border>
-                    </DataTemplate>
-                </CollectionView.ItemTemplate>
-            </CollectionView>
-
-            <Border IsVisible="{Binding HasActiveGsrs, Converter={StaticResource InvertedBoolConverter}}"
-                        Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}"
-                        StrokeThickness="1"
-                        StrokeShape="RoundRectangle 10"
-                        Padding="20"
-                        Margin="0,10,0,10"
-                        BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray900}}">
-                <StackLayout HorizontalOptions="Center" Spacing="10">
-                    <Label Text="No GSRs Registered"
-                               FontSize="20"
+                    <!-- Header -->
+                    <!--<VerticalStackLayout Spacing="4">
+                        <Label Text="{Binding Group.Name}"
+                               FontSize="24"
                                FontAttributes="Bold"
-                               HorizontalOptions="Center"
-                               TextColor="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource Gray400}}"/>
-                    <Label Text="Tap 'No' below to add a group service representative."
-                               FontSize="16"
-                               HorizontalOptions="Center"
-                               HorizontalTextAlignment="Center"
-                               TextColor="{AppThemeBinding Light={StaticResource Gray400}, Dark={StaticResource Gray500}}"/>
-                </StackLayout>
-            </Border>
+                               TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"
+                               LineBreakMode="WordWrap"/>
+                        <Label Text="{Binding GsrCountText}"
+                               Style="{StaticResource SecondaryTextStyle}"/>
+                    </VerticalStackLayout>-->
 
-            <Border IsVisible="{Binding HasActiveGsrs}"
-        Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}"
-        StrokeThickness="2"
-        StrokeShape="RoundRectangle 10"
-        Padding="15"
-        Margin="0,10,0,15"
+                    <!-- Member list -->
+                    <CollectionView ItemsSource="{Binding ActiveGsrs}"
+                                    SelectionMode="None"
+                                    IsVisible="{Binding HasActiveGsrs}">
+                        <CollectionView.ItemsLayout>
+                            <LinearItemsLayout Orientation="Vertical" ItemSpacing="0"/>
+                        </CollectionView.ItemsLayout>
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="entities:Member">
+                                <Border Style="{StaticResource M3CardStyle}"
+                                        HorizontalOptions="Center"
+                                        WidthRequest="560"
+                                        MaximumWidthRequest="560">
+                                    <VerticalStackLayout Spacing="6">
+                                        <Label Text="Name" Style="{StaticResource FieldLabelStyle}"/>
+                                        <Label Text="{Binding AnonymousName}" Style="{StaticResource ValueLabelStyle}"/>
+
+                                        <Label Text="Personal Email" Style="{StaticResource FieldLabelStyle}"/>
+                                        <controls:MaskedRevealLabel x:Name="EmailReveal"
+                                                                    Value="{Binding PersonalEmail}"
+                                                                    MaskType="Email"
+                                                                    ShowRevealButton="False"
+                                                                    FontSize="16"
+                                                                    Margin="0,0,0,4"
+                                                                    BackgroundColor="Transparent"
+                                                                    TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"/>
+
+                                        <Label Text="Mobile Phone" Style="{StaticResource FieldLabelStyle}"/>
+                                        <controls:MaskedRevealLabel x:Name="MobileReveal"
+                                                                    Value="{Binding MobileNumber}"
+                                                                    MaskType="Mobile"
+                                                                    ShowRevealButton="False"
+                                                                    FontSize="16"
+                                                                    Margin="0,0,0,4"
+                                                                    BackgroundColor="Transparent"
+                                                                    TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"/>
+
+                                        <!-- Card-level Review toggle: reveals both fields while held -->
+                                        <Button Text="Review"
+                                                Style="{StaticResource M3SecondaryButtonStyle}"
+                                                HorizontalOptions="Center"
+                                                WidthRequest="160"
+                                                HeightRequest="44"
+                                                Margin="0,8,0,0"
+                                                Pressed="OnReviewPressed"
+                                                Released="OnReviewReleased"/>
+                                    </VerticalStackLayout>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+
+                    <!-- Empty state card -->
+                    <Border Style="{StaticResource M3CardStyle}"
+                            IsVisible="{Binding HasActiveGsrs, Converter={StaticResource InvertedBoolConverter}}">
+                        <VerticalStackLayout HorizontalOptions="Center" Spacing="6" Padding="12">
+                            <Label Text="No GSRs Registered"
+                                   Style="{StaticResource M3EmptyStateTitleStyle}"/>
+                            <Label Text="Tap 'No' below to add a group service representative."
+                                   Style="{StaticResource M3EmptyStateSubtitleStyle}"/>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- Standing-in card (only when there ARE active GSRs) -->
+                    <Border Style="{StaticResource M3CardStyle}"
+        IsVisible="{Binding HasActiveGsrs}"
         HorizontalOptions="Center"
-        BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray900}}">
-                <StackLayout Spacing="10" x:Name="StandingIn" HorizontalOptions="Center">
-                    <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="10" HorizontalOptions="Center">
-                        <Label Text="Are you standing in?" 
-                   FontSize="21"
-                   FontAttributes="Bold"
-                   TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}"
-                   VerticalOptions="Center"
-                   Grid.Column="0"/>
-                        <CheckBox x:Name="StandingInCheckBox" 
-                      IsChecked="{Binding StandingIn, Mode=TwoWay}"
-                      Grid.Column="1"
-                      VerticalOptions="Center"/>
-                    </Grid>
+        WidthRequest="560"
+        MaximumWidthRequest="560">
+                        <!--
+    One centred row. A Grid (not a HorizontalStackLayout) so the entry
+    column (*) absorbs the remaining space rather than letting the row
+    grow past the card. Name label + entry columns collapse to 0 when
+    the checkbox is unchecked because their content is IsVisible=False.
+    -->
+                        <Grid ColumnDefinitions="Auto,Auto,Auto,*"
+          ColumnSpacing="8"
+          HorizontalOptions="Fill"
+          VerticalOptions="Center">
+                            <Label Grid.Column="0"
+               Text="Are you standing in?"
+               FontSize="16"
+               FontAttributes="Bold"
+               VerticalOptions="Center"
+               TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"/>
+                            <CheckBox Grid.Column="1"
+                  x:Name="StandingInCheckBox"
+                  IsChecked="{Binding StandingIn, Mode=TwoWay}"
+                  VerticalOptions="Center"/>
+                            <Label Grid.Column="2"
+               Text="Your Name"
+               VerticalOptions="Center"
+               IsVisible="{Binding Source={x:Reference StandingInCheckBox}, Path=IsChecked}"
+               Style="{StaticResource FieldLabelStyle}"/>
+                            <controls:CloseableEntry Grid.Column="3"
+                                 x:Name="StandingInNameEntry"
+                                 Text="{Binding StandinName}"
+                                 Placeholder="Enter your name"
+                                 Keyboard="Text"
+                                 FontSize="16"
+                                 HorizontalOptions="Fill"
+                                 VerticalOptions="Center"
+                                 IsVisible="{Binding Source={x:Reference StandingInCheckBox}, Path=IsChecked}"
+                                 BackgroundColor="{AppThemeBinding Light={StaticResource Surface}, Dark={StaticResource Gray800}}"
+                                 TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"/>
+                        </Grid>
+                    </Border>
+                </VerticalStackLayout>
+            </ScrollView>
+        </controls:PageScaffold.ContentBody>
 
-                    <StackLayout IsVisible="{Binding Source={x:Reference StandingInCheckBox}, Path=IsChecked}"
-                     Spacing="5"
-                     HorizontalOptions="Center">
-                        <Label Text="Your Name" 
-                   FontSize="20"
-                   FontAttributes="Bold"
-                   HorizontalOptions="Center"
-                   TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}"/>
-                        <controls:ClearableEntry x:Name="StandingInNameEntry"
-                       Text="{Binding StandinName}"
-                       Placeholder="Enter your name"
-                       Keyboard="Text"
-                       FontSize="18"
-                       WidthRequest="300"
-                       BackgroundColor="{AppThemeBinding Light=White, Dark={StaticResource Gray800}}"
-                       TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"/>
-                    </StackLayout>
-                </StackLayout>
-            </Border>
+        <!-- ═══ Action bar: prompt, then Yes (primary, top) / No (secondary, bottom) ═══ -->
+        <controls:PageScaffold.ActionBarBody>
+            <VerticalStackLayout Spacing="12">
+                <Label Text="Is this correct?"
+                       FontSize="22"
+                       FontAttributes="Bold"
+                       HorizontalOptions="Center"
+                       Margin="0,0,0,4"
+                       TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"
+                       IsVisible="{Binding HasActiveGsrs}"/>
+                <Button Text="Yes"
+                        Command="{Binding YesCommand}"
+                        IsEnabled="{Binding CanRegister}"
+                        IsVisible="{Binding HasActiveGsrs}"
+                        Style="{StaticResource M3PrimaryButtonStyle}"/>
+                <Button Text="{Binding NoButtonText}"
+                        Command="{Binding NoCommand}"
+                        Style="{StaticResource M3SecondaryButtonStyle}"/>
+            </VerticalStackLayout>
+        </controls:PageScaffold.ActionBarBody>
 
-
-        </StackLayout>
-
-        <!-- Fixed action buttons at base of page (Row 1) -->
-        <!-- Fixed action buttons at base of page (Row 1) -->
-        <FlexLayout Grid.Row="1"
-            Direction="Row"
-            JustifyContent="SpaceEvenly"
-            AlignItems="Center"
-            IsVisible="{Binding IsLoading, Converter={StaticResource InvertedBoolConverter}}">
-
-            <Label FontSize="Medium"
-           FontAttributes="Bold"
-           Text="Is this correct?"
-           HorizontalOptions="Center"
-           Margin="0,10,0,10"
-           IsVisible="{Binding HasActiveGsrs}"/>
-
-            <Button Text="Yes" 
-            Command="{Binding YesCommand}"
-            IsEnabled="{Binding CanRegister}"
-            IsVisible="{Binding HasActiveGsrs}"
-            Style="{StaticResource PrimaryButtonStyle}"
-            TextColor="White"
-            CornerRadius="25"
-            HeightRequest="100"
-            FlexLayout.Grow="1"
-            Margin="0,0,7.5,0"/>
-
-            <Button Text="{Binding NoButtonText}"
-            Command="{Binding NoCommand}"
-            Style="{StaticResource PrimaryButtonStyle}"
-            TextColor="White"
-            CornerRadius="25"
-            HeightRequest="100"
-            FlexLayout.Grow="1"
-            Margin="7.5,0,0,0"/>
-        </FlexLayout>
-
-        <!-- Loading Indicator spans both rows -->
-        <ActivityIndicator Grid.RowSpan="2"
-                           IsVisible="{Binding IsLoading}" 
-                           IsRunning="{Binding IsLoading}"
-                           HorizontalOptions="Center"
-                           VerticalOptions="Center"
-                           Scale="1.5"
-                           Color="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"/>
-
-
-    </Grid>
+    </controls:PageScaffold>
 
 </ContentPage>

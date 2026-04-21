@@ -1,51 +1,51 @@
-<?xml version="1.0" encoding="utf-8" ?>
+﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage x:Class="TheBleedingDeacons.Intergroup.Register.Views.DaySelectionPage"
              xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:vm="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
              xmlns:models="clr-namespace:TheBleedingDeacons.Intergroup.Register.Models"
+             xmlns:controls="clr-namespace:TheBleedingDeacons.Intergroup.Register.Controls"
+             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
              x:DataType="vm:DaySelectionViewModel"
              Title="{Binding Title}">
 
-    <Grid RowDefinitions="Auto,*" Padding="20">
+    <ContentPage.Behaviors>
+        <toolkit:StatusBarBehavior StatusBarColor="{AppThemeBinding Light=White, Dark=Black}"
+                                   StatusBarStyle="{AppThemeBinding Light=DarkContent, Dark=LightContent}"/>
+    </ContentPage.Behaviors>
 
-        <!-- Header -->
-        <StackLayout Grid.Row="0" Spacing="10">
-            <Label x:Name="QuestionLabel"
-                   Style="{StaticResource Question}"
-                   Text="My Meeting is held on?"
-                   HorizontalOptions="Center" />
-        </StackLayout>
+    <controls:PageScaffold IsBusy="{Binding IsBusy}"
+                           BusyMessage="Loading...">
+        <controls:PageScaffold.ContentBody>
+            <ScrollView>
+                <VerticalStackLayout Spacing="16">
 
-        <!-- Days FlexLayout -->
-        <ScrollView Grid.Row="1" VerticalOptions="Center">
-            <FlexLayout BindableLayout.ItemsSource="{Binding Days}"
-                       Direction="Row"
-                       Wrap="Wrap"
-                       JustifyContent="Center"
-                       AlignContent="Center"
-                       Margin="0,30,0,30">
+                    <Label Text="My meeting is held on?"
+                           FontSize="22"
+                           FontAttributes="Bold"
+                           HorizontalOptions="Center"
+                           HorizontalTextAlignment="Center"
+                           TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"
+                           Margin="0,8,0,16"/>
 
-                <BindableLayout.ItemTemplate>
-                    <DataTemplate x:DataType="models:DayItem">
-                        <Button Text="{Binding Name}"
-                               Style="{StaticResource PrimaryButtonStyle}"
-                               HeightRequest="130"
-                               WidthRequest="350"
-                               Margin="7.5"
-                               Command="{Binding Source={RelativeSource AncestorType={x:Type vm:DaySelectionViewModel}}, Path=SelectDayCommand}"
-                               CommandParameter="{Binding .}"/>
-                    </DataTemplate>
-                </BindableLayout.ItemTemplate>
-            </FlexLayout>
-        </ScrollView>
+                    <!-- Days as stacked tiles, one per row on phones -->
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding Days}"
+                                         Spacing="12">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="models:DayItem">
+                                <Button Text="{Binding Name}"
+                                        Style="{StaticResource M3TileButtonStyle}"
+                                        HeightRequest="72"
+                                        FontSize="18"
+                                        Command="{Binding Source={RelativeSource AncestorType={x:Type vm:DaySelectionViewModel}}, Path=SelectDayCommand}"
+                                        CommandParameter="{Binding .}"/>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
 
-        <ActivityIndicator IsVisible="{Binding IsBusy}"
-                          IsRunning="{Binding IsBusy}"
-                          Color="{StaticResource Primary}"
-                          HorizontalOptions="Center"
-                          HeightRequest="40" />
-
-    </Grid>
+                </VerticalStackLayout>
+            </ScrollView>
+        </controls:PageScaffold.ContentBody>
+    </controls:PageScaffold>
 
 </ContentPage>

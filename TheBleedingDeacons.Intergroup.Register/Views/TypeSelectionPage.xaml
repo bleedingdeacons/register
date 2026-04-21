@@ -1,39 +1,49 @@
-<?xml version="1.0" encoding="utf-8" ?>
+﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:vm="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
+             xmlns:controls="clr-namespace:TheBleedingDeacons.Intergroup.Register.Controls"
+             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
              x:Class="TheBleedingDeacons.Intergroup.Register.Views.TypeSelectionPage"
              x:DataType="vm:TypeSelectionViewModel"
              Title="{Binding Title}">
-    <VerticalStackLayout Spacing="30" Padding="30,0" VerticalOptions="Center">
 
-        <FlexLayout Direction="Row"
-                Wrap="Wrap"
-                JustifyContent="SpaceBetween"
-                AlignItems="Stretch"
-                AlignContent="Start">
+    <ContentPage.Behaviors>
+        <toolkit:StatusBarBehavior StatusBarColor="{AppThemeBinding Light=White, Dark=Black}"
+                                   StatusBarStyle="{AppThemeBinding Light=DarkContent, Dark=LightContent}"/>
+    </ContentPage.Behaviors>
 
-            <!-- Face 2 Face Button -->
-            <Button Text="Face 2 Face" Style="{StaticResource PrimaryButtonStyle}"
-                Command="{Binding Face2FaceCommand}"
-                HeightRequest="200"
-                FlexLayout.Basis="48%"
-                Margin="0,0,5,10" />
+    <controls:PageScaffold IsBusy="{Binding IsBusy}"
+                           BusyMessage="Loading...">
+        <controls:PageScaffold.ContentBody>
+            <VerticalStackLayout VerticalOptions="Center" Spacing="24">
 
-            <!-- Online Button -->
-            <Button Text="Online" Style="{StaticResource PrimaryButtonStyle}"
-                Command="{Binding OnlineCommand}"
-                HeightRequest="200"
-                FlexLayout.Basis="48%"
-                Margin="0,0,5,10" />
+                <Label Text="Where is the meeting?"
+                       FontSize="22"
+                       FontAttributes="Bold"
+                       HorizontalOptions="Center"
+                       HorizontalTextAlignment="Center"
+                       TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"
+                       Margin="0,0,0,8"/>
 
-        </FlexLayout>
-        <ActivityIndicator IsVisible="{Binding IsBusy}"
-                              IsRunning="{Binding IsBusy}"
-                              Color="{StaticResource Primary}"
-                              HorizontalOptions="Center"
-                              HeightRequest="40" />
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
 
-    </VerticalStackLayout>
+                    <Button Grid.Column="0"
+                            Text="Face 2 Face"
+                            Style="{StaticResource M3TileButtonStyle}"
+                            Command="{Binding Face2FaceCommand}"
+                            HeightRequest="200"/>
+
+                    <Button Grid.Column="1"
+                            Text="Online"
+                            Style="{StaticResource M3TileButtonStyle}"
+                            Command="{Binding OnlineCommand}"
+                            HeightRequest="200"/>
+
+                </Grid>
+
+            </VerticalStackLayout>
+        </controls:PageScaffold.ContentBody>
+    </controls:PageScaffold>
 
 </ContentPage>

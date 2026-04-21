@@ -49,15 +49,18 @@ public partial class VerifyGroupViewModel : BaseViewModel
 	private bool edited;
 
 	[ObservableProperty]
+	[NotifyCanExecuteChangedFor(nameof(YesCommand))]
 	private bool standingIn;
 
 	[ObservableProperty]
 	private string? standinEmail;
 
 	[ObservableProperty]
+	[NotifyCanExecuteChangedFor(nameof(YesCommand))]
 	private string? standinName;
 
 	[ObservableProperty]
+	[NotifyCanExecuteChangedFor(nameof(YesCommand))]
 	private bool canRegister;
 
 	[ObservableProperty]
@@ -65,6 +68,12 @@ public partial class VerifyGroupViewModel : BaseViewModel
 
 	[ObservableProperty]
 	private string noButtonText = "No";
+
+	// If the user toggles "Standing in", re-gate the Yes button.
+	partial void OnStandingInChanged(bool value) => UpdateCanRegister();
+
+	// And if they type/clear their name, re-gate again.
+	partial void OnStandinNameChanged(string? value) => UpdateCanRegister();
 
 	/// <summary>
 	/// Active GSR members for the group, displayed as a list.
@@ -191,7 +200,10 @@ public partial class VerifyGroupViewModel : BaseViewModel
 
 	/// <summary>
 	/// User confirms details are correct — register attendance for the group.
+	/// Gated via CanExecute so the command cannot fire even if the bound IsEnabled
+	/// path is somehow bypassed.
 	/// </summary>
+	//[RelayCommand(CanExecute = nameof(CanExecuteYes))]
 	[RelayCommand]
 	public async Task Yes()
 	{
@@ -318,9 +330,34 @@ public partial class VerifyGroupViewModel : BaseViewModel
 	private void UpdateCanRegister()
 	{
 		// At least one active GSR must have required contact fields
-		CanRegister = ActiveGsrs.Any(g =>
+		bool hasValidGsr = ActiveGsrs.Any(g =>
 			!string.IsNullOrEmpty(g.AnonymousName) &&
 			(!string.IsNullOrEmpty(g.MobileNumber) || !string.IsNullOrEmpty(g.PersonalEmail)));
+
+		// If the user is marking themselves as standing in, they must enter a name.
+		// When StandingIn is unticked, StandinName is not required.
+		bool standInOk = !StandingIn || !string.IsNullOrWhiteSpace(StandinName);
+
+		CanRegister = hasValidGsr && standInOk;
+	}
+
+	/// <summary>
+	/// Authoritative guard for the Yes command. Mirrors the CanRegister invariant so the
+	/// button cannot fire even if IsEnabled propagation misbehaves — e.g. during a
+	/// rebind after the checkbox toggles visibility.
+	///
+	/// Wired via [NotifyCanExecuteChangedFor(nameof(YesCommand))] on StandingIn and
+	/// StandinName, so any change to either re-runs this automatically.
+	/// </summary>
+	private bool CanExecuteYes()
+	{
+		bool hasValidGsr = ActiveGsrs.Any(g =>
+			!string.IsNullOrEmpty(g.AnonymousName) &&
+			(!string.IsNullOrEmpty(g.MobileNumber) || !string.IsNullOrEmpty(g.PersonalEmail)));
+
+		bool standInOk = !StandingIn || !string.IsNullOrWhiteSpace(StandinName);
+
+		return hasValidGsr && standInOk;
 	}
 
 	#endregion

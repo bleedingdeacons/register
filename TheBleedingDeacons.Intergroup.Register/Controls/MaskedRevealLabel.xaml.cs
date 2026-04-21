@@ -66,9 +66,26 @@ public partial class MaskedRevealLabel : ContentView
 		BindableProperty.Create(nameof(VisibleMobileDigits), typeof(int), typeof(MaskedRevealLabel), 4,
 			propertyChanged: OnValueOrMaskChanged);
 
+	/// <summary>
+	/// Whether the built-in press-and-hold Show button is displayed (default: true).
+	/// Set to false when the parent view provides its own reveal trigger and drives the
+	/// control via the public Reveal() / Hide() methods.
+	/// </summary>
+	public static readonly BindableProperty ShowRevealButtonProperty =
+		BindableProperty.Create(nameof(ShowRevealButton), typeof(bool), typeof(MaskedRevealLabel), true,
+			propertyChanged: OnShowRevealButtonChanged);
+
+	/// <summary>
+	/// Derived: RevealButton is only shown when the caller allows it AND there is a value to reveal.
+	/// Bound directly by the XAML; never set manually.
+	/// </summary>
+	public static readonly BindableProperty IsRevealButtonVisibleProperty =
+		BindableProperty.Create(nameof(IsRevealButtonVisible), typeof(bool), typeof(MaskedRevealLabel), false);
+
 	public MaskedRevealLabel()
 	{
 		InitializeComponent();
+		UpdateRevealButtonVisibility();
 		UpdateDisplay(revealed: false);
 	}
 
@@ -162,6 +179,18 @@ public partial class MaskedRevealLabel : ContentView
 		set => SetValue(VisibleMobileDigitsProperty, value);
 	}
 
+	public bool ShowRevealButton
+	{
+		get => (bool)GetValue(ShowRevealButtonProperty);
+		set => SetValue(ShowRevealButtonProperty, value);
+	}
+
+	public bool IsRevealButtonVisible
+	{
+		get => (bool)GetValue(IsRevealButtonVisibleProperty);
+		private set => SetValue(IsRevealButtonVisibleProperty, value);
+	}
+
 	// Events
 	public event EventHandler Revealed;
 	public event EventHandler Hidden;
@@ -171,8 +200,42 @@ public partial class MaskedRevealLabel : ContentView
 		if (bindable is MaskedRevealLabel control)
 		{
 			control.HasValue = !string.IsNullOrEmpty(control.Value);
+			control.UpdateRevealButtonVisibility();
 			control.UpdateDisplay(revealed: false);
 		}
+	}
+
+	private static void OnShowRevealButtonChanged(BindableObject bindable, object oldValue, object newValue)
+	{
+		if (bindable is MaskedRevealLabel control)
+		{
+			control.UpdateRevealButtonVisibility();
+		}
+	}
+
+	private void UpdateRevealButtonVisibility()
+	{
+		// Only show the built-in button when the caller allows it AND there's a value to reveal.
+		IsRevealButtonVisible = ShowRevealButton && HasValue;
+	}
+
+	/// <summary>
+	/// Reveal the value. Intended for parent views that manage their own reveal trigger
+	/// (see ShowRevealButton). Fires Revealed. Idempotent.
+	/// </summary>
+	public void Reveal()
+	{
+		UpdateDisplay(revealed: true);
+		Revealed?.Invoke(this, EventArgs.Empty);
+	}
+
+	/// <summary>
+	/// Re-mask the value. Pair with Reveal(). Fires Hidden. Idempotent.
+	/// </summary>
+	public void Hide()
+	{
+		UpdateDisplay(revealed: false);
+		Hidden?.Invoke(this, EventArgs.Empty);
 	}
 
 	private void OnRevealPressed(object sender, EventArgs e)

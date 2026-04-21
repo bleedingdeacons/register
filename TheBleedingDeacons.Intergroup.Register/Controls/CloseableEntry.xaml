@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="TheBleedingDeacons.Intergroup.Register.Controls.CloseableEntry"
+             x:Name="RootView">
+
+    <!--
+    CloseableEntry — an Entry wrapper with a trailing Close button.
+
+    The close button is shown only while all three of these are true:
+      • the entry has focus (which on Android/iOS means the soft keyboard is up)
+      • the entry has a non-empty value
+      • the entry is not read-only
+
+    Pressing Close unfocuses the entry, which dismisses the soft keyboard.
+    It does NOT clear the text — use ClearableEntry for that behaviour.
+    -->
+
+    <Border BackgroundColor="{Binding BackgroundColor, Source={x:Reference RootView}}"
+            Stroke="{Binding BorderColor, Source={x:Reference RootView}}"
+            StrokeThickness="{Binding BorderThickness, Source={x:Reference RootView}}">
+        <Border.StrokeShape>
+            <RoundRectangle CornerRadius="{Binding CornerRadius, Source={x:Reference RootView}}"/>
+        </Border.StrokeShape>
+
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Text Entry -->
+            <Entry x:Name="InternalEntry"
+                   HeightRequest="{Binding ControlHeight, Source={x:Reference RootView}}"
+                   Grid.Column="0"
+                   Text="{Binding Text, Source={x:Reference RootView}}"
+                   Placeholder="{Binding Placeholder, Source={x:Reference RootView}}"
+                   FontSize="{Binding FontSize, Source={x:Reference RootView}}"
+                   TextColor="{Binding TextColor, Source={x:Reference RootView}}"
+                   PlaceholderColor="{Binding PlaceholderColor, Source={x:Reference RootView}}"
+                   Keyboard="{Binding Keyboard, Source={x:Reference RootView}}"
+                   IsPassword="{Binding IsPassword, Source={x:Reference RootView}}"
+                   MaxLength="{Binding MaxLength, Source={x:Reference RootView}}"
+                   IsReadOnly="{Binding IsReadOnly, Source={x:Reference RootView}}"
+                   HorizontalTextAlignment="{Binding HorizontalTextAlignment, Source={x:Reference RootView}}"
+                   VerticalTextAlignment="{Binding VerticalTextAlignment, Source={x:Reference RootView}}"
+                   BackgroundColor="Transparent"
+                   Margin="0"
+                   TextChanged="OnTextChanged"
+                   Focused="OnEntryFocused"
+                   Unfocused="OnEntryUnfocused"/>
+
+            <!-- Close Button -->
+            <Button x:Name="CloseButton"
+                    Grid.Column="1"
+                    Text="Close"
+                    FontSize="16"
+                    BackgroundColor="{Binding CloseButtonColor, Source={x:Reference RootView}}"
+                    TextColor="White"
+                    BorderWidth="0"
+                    IsVisible="False"
+                    Clicked="OnCloseClicked"/>
+        </Grid>
+    </Border>
+
+</ContentView>

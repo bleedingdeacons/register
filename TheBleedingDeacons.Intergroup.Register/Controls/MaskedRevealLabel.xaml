@@ -17,7 +17,6 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
-            <!-- Display Label (masked or revealed) -->
             <Label x:Name="InternalLabel"
                    Grid.Column="0"
                    HeightRequest="{Binding ControlHeight, Source={x:Reference RootView}}"
@@ -30,7 +29,6 @@
                    Margin="10,0,0,0"
                    BackgroundColor="Transparent"/>
 
-            <!-- Reveal Button (hold to show value) -->
             <Button x:Name="RevealButton"
                     Grid.Column="1"
                     Text="Show"
@@ -38,7 +36,7 @@
                     BackgroundColor="{Binding RevealButtonColor, Source={x:Reference RootView}}"
                     TextColor="White"
                     BorderWidth="0"
-                    IsVisible="{Binding HasValue, Source={x:Reference RootView}}"
+                    IsVisible="{Binding IsRevealButtonVisible, Source={x:Reference RootView}}"
                     Pressed="OnRevealPressed"
                     Released="OnRevealReleased"/>
         </Grid>
