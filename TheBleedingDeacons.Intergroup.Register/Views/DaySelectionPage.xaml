@@ -1,44 +1,54 @@
 ﻿<?xml version="1.0" encoding="utf-8" ?>
-<ContentPage x:Class="TheBleedingDeacons.Intergroup.Register.Views.DaySelectionPage"
-             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             xmlns:vm="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
-             xmlns:models="clr-namespace:TheBleedingDeacons.Intergroup.Register.Models"
-             xmlns:controls="clr-namespace:TheBleedingDeacons.Intergroup.Register.Controls"
-             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
-             x:DataType="vm:DaySelectionViewModel"
-             Title="{Binding Title}">
+<ContentPage
+    x:Class="TheBleedingDeacons.Intergroup.Register.Views.DaySelectionPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:controls="clr-namespace:TheBleedingDeacons.Intergroup.Register.Controls"
+    xmlns:models="clr-namespace:TheBleedingDeacons.Intergroup.Register.Models"
+    xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+    xmlns:vm="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
+    Title="{Binding Title}"
+    x:DataType="vm:DaySelectionViewModel">
 
     <ContentPage.Behaviors>
-        <toolkit:StatusBarBehavior StatusBarColor="{AppThemeBinding Light=White, Dark=Black}"
-                                   StatusBarStyle="{AppThemeBinding Light=DarkContent, Dark=LightContent}"/>
+        <toolkit:StatusBarBehavior StatusBarColor="{AppThemeBinding Light=White, Dark=Black}" StatusBarStyle="{AppThemeBinding Light=DarkContent, Dark=LightContent}" />
     </ContentPage.Behaviors>
 
-    <controls:PageScaffold IsBusy="{Binding IsBusy}"
-                           BusyMessage="Loading...">
+    <controls:PageScaffold BusyMessage="Loading..." IsBusy="{Binding IsBusy}">
         <controls:PageScaffold.ContentBody>
             <ScrollView>
                 <VerticalStackLayout Spacing="16">
 
-                    <Label Text="My meeting is held on?"
-                           FontSize="22"
-                           FontAttributes="Bold"
-                           HorizontalOptions="Center"
-                           HorizontalTextAlignment="Center"
-                           TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"
-                           Margin="0,8,0,16"/>
+                    <Label
+                        Margin="0,8,0,16"
+                        FontAttributes="Bold"
+                        FontSize="22"
+                        HorizontalOptions="Center"
+                        HorizontalTextAlignment="Center"
+                        Text="My meeting is held on?"
+                        TextColor="{AppThemeBinding Light={StaticResource Gray900},
+                                                    Dark={StaticResource Gray100}}" />
 
-                    <!-- Days as stacked tiles, one per row on phones -->
-                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding Days}"
-                                         Spacing="12">
+                    <!--
+                        Days as stacked tiles. Each button wraps in a 3-column
+                        Grid (*,2*,*) so the middle column is half the page
+                        width; the button fills that column and the outer
+                        columns act as flexible side-margins.
+                    -->
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding Days}" Spacing="12">
                         <BindableLayout.ItemTemplate>
                             <DataTemplate x:DataType="models:DayItem">
-                                <Button Text="{Binding Name}"
-                                        Style="{StaticResource M3TileButtonStyle}"
-                                        HeightRequest="72"
-                                        FontSize="18"
+                                <Grid ColumnDefinitions="*,2*,*">
+                                    <Button
+                                        Grid.Column="1"
                                         Command="{Binding Source={RelativeSource AncestorType={x:Type vm:DaySelectionViewModel}}, Path=SelectDayCommand}"
-                                        CommandParameter="{Binding .}"/>
+                                        CommandParameter="{Binding .}"
+                                        FontSize="18"
+                                        HeightRequest="72"
+                                        HorizontalOptions="Fill"
+                                        Style="{StaticResource M3TileButtonStyle}"
+                                        Text="{Binding Name}" />
+                                </Grid>
                             </DataTemplate>
                         </BindableLayout.ItemTemplate>
                     </VerticalStackLayout>
