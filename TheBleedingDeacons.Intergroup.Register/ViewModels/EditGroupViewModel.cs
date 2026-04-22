@@ -451,7 +451,11 @@ public partial class EditGroupViewModel : BaseViewModel
 		ActiveMembers.Add(member);
 
 		UpdateHasPendingRemovals();
-		HasPendingChanges = PendingRemovals.Count > 0;
+		// Undoing a removal is itself a pending change (we're putting the
+		// member back after a delete was staged), and it doesn't cancel any
+		// prior adds or edits — so keep the flag set regardless of whether
+		// there are still other pending removals in the list.
+		HasPendingChanges = true;
 		RefreshMemberCountText();
 		UpdateHasActiveMembers();
 
@@ -486,7 +490,9 @@ public partial class EditGroupViewModel : BaseViewModel
 	}
 
 	/// <summary>
-	/// OK — commit all pending removals to the database and navigate back.
+	/// Finished — commit all pending removals to the database and navigate
+	/// back, signalling the parent page (via ?edited=true) that member-list
+	/// state may have changed so it can refresh.
 	/// </summary>
 	[RelayCommand]
 	private async Task Done()

@@ -408,7 +408,7 @@
             </ScrollView>
         </controls:PageScaffold.ContentBody>
 
-        <!--  ═══ Action bar: swaps between list-mode (OK/Cancel) and edit-mode (Save/Cancel) ═══  -->
+        <!--  ═══ Action bar: swaps between list-mode (Finished) and edit-mode (Save/Cancel) ═══  -->
         <!--
             Buttons are arranged horizontally, side by side. The pair
             together occupies half the screen width and is centred via the
@@ -418,41 +418,31 @@
         -->
         <controls:PageScaffold.ActionBarBody>
             <Grid ColumnDefinitions="*,2*,*">
-                <!--  Inner row hosts both buttons side-by-side in the middle 50% column  -->
+                <!--  List mode (IsEditing = false): single Finished button filling the middle 50%  -->
+                <Button
+                    Grid.Column="1"
+                    Command="{Binding DoneCommand}"
+                    HorizontalOptions="Fill"
+                    IsVisible="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}"
+                    Style="{StaticResource M3PrimaryButtonStyle}"
+                    Text="Finished" />
+
+                <!--  Edit mode (IsEditing = true): Cancel (left) / Save (right) side-by-side in the middle 50%  -->
                 <Grid
                     Grid.Column="1"
                     ColumnDefinitions="*,*"
-                    ColumnSpacing="12">
-
-                    <!--  List mode (IsEditing = false): Cancel (left) / OK (right)  -->
-                    <Button
-                        Grid.Column="0"
-                        Command="{Binding CancelPageCommand}"
-                        HorizontalOptions="Fill"
-                        IsVisible="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}"
-                        Style="{StaticResource M3SecondaryButtonStyle}"
-                        Text="Cancel" />
-                    <Button
-                        Grid.Column="1"
-                        Command="{Binding DoneCommand}"
-                        HorizontalOptions="Fill"
-                        IsVisible="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}"
-                        Style="{StaticResource M3PrimaryButtonStyle}"
-                        Text="OK" />
-
-                    <!--  Edit mode (IsEditing = true): Cancel (left) / Save (right)  -->
+                    ColumnSpacing="12"
+                    IsVisible="{Binding IsEditing}">
                     <Button
                         Grid.Column="0"
                         Command="{Binding CancelEditCommand}"
                         HorizontalOptions="Fill"
-                        IsVisible="{Binding IsEditing}"
                         Style="{StaticResource M3SecondaryButtonStyle}"
                         Text="Cancel" />
                     <Button
                         Grid.Column="1"
                         Command="{Binding SaveMemberCommand}"
                         HorizontalOptions="Fill"
-                        IsVisible="{Binding IsEditing}"
                         Style="{StaticResource M3PrimaryButtonStyle}"
                         Text="{Binding SaveButtonText}" />
                 </Grid>
