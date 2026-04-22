@@ -673,7 +673,22 @@
                     </VisualState>
                     <VisualState x:Name="Disabled">
                         <VisualState.Setters>
-                            <Setter Property="Opacity" Value="0.38"/>
+                            <!--
+                                Material 3 disabled button: flat surface-variant fill,
+                                muted on-surface text, no shadow. Explicit colour setters
+                                are required because Opacity on Button.Disabled is
+                                unreliable on Android — logically-disabled buttons stay
+                                visually "enabled blue" without the explicit overrides.
+
+                                Gray50/Gray800 sits lighter than M3SecondaryButton's
+                                enabled Gray100/Gray800 fill so the disabled secondary
+                                still reads as more recessed than its enabled state,
+                                while the primary button goes from vivid blue to a
+                                clearly inert pale surface.
+                            -->
+                            <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource Gray50}, Dark={StaticResource Gray800}}"/>
+                            <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Gray400}, Dark={StaticResource Gray500}}"/>
+                            <Setter Property="Opacity" Value="1"/>
                             <Setter Property="Shadow" Value="{x:Null}"/>
                         </VisualState.Setters>
                     </VisualState>

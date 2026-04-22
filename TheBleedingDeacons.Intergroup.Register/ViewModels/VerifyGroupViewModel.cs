@@ -203,8 +203,7 @@ public partial class VerifyGroupViewModel : BaseViewModel
 	/// Gated via CanExecute so the command cannot fire even if the bound IsEnabled
 	/// path is somehow bypassed.
 	/// </summary>
-	//[RelayCommand(CanExecute = nameof(CanExecuteYes))]
-	[RelayCommand]
+	[RelayCommand(CanExecute = nameof(CanExecuteYes))]
 	public async Task Yes()
 	{
 		if (Group == null)

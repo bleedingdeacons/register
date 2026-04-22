@@ -99,53 +99,70 @@
 
                     <!-- Standing-in card (only when there ARE active GSRs) -->
                     <Border Style="{StaticResource M3CardStyle}"
-        IsVisible="{Binding HasActiveGsrs}"
-        HorizontalOptions="Center"
-        WidthRequest="560"
-        MaximumWidthRequest="560">
+                            IsVisible="{Binding HasActiveGsrs}"
+                            HorizontalOptions="Center"
+                            WidthRequest="560"
+                            MaximumWidthRequest="560">
                         <!--
-    One centred row. A Grid (not a HorizontalStackLayout) so the entry
-    column (*) absorbs the remaining space rather than letting the row
-    grow past the card. Name label + entry columns collapse to 0 when
-    the checkbox is unchecked because their content is IsVisible=False.
-    -->
-                        <Grid ColumnDefinitions="Auto,Auto,Auto,*"
-          ColumnSpacing="8"
-          HorizontalOptions="Fill"
-          VerticalOptions="Center">
-                            <Label Grid.Column="0"
-               Text="Are you standing in?"
-               FontSize="16"
-               FontAttributes="Bold"
-               VerticalOptions="Center"
-               TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"/>
-                            <CheckBox Grid.Column="1"
-                  x:Name="StandingInCheckBox"
-                  IsChecked="{Binding StandingIn, Mode=TwoWay}"
-                  VerticalOptions="Center"/>
-                            <Label Grid.Column="2"
-               Text="Your Name"
-               VerticalOptions="Center"
-               IsVisible="{Binding Source={x:Reference StandingInCheckBox}, Path=IsChecked}"
-               Style="{StaticResource FieldLabelStyle}"/>
-                            <controls:CloseableEntry Grid.Column="3"
-                                 x:Name="StandingInNameEntry"
-                                 Text="{Binding StandinName}"
-                                 Placeholder="Enter your name"
-                                 Keyboard="Text"
-                                 FontSize="16"
-                                 HorizontalOptions="Fill"
-                                 VerticalOptions="Center"
-                                 IsVisible="{Binding Source={x:Reference StandingInCheckBox}, Path=IsChecked}"
-                                 BackgroundColor="{AppThemeBinding Light={StaticResource Surface}, Dark={StaticResource Gray800}}"
-                                 TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"/>
-                        </Grid>
+                            Two rows:
+                              1. Prompt + checkbox, centred as a pair.
+                              2. "Your Name" label + entry, centred,
+                                 shown only while the checkbox is ticked.
+                        -->
+                        <VerticalStackLayout Spacing="12">
+
+                            <!-- Row 1: prompt + checkbox, centred -->
+                            <HorizontalStackLayout Spacing="8"
+                                                   HorizontalOptions="Center"
+                                                   VerticalOptions="Center">
+                                <Label Text="Are you standing in?"
+                                       FontSize="16"
+                                       FontAttributes="Bold"
+                                       VerticalOptions="Center"
+                                       TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"/>
+                                <CheckBox x:Name="StandingInCheckBox"
+                                          IsChecked="{Binding StandingIn, Mode=TwoWay}"
+                                          VerticalOptions="Center"/>
+                            </HorizontalStackLayout>
+
+                            <!-- Row 2: "Your Name" label + entry, centred, only when ticked -->
+                            <VerticalStackLayout Spacing="6"
+                                                 HorizontalOptions="Center"
+                                                 WidthRequest="360"
+                                                 MaximumWidthRequest="360"
+                                                 IsVisible="{Binding Source={x:Reference StandingInCheckBox}, Path=IsChecked}">
+                                <Label Text="Your Name"
+                                       HorizontalOptions="Center"
+                                       Style="{StaticResource FieldLabelStyle}"/>
+                                <controls:CloseableEntry x:Name="StandingInNameEntry"
+                                                         Text="{Binding StandinName}"
+                                                         Placeholder="Enter your name"
+                                                         Keyboard="Text"
+                                                         FontSize="16"
+                                                         HorizontalOptions="Fill"
+                                                         HorizontalTextAlignment="Center"
+                                                         VerticalOptions="Center"
+                                                         BackgroundColor="{AppThemeBinding Light={StaticResource Surface}, Dark={StaticResource Gray800}}"
+                                                         TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"/>
+                            </VerticalStackLayout>
+
+                        </VerticalStackLayout>
                     </Border>
                 </VerticalStackLayout>
             </ScrollView>
         </controls:PageScaffold.ContentBody>
 
-        <!-- ═══ Action bar: prompt, then Yes (primary, top) / No (secondary, bottom) ═══ -->
+        <!-- ═══ Action bar: prompt, then No (left) / Yes (right) horizontally ═══ -->
+        <!--
+             Buttons are arranged horizontally, side by side. The pair
+             together occupies half the screen width and is centred via the
+             outer three-column Grid (*,2*,*). The action-bar Border itself
+             (in PageScaffold) sizes to its content height, so the bar is
+             just tall enough to hold the prompt + one row of buttons.
+
+             When there are no active GSRs, only the No button is shown and
+             it is centred on its own at the same half-screen width.
+        -->
         <controls:PageScaffold.ActionBarBody>
             <VerticalStackLayout Spacing="12">
                 <Label Text="Is this correct?"
@@ -155,14 +172,36 @@
                        Margin="0,0,0,4"
                        TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"
                        IsVisible="{Binding HasActiveGsrs}"/>
-                <Button Text="Yes"
-                        Command="{Binding YesCommand}"
-                        IsEnabled="{Binding CanRegister}"
-                        IsVisible="{Binding HasActiveGsrs}"
-                        Style="{StaticResource M3PrimaryButtonStyle}"/>
-                <Button Text="{Binding NoButtonText}"
-                        Command="{Binding NoCommand}"
-                        Style="{StaticResource M3SecondaryButtonStyle}"/>
+
+                <!-- With active GSRs: No (left) / Yes (right) -->
+                <Grid ColumnDefinitions="*,2*,*"
+                      IsVisible="{Binding HasActiveGsrs}">
+                    <Grid Grid.Column="1"
+                          ColumnDefinitions="*,*"
+                          ColumnSpacing="12">
+                        <Button Grid.Column="0"
+                                Text="{Binding NoButtonText}"
+                                Command="{Binding NoCommand}"
+                                Style="{StaticResource M3SecondaryButtonStyle}"
+                                HorizontalOptions="Fill"/>
+                        <Button Grid.Column="1"
+                                Text="Yes"
+                                Command="{Binding YesCommand}"
+                                IsEnabled="{Binding CanRegister}"
+                                Style="{StaticResource M3PrimaryButtonStyle}"
+                                HorizontalOptions="Fill"/>
+                    </Grid>
+                </Grid>
+
+                <!-- No active GSRs: single No button, half-width, centred -->
+                <Grid ColumnDefinitions="*,2*,*"
+                      IsVisible="{Binding HasActiveGsrs, Converter={StaticResource InvertedBoolConverter}}">
+                    <Button Grid.Column="1"
+                            Text="{Binding NoButtonText}"
+                            Command="{Binding NoCommand}"
+                            Style="{StaticResource M3SecondaryButtonStyle}"
+                            HorizontalOptions="Fill"/>
+                </Grid>
             </VerticalStackLayout>
         </controls:PageScaffold.ActionBarBody>
 

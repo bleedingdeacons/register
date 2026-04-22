@@ -105,7 +105,14 @@
             </ScrollView>
         </controls:PageScaffold.ContentBody>
 
-        <!-- ═══ Action bar: prompt, then Yes (primary, top) / No (secondary, bottom) ═══ -->
+        <!-- ═══ Action bar: prompt, then No (left) / Yes (right) horizontally ═══ -->
+        <!--
+             Buttons are arranged horizontally, side by side. The pair
+             together occupies half the screen width and is centred via the
+             outer three-column Grid (*,2*,*). The action-bar Border itself
+             (in PageScaffold) sizes to its content height, so the bar is
+             just tall enough to hold the prompt + one row of buttons.
+        -->
         <controls:PageScaffold.ActionBarBody>
             <VerticalStackLayout Spacing="12">
                 <Label Text="Is this correct?"
@@ -114,13 +121,22 @@
                        HorizontalOptions="Center"
                        Margin="0,0,0,4"
                        TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"/>
-                <Button Text="Yes"
-                        Command="{Binding YesCommand}"
-                        IsEnabled="{Binding CanRegister}"
-                        Style="{StaticResource M3PrimaryButtonStyle}"/>
-                <Button Text="No"
-                        Command="{Binding NoCommand}"
-                        Style="{StaticResource M3SecondaryButtonStyle}"/>
+                <Grid ColumnDefinitions="*,2*,*">
+                    <Grid Grid.Column="1"
+                          ColumnDefinitions="*,*"
+                          ColumnSpacing="12">
+                        <Button Grid.Column="0"
+                                Text="No"
+                                Command="{Binding NoCommand}"
+                                Style="{StaticResource M3SecondaryButtonStyle}"
+                                HorizontalOptions="Fill"/>
+                        <Button Grid.Column="1"
+                                Text="Yes"
+                                Command="{Binding YesCommand}"
+                                Style="{StaticResource M3PrimaryButtonStyle}"
+                                HorizontalOptions="Fill"/>
+                    </Grid>
+                </Grid>
             </VerticalStackLayout>
         </controls:PageScaffold.ActionBarBody>
 
