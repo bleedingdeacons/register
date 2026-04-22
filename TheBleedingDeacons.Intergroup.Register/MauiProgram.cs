@@ -243,12 +243,12 @@ public static class MauiProgram
 		// ── Views ─────────────────────────────────────────────────────
 		builder.Services.AddTransient<MailSettingsPage>();
 		builder.Services.AddSingleton<MainPage>();
-		builder.Services.AddTransient<GroupEditPage>();
-		builder.Services.AddTransient<GroupVerifyPage>();
+		builder.Services.AddTransient<EditGroupPage>();
+		builder.Services.AddTransient<VerifyGroupPage>();
 		builder.Services.AddSingleton<DaySelectionPage>();
 		builder.Services.AddSingleton<TypeSelectionPage>();
 		builder.Services.AddTransient<GroupSelectionPage>();
-		builder.Services.AddTransient<PositionEditPage>();
+		builder.Services.AddTransient<EditPositionPage>();
 		builder.Services.AddTransient<PositionSelectionPage>();
 		builder.Services.AddTransient<DatabaseBackupPage>();
 		builder.Services.AddTransient<EmailStatusPage>();
@@ -275,7 +275,7 @@ public static class MauiProgram
 		builder.Services.AddTransient<BetterStackSettingsViewModel>();
 		builder.Services.AddTransient<AdminViewModel>();
 		builder.Services.AddTransient<VerifyPositionViewModel>();
-		builder.Services.AddTransient<PositionVerifyPage>();
+		builder.Services.AddTransient<VerifyPositionPage>();
 		builder.Services.AddTransient<RegistrationOverviewViewModel>();
 
 #if DEBUG

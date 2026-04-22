@@ -2,11 +2,11 @@ using TheBleedingDeacons.Intergroup.Register.ViewModels;
 
 namespace TheBleedingDeacons.Intergroup.Register.Views;
 
-public partial class GroupEditPage : ContentPage, IQueryAttributable
+public partial class EditGroupPage : ContentPage, IQueryAttributable
 {
 	private readonly EditGroupViewModel _viewModel;
 
-	public GroupEditPage(EditGroupViewModel viewModel)
+	public EditGroupPage(EditGroupViewModel viewModel)
 	{
 		InitializeComponent();
 		_viewModel = viewModel;

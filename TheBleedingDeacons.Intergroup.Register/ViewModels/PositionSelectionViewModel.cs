@@ -75,7 +75,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
             var parameters = new Dictionary<string, object> {
         {"positionId", position.Id.ToString()} };
 
-            await Shell.Current.GoToAsync(nameof(PositionVerifyPage), parameters);
+            await Shell.Current.GoToAsync(nameof(VerifyPositionPage), parameters);
         }
     }
 }

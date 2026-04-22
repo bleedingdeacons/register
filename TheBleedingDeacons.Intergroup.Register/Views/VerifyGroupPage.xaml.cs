@@ -3,11 +3,11 @@ using TheBleedingDeacons.Intergroup.Register.ViewModels;
 
 namespace TheBleedingDeacons.Intergroup.Register.Views;
 
-public partial class GroupVerifyPage : ContentPage, IQueryAttributable
+public partial class VerifyGroupPage : ContentPage, IQueryAttributable
 {
 	private readonly VerifyGroupViewModel _viewModel;
 
-	public GroupVerifyPage(VerifyGroupViewModel viewModel)
+	public VerifyGroupPage(VerifyGroupViewModel viewModel)
 	{
 		InitializeComponent();
 		_viewModel = viewModel;
@@ -26,13 +26,13 @@ public partial class GroupVerifyPage : ContentPage, IQueryAttributable
 	{
 		base.OnAppearing();
 
-		System.Diagnostics.Debug.WriteLine("=== GroupVerifyPage OnAppearing ===");
+		System.Diagnostics.Debug.WriteLine("=== VerifyGroupPage OnAppearing ===");
 		System.Diagnostics.Debug.WriteLine($"Group is null: {_viewModel.Group == null}");
 		System.Diagnostics.Debug.WriteLine($"CanRegister: {_viewModel.CanRegister}");
 
 		// Prime scroll chevron visibility — the Scrolled event won't fire on
 		// first layout, so we refresh manually here and whenever the collection
-		// changes. Mirrors GroupEditPage.
+		// changes. Mirrors EditGroupPage.
 		_viewModel.ActiveGsrs.CollectionChanged += OnActiveGsrsChanged;
 		RefreshScrollChevronsDeferred();
 	}
@@ -44,7 +44,7 @@ public partial class GroupVerifyPage : ContentPage, IQueryAttributable
 	}
 
 	// ─── Horizontal scroll chevrons ────────────────────────────────────
-	// Same pattern as GroupEditPage. XAML-wired handlers must use
+	// Same pattern as EditGroupPage. XAML-wired handlers must use
 	// non-nullable `object` sender or the XAML compiler rejects them with XC0002.
 
 	private int _activeGsrsFirstVisibleIndex;

@@ -195,7 +195,7 @@ public partial class VerifyGroupViewModel : BaseViewModel
 
 		await ShowFeedback();
 
-		await Shell.Current.GoToAsync(nameof(GroupEditPage), parameters);
+		await Shell.Current.GoToAsync(nameof(EditGroupPage), parameters);
 	}
 
 	/// <summary>

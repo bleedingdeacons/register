@@ -175,7 +175,7 @@ public partial class VerifyPositionViewModel : BaseViewModel
 			["position"] = Position
 		};
 
-		await Shell.Current.GoToAsync(nameof(PositionEditPage), parameters);
+		await Shell.Current.GoToAsync(nameof(EditPositionPage), parameters);
 	}
 
 	/// <summary>

@@ -3,11 +3,11 @@ using TheBleedingDeacons.Intergroup.Register.ViewModels;
 
 namespace TheBleedingDeacons.Intergroup.Register.Views;
 
-public partial class PositionVerifyPage : ContentPage, IQueryAttributable
+public partial class VerifyPositionPage : ContentPage, IQueryAttributable
 {
 	private readonly VerifyPositionViewModel _viewModel;
 
-	public PositionVerifyPage(VerifyPositionViewModel viewModel)
+	public VerifyPositionPage(VerifyPositionViewModel viewModel)
 	{
 		InitializeComponent();
 		_viewModel = viewModel;
@@ -26,11 +26,11 @@ public partial class PositionVerifyPage : ContentPage, IQueryAttributable
 	{
 		base.OnAppearing();
 
-		System.Diagnostics.Debug.WriteLine("=== PositionVerifyPage OnAppearing ===");
+		System.Diagnostics.Debug.WriteLine("=== VerifyPositionPage OnAppearing ===");
 		System.Diagnostics.Debug.WriteLine($"Position is null: {_viewModel.Position == null}");
 		System.Diagnostics.Debug.WriteLine($"CanRegister: {_viewModel.CanRegister}");
 
-		// Prime scroll chevron visibility. See GroupEditPage for the rationale.
+		// Prime scroll chevron visibility. See EditGroupPage for the rationale.
 		_viewModel.ActiveHolders.CollectionChanged += OnActiveHoldersChanged;
 		RefreshScrollChevronsDeferred();
 	}
@@ -42,7 +42,7 @@ public partial class PositionVerifyPage : ContentPage, IQueryAttributable
 	}
 
 	// ─── Horizontal scroll chevrons ────────────────────────────────────
-	// Same pattern as GroupEditPage / GroupVerifyPage.
+	// Same pattern as EditGroupPage / VerifyGroupPage.
 
 	private int _activeHoldersFirstVisibleIndex;
 
@@ -105,7 +105,7 @@ public partial class PositionVerifyPage : ContentPage, IQueryAttributable
 	}
 
 	// ─── Review (hold-to-reveal) ───────────────────────────────────────
-	// See GroupVerifyPage for the same pattern — the Review button lives inside
+	// See VerifyGroupPage for the same pattern — the Review button lives inside
 	// a DataTemplate so we walk up from the sender to find the card's reveal labels.
 
 	private void OnReviewPressed(object sender, EventArgs e) => SetRevealState(sender, reveal: true);

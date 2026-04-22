@@ -26,7 +26,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels;
 /// automatically with no duplicated logic here.
 ///
 /// Editing is handled by navigating to the existing
-/// <see cref="GroupVerifyPage"/> / <see cref="PositionVerifyPage"/>,
+/// <see cref="VerifyGroupPage"/> / <see cref="VerifyPositionPage"/>,
 /// which in turn allow jumping into the edit flow. This keeps a single
 /// source of truth for validation and edit UX.
 /// </summary>
@@ -274,13 +274,13 @@ public partial class RegistrationOverviewViewModel : BaseViewModel
 	private static Task NavigateToGroupVerify(int groupId)
 	{
 		var parameters = new Dictionary<string, object> { { "groupId", groupId.ToString() } };
-		return Shell.Current.GoToAsync(nameof(GroupVerifyPage), parameters);
+		return Shell.Current.GoToAsync(nameof(VerifyGroupPage), parameters);
 	}
 
 	private static Task NavigateToPositionVerify(int positionId)
 	{
 		var parameters = new Dictionary<string, object> { { "positionId", positionId.ToString() } };
-		return Shell.Current.GoToAsync(nameof(PositionVerifyPage), parameters);
+		return Shell.Current.GoToAsync(nameof(VerifyPositionPage), parameters);
 	}
 }
 
