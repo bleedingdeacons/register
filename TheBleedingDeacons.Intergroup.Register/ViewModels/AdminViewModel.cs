@@ -316,10 +316,17 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 
 		/// <summary>
 		/// Purges all data from the local database and resets the session.
+		/// Only available once the current meeting has been finished.
 		/// </summary>
 		[RelayCommand]
 		private async Task PurgeDatabase()
 		{
+			if (Phase != MeetingPhase.Completed)
+			{
+				Logger.Warning("PurgeDatabase rejected — phase is {Phase}, expected Completed", Phase);
+				return;
+			}
+
 			bool confirmed = await Shell.Current.DisplayAlert(
 				"Purge Database",
 				"This will permanently delete ALL local data including groups, members, meetings, positions, and snapshots.\n\nThis action cannot be undone. Are you sure?",
@@ -360,16 +367,23 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 				var config = await _configService.LoadUnityConfigurationAsync();
 				if (config.ActiveIntergroupMeetingId.HasValue)
 				{
-					ActiveMeetingId = config.ActiveIntergroupMeetingId;
-
 					var meeting = await _intergroupMeetingRepository
 						.GetByIdAsync(config.ActiveIntergroupMeetingId.Value, Token);
 
 					if (meeting != null)
 					{
+						ActiveMeetingId = config.ActiveIntergroupMeetingId;
 						UpdateActiveMeetingDisplay(meeting);
 						Phase = MeetingPhase.InProgress;
 						Logger.Information("Restored active meeting session: {Id}", meeting.Id);
+					}
+					else
+					{
+						// Meeting ID in SecureStorage is stale (DB was cleared) — clean up
+						await _configService.SaveActiveIntergroupMeetingAsync(null);
+						Logger.Information(
+							"Cleared stale active meeting ID {Id} — meeting no longer in database",
+							config.ActiveIntergroupMeetingId.Value);
 					}
 				}
 			}
