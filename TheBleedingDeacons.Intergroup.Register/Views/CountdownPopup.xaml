@@ -1,51 +1,55 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<toolkit:Popup xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-               xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-               xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
-               xmlns:vm="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
-               x:Class="TheBleedingDeacons.Intergroup.Register.Views.CountdownPopup"
-               x:DataType="vm:CountdownPopupViewModel"
-               CanBeDismissedByTappingOutsideOfPopup="True">
+<toolkit:Popup
+    x:Class="TheBleedingDeacons.Intergroup.Register.Views.CountdownPopup"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+    xmlns:vm="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
+    x:DataType="vm:CountdownPopupViewModel"
+    BackgroundColor="Transparent"
+    CanBeDismissedByTappingOutsideOfPopup="True">
 
-    <Border x:DataType="vm:CountdownPopupViewModel"
-            BackgroundColor="White"
-            Stroke="LightGray"
-            StrokeThickness="1"
-            WidthRequest="640"
-            HeightRequest="400">
-        <Border.StrokeShape>
-            <RoundRectangle CornerRadius="12"/>
-        </Border.StrokeShape>
+    <Border
+        x:DataType="vm:CountdownPopupViewModel"
+        HeightRequest="400"
+        Style="{StaticResource M3CardStyle}"
+        WidthRequest="640">
 
-        <StackLayout Padding="60" Spacing="30">
+        <VerticalStackLayout
+            Padding="32"
+            Spacing="24"
+            VerticalOptions="Center">
 
-            <!-- Title -->
-            <Label Text="{Binding Title}"
-                   FontSize="48"
-                   FontAttributes="Bold"
-                   HorizontalOptions="Center"
-                   TextColor="Black"/>
+            <!--  Title  -->
+            <Label
+                FontAttributes="Bold"
+                FontSize="32"
+                HorizontalOptions="Center"
+                HorizontalTextAlignment="Center"
+                LineBreakMode="WordWrap"
+                Text="{Binding Title}"
+                TextColor="{AppThemeBinding Light={StaticResource Gray900},
+                                            Dark={StaticResource Gray100}}" />
 
-            <!-- Message -->
-            <Label Text="{Binding Message}"
-                   FontSize="24"
-                   FontAttributes="Bold"
-                   HorizontalOptions="Center"
-                   HorizontalTextAlignment="Center"
-                   VerticalTextAlignment="Center"
-                   LineBreakMode="WordWrap"
-                   Padding="20"/>
+            <!--  Message  -->
+            <Label
+                FontSize="18"
+                HorizontalOptions="Center"
+                HorizontalTextAlignment="Center"
+                LineBreakMode="WordWrap"
+                Text="{Binding Message}"
+                TextColor="{AppThemeBinding Light={StaticResource Gray900},
+                                            Dark={StaticResource Gray100}}"
+                VerticalTextAlignment="Center" />
 
-            <!-- Next Button -->
-            <Button Text="{Binding NextButtonText}"
-                    Command="{Binding NavigateAndCloseCommand}"
-                    BackgroundColor="#007ACC"
-                    TextColor="White"
-                    WidthRequest="360"
-                    HeightRequest="72"
-                    FontSize="24"
-                    HorizontalOptions="Center"/>
+            <!--  Next Button  -->
+            <Button
+                Command="{Binding NavigateAndCloseCommand}"
+                HorizontalOptions="Center"
+                Style="{StaticResource M3PrimaryButtonStyle}"
+                Text="{Binding NextButtonText}"
+                WidthRequest="360" />
 
-        </StackLayout>
+        </VerticalStackLayout>
     </Border>
 </toolkit:Popup>

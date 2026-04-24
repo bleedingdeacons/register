@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Support;
 using TheBleedingDeacons.Intergroup.Register.Views;
-using TheBleedingDeacons.Unity.Intergroup.Repositories.Interfaces;
 
 namespace TheBleedingDeacons.Intergroup.Register.ViewModels;
 
@@ -13,10 +12,9 @@ public partial class MainPageViewModel : BaseViewModel
 {
 	private static readonly ILogger Logger = AppLogger.ForContext<MainPageViewModel>();
 
-	private const string BaseTitle = "Intergroup Registration";
+	private const string BaseTitle = "Intergroup Attendance Register";
 
 	private readonly IConfigurationService _configService;
-	private readonly IIntergroupMeetingRepository _intergroupMeetingRepository;
 
 	[ObservableProperty]
 	[NotifyPropertyChangedFor(nameof(IsButtonsEnabled))]
@@ -30,22 +28,12 @@ public partial class MainPageViewModel : BaseViewModel
 	[ObservableProperty]
 	public string appVersion;
 
-	public MainPageViewModel(IConfigurationService configService, IIntergroupMeetingRepository intergroupMeetingRepository)
+	public MainPageViewModel(IConfigurationService configService)
 	{
 		_configService = configService;
-		_intergroupMeetingRepository = intergroupMeetingRepository;
 		Title = BaseTitle;
 
-		if (DeviceInfo.Platform == DevicePlatform.WinUI)
-		{
-			AppVersion = System.Diagnostics.FileVersionInfo
-				.GetVersionInfo(System.Environment.ProcessPath!)
-				.FileVersion ?? AppInfo.VersionString;
-		}
-		else
-		{
-			AppVersion = AppInfo.VersionString;
-		}
+		AppVersion = MauiProgram.AppVersion();
 	}
 
 	// Called each time the page appears so meeting state refreshes.
@@ -57,31 +45,7 @@ public partial class MainPageViewModel : BaseViewModel
 	public async Task RefreshMeetingStateAsync()
 	{
 		var config = await _configService.LoadUnityConfigurationAsync();
-
-		if (config.ActiveIntergroupMeetingId.HasValue)
-		{
-			// Verify the meeting still exists in the database
-			var meeting = await _intergroupMeetingRepository
-				.GetByIdAsync(config.ActiveIntergroupMeetingId.Value);
-
-			if (meeting != null)
-			{
-				IsMeetingSelected = true;
-			}
-			else
-			{
-				// Meeting ID in SecureStorage is stale (DB was cleared) — clean up
-				await _configService.SaveActiveIntergroupMeetingAsync(null);
-				IsMeetingSelected = false;
-				Logger.Information("Cleared stale active meeting ID {Id} — meeting no longer in database",
-					config.ActiveIntergroupMeetingId.Value);
-			}
-		}
-		else
-		{
-			IsMeetingSelected = false;
-		}
-
+		IsMeetingSelected = config.ActiveIntergroupMeetingId.HasValue;
 		OnPropertyChanged(nameof(IsButtonsEnabled));
 	}
 

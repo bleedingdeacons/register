@@ -126,6 +126,6 @@ public partial class GroupSelectionViewModel : BaseViewModel
         var parameters = new Dictionary<string, object> {
             {"groupId", group.Id.ToString()} };
 
-        await Shell.Current.GoToAsync(nameof(GroupVerifyPage), parameters);
+        await Shell.Current.GoToAsync(nameof(VerifyGroupPage), parameters);
     }
 }

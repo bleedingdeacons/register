@@ -606,6 +606,181 @@
 
 
     <!-- ══════════════════════════════════════════════════════════════════
+         Material 3 — elevation shadows
+         Used by:  M3CardStyle, M3ListItemCardStyle, M3PrimaryButtonStyle,
+                   ActionBar (in PageScaffold), Fab
+         See DESIGN_SPEC.md §2 (Elevation) before changing these values.
+         ══════════════════════════════════════════════════════════════════ -->
+    <Shadow x:Key="M3Elevation1"
+            Brush="Black"
+            Opacity="0.10"
+            Radius="3"
+            Offset="0,1"/>
+
+    <Shadow x:Key="M3Elevation2"
+            Brush="Black"
+            Opacity="0.18"
+            Radius="10"
+            Offset="0,4"/>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         Material 3 — cards
+         ══════════════════════════════════════════════════════════════════ -->
+
+    <!-- Base card: white surface, soft elevation-1 shadow, rounded 12 -->
+    <Style x:Key="M3CardStyle" TargetType="Border">
+        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource Surface}, Dark={StaticResource Gray900}}"/>
+        <Setter Property="Stroke" Value="Transparent"/>
+        <Setter Property="StrokeThickness" Value="0"/>
+        <Setter Property="StrokeShape" Value="RoundRectangle 12"/>
+        <Setter Property="Padding" Value="16"/>
+        <Setter Property="Margin" Value="0,0,0,12"/>
+        <Setter Property="Shadow" Value="{StaticResource M3Elevation1}"/>
+    </Style>
+
+    <!-- List row card: same surface, slightly smaller margin so the list is dense -->
+    <Style x:Key="M3ListItemCardStyle" TargetType="Border" BasedOn="{StaticResource M3CardStyle}">
+        <Setter Property="Padding" Value="16,14"/>
+        <Setter Property="Margin" Value="0,0,0,8"/>
+        <Setter Property="MinimumHeightRequest" Value="64"/>
+    </Style>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         Material 3 — filled primary button
+         Replaces the heavy-shadow + white-border PrimaryButtonStyle for
+         new pages. Height 56, pill corner, elevation 2.
+         ══════════════════════════════════════════════════════════════════ -->
+    <Style x:Key="M3PrimaryButtonStyle" TargetType="Button">
+        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"/>
+        <Setter Property="TextColor" Value="White"/>
+        <Setter Property="FontFamily" Value="OpenSansRegular"/>
+        <Setter Property="FontSize" Value="16"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
+        <Setter Property="CornerRadius" Value="20"/>
+        <Setter Property="Padding" Value="24,0"/>
+        <Setter Property="HeightRequest" Value="56"/>
+        <Setter Property="MinimumHeightRequest" Value="48"/>
+        <Setter Property="BorderWidth" Value="0"/>
+        <Setter Property="Shadow" Value="{StaticResource M3Elevation2}"/>
+        <Setter Property="VisualStateManager.VisualStateGroups">
+            <VisualStateGroupList>
+                <VisualStateGroup x:Name="CommonStates">
+                    <VisualState x:Name="Normal"/>
+                    <VisualState x:Name="Pressed">
+                        <VisualState.Setters>
+                            <Setter Property="Opacity" Value="0.85"/>
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="Disabled">
+                        <VisualState.Setters>
+                            <!--
+                                Material 3 disabled button: flat surface-variant fill,
+                                muted on-surface text, no shadow. Explicit colour setters
+                                are required because Opacity on Button.Disabled is
+                                unreliable on Android — logically-disabled buttons stay
+                                visually "enabled blue" without the explicit overrides.
+
+                                Gray50/Gray800 sits lighter than M3SecondaryButton's
+                                enabled Gray100/Gray800 fill so the disabled secondary
+                                still reads as more recessed than its enabled state,
+                                while the primary button goes from vivid blue to a
+                                clearly inert pale surface.
+                            -->
+                            <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource Gray50}, Dark={StaticResource Gray800}}"/>
+                            <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Gray400}, Dark={StaticResource Gray500}}"/>
+                            <Setter Property="Opacity" Value="1"/>
+                            <Setter Property="Shadow" Value="{x:Null}"/>
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateGroupList>
+        </Setter>
+    </Style>
+
+    <!-- Tonal / secondary — same shape, filled tertiary surface -->
+    <Style x:Key="M3SecondaryButtonStyle" TargetType="Button" BasedOn="{StaticResource M3PrimaryButtonStyle}">
+        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray800}}"/>
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"/>
+        <Setter Property="Shadow" Value="{x:Null}"/>
+    </Style>
+
+    <!-- Flat text button: for "Details" in list rows, "Cancel" in dialogs -->
+    <Style x:Key="M3TextButtonStyle" TargetType="Button">
+        <Setter Property="BackgroundColor" Value="Transparent"/>
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"/>
+        <Setter Property="FontFamily" Value="OpenSansRegular"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
+        <Setter Property="Padding" Value="12,6"/>
+        <Setter Property="HeightRequest" Value="36"/>
+        <Setter Property="CornerRadius" Value="18"/>
+        <Setter Property="BorderWidth" Value="0"/>
+    </Style>
+
+    <!-- Large tile button for MainPage / TypeSelection / DaySelection -->
+    <Style x:Key="M3TileButtonStyle" TargetType="Button" BasedOn="{StaticResource M3PrimaryButtonStyle}">
+        <Setter Property="FontSize" Value="20"/>
+        <Setter Property="CornerRadius" Value="16"/>
+        <Setter Property="Padding" Value="16,12"/>
+    </Style>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         Material 3 — Registered chip (success pill)
+         ══════════════════════════════════════════════════════════════════ -->
+    <Style x:Key="M3RegisteredChipStyle" TargetType="Border">
+        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource SuccessBanner}, Dark={StaticResource SuccessBannerDim}}"/>
+        <Setter Property="Stroke" Value="Transparent"/>
+        <Setter Property="StrokeThickness" Value="0"/>
+        <Setter Property="StrokeShape" Value="RoundRectangle 10"/>
+        <Setter Property="Padding" Value="10,4"/>
+        <Setter Property="HorizontalOptions" Value="Start"/>
+        <Setter Property="VerticalOptions" Value="Center"/>
+    </Style>
+
+    <Style x:Key="M3RegisteredChipLabelStyle" TargetType="Label">
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource SuccessText}, Dark={StaticResource SuccessTextDim}}"/>
+    </Style>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         Material 3 — Empty state
+         ══════════════════════════════════════════════════════════════════ -->
+    <Style x:Key="M3EmptyStateIconStyle" TargetType="Label">
+        <Setter Property="FontSize" Value="56"/>
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}"/>
+        <Setter Property="HorizontalOptions" Value="Center"/>
+    </Style>
+
+    <Style x:Key="M3EmptyStateTitleStyle" TargetType="Label">
+        <Setter Property="FontSize" Value="20"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource Gray400}}"/>
+        <Setter Property="HorizontalOptions" Value="Center"/>
+        <Setter Property="Margin" Value="0,16,0,4"/>
+    </Style>
+
+    <Style x:Key="M3EmptyStateSubtitleStyle" TargetType="Label">
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Gray400}, Dark={StaticResource Gray500}}"/>
+        <Setter Property="HorizontalOptions" Value="Center"/>
+        <Setter Property="HorizontalTextAlignment" Value="Center"/>
+    </Style>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         Material 3 — Tab bar (Registration Overview)
+         ══════════════════════════════════════════════════════════════════ -->
+    <Style x:Key="M3TabButtonStyle" TargetType="Button">
+        <Setter Property="BackgroundColor" Value="Transparent"/>
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}"/>
+        <Setter Property="FontSize" Value="15"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
+        <Setter Property="CornerRadius" Value="0"/>
+        <Setter Property="HeightRequest" Value="48"/>
+        <Setter Property="BorderWidth" Value="0"/>
+    </Style>
+
+    <!-- ══════════════════════════════════════════════════════════════════
          Converters (global — pages no longer need per-page declarations)
          ══════════════════════════════════════════════════════════════════ -->
 

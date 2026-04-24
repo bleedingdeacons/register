@@ -2,11 +2,12 @@ using TheBleedingDeacons.Intergroup.Register.ViewModels;
 
 namespace TheBleedingDeacons.Intergroup.Register.Views;
 
-public partial class GroupEditPage : ContentPage, IQueryAttributable
+public partial class EditPositionPage : ContentPage, IQueryAttributable
 {
-    private readonly EditGroupViewModel _viewModel;
+    private readonly PositionEditViewModel _viewModel;
 
-    public GroupEditPage(EditGroupViewModel viewModel)
+    public EditPositionPage(PositionEditViewModel viewModel)
+
     {
         InitializeComponent();
         _viewModel = viewModel;
@@ -27,7 +28,7 @@ public partial class GroupEditPage : ContentPage, IQueryAttributable
 
     protected override bool OnBackButtonPressed()
     {
-        if (BindingContext is EditGroupViewModel viewModel)
+        if (BindingContext is PositionEditViewModel viewModel)
         {
             viewModel.DoneCommand.Execute(null);
             return true;

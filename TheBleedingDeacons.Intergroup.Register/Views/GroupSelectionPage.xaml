@@ -1,117 +1,123 @@
-<?xml version="1.0" encoding="utf-8" ?>
-<ContentPage x:Class="TheBleedingDeacons.Intergroup.Register.Views.GroupSelectionPage"
-             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             xmlns:vm="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
-             xmlns:entities="clr-namespace:TheBleedingDeacons.Unity.Intergroup.Entities;assembly=TheBleedingDeacons.Unity.Intergroup"
-             x:DataType="vm:GroupSelectionViewModel"
-             Title="{Binding Title}">
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="TheBleedingDeacons.Intergroup.Register.Views.GroupSelectionPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:controls="clr-namespace:TheBleedingDeacons.Intergroup.Register.Controls"
+    xmlns:entities="clr-namespace:TheBleedingDeacons.Unity.Intergroup.Entities;assembly=TheBleedingDeacons.Unity.Intergroup"
+    xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+    xmlns:vm="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
+    Title="{Binding Title}"
+    x:DataType="vm:GroupSelectionViewModel">
 
-    <Grid>
-        <!-- Main content - hidden while loading -->
-        <Grid RowDefinitions="*" IsVisible="{Binding IsDataLoaded}" Margin="10">
+    <ContentPage.Behaviors>
+        <toolkit:StatusBarBehavior StatusBarColor="{AppThemeBinding Light=White, Dark=Black}" StatusBarStyle="{AppThemeBinding Light=DarkContent, Dark=LightContent}" />
+    </ContentPage.Behaviors>
 
-            <!-- Groups list -->
-            <CollectionView ItemsSource="{Binding Groups}"
-                           SelectionMode="None">
+    <controls:PageScaffold
+        BusyMessage="Finding groups..."
+        ContentPadding="0"
+        IsBusy="{Binding IsLoading}">
+        <controls:PageScaffold.ContentBody>
+            <CollectionView
+                IsVisible="{Binding IsDataLoaded}"
+                ItemsSource="{Binding Groups}"
+                SelectionMode="None">
+
                 <CollectionView.ItemsLayout>
-                    <LinearItemsLayout Orientation="Vertical" ItemSpacing="5" />
+                    <LinearItemsLayout ItemSpacing="8" Orientation="Vertical" />
                 </CollectionView.ItemsLayout>
+
+                <CollectionView.Header>
+                    <Grid HeightRequest="8" />
+                </CollectionView.Header>
+
+                <CollectionView.Footer>
+                    <Grid HeightRequest="16" />
+                </CollectionView.Footer>
+
                 <CollectionView.ItemTemplate>
                     <DataTemplate x:DataType="entities:Group">
-                        <Border StrokeShape="RoundRectangle 15"
-                Stroke="#80FFFFFF"
-                StrokeThickness="1"
-                BackgroundColor="#0071BB"
-                Margin="15,5">
-
-                            <Border.Shadow>
-                                <Shadow Brush="Black"
-                        Opacity="0.25"
-                        Radius="12"
-                        Offset="0,6" />
-                            </Border.Shadow>
+                        <Border
+                            Margin="16,0,16,16"
+                            HorizontalOptions="Center"
+                            MaximumWidthRequest="560"
+                            Style="{StaticResource M3ListItemCardStyle}"
+                            WidthRequest="560">
 
                             <Border.GestureRecognizers>
-                                <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type vm:GroupSelectionViewModel}}, Path=SelectGroupCommand}"
-                                     CommandParameter="{Binding .}" />
+                                <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type vm:GroupSelectionViewModel}}, Path=SelectGroupCommand}" CommandParameter="{Binding .}" />
                             </Border.GestureRecognizers>
 
-                            <Grid Padding="14,10"
-                  RowDefinitions="Auto,Auto"
-                  ColumnDefinitions="Auto,*,Auto">
+                            <Grid
+                                ColumnDefinitions="24,*,Auto,Auto"
+                                ColumnSpacing="12"
+                                RowDefinitions="Auto,Auto">
 
-                                <!-- Registered indicator -->
-                                <Label Grid.Row="0" Grid.RowSpan="2" Grid.Column="0"
-                       Text="✓"
-                       FontSize="28"
-                       FontAttributes="Bold"
-                       TextColor="#A5D6A7"
-                       VerticalOptions="Center"
-                       Margin="0,0,12,0"
-                       IsVisible="{Binding Registered}" />
+                                <!--  Leading registered tick  -->
+                                <Label
+                                    Grid.Row="0"
+                                    Grid.RowSpan="2"
+                                    Grid.Column="0"
+                                    FontAttributes="Bold"
+                                    FontSize="22"
+                                    HorizontalTextAlignment="Center"
+                                    IsVisible="{Binding Registered}"
+                                    Text="✓"
+                                    TextColor="{AppThemeBinding Light={StaticResource SuccessAccent},
+                                                                Dark={StaticResource SuccessAccentDim}}"
+                                    VerticalOptions="Center" />
+                                <!--  Group name  -->
+                                <Label
+                                    Grid.Row="0"
+                                    Grid.Column="1"
+                                    FontAttributes="Bold"
+                                    FontSize="17"
+                                    LineBreakMode="TailTruncation"
+                                    Text="{Binding Name}"
+                                    TextColor="{AppThemeBinding Light={StaticResource Gray900},
+                                                                Dark={StaticResource Gray100}}"
+                                    VerticalOptions="Center" />
 
-                                <!-- Group Name -->
-                                <Label Grid.Row="0" Grid.Column="1"
-                       Text="{Binding Name}"
-                       FontFamily="OpenSansRegular"
-                       FontSize="24"
-                       FontAttributes="Bold"
-                       TextColor="White"
-                       VerticalOptions="Center" />
+                                <!--  Registered chip  -->
+                                <Border
+                                    Grid.Row="1"
+                                    Grid.Column="1"
+                                    Margin="0,4,0,0"
+                                    IsVisible="{Binding Registered}"
+                                    Style="{StaticResource M3RegisteredChipStyle}">
+                                    <Label Style="{StaticResource M3RegisteredChipLabelStyle}" Text="Registered" />
+                                </Border>
 
-                                <!-- Registered status text -->
-                                <Label Grid.Row="1" Grid.Column="1"
-                       Text="Registered"
-                       FontSize="14"
-                       FontAttributes="Bold"
-                       TextColor="#C8E6C9"
-                       IsVisible="{Binding Registered}" />
-
-                                <!-- Arrow indicator -->
-                                <Label Grid.Row="0" Grid.RowSpan="2" Grid.Column="2"
-                       Text="›"
-                       FontSize="32"
-                       FontAttributes="Bold"
-                       TextColor="White"
-                       VerticalOptions="Center" />
-
+                                <!--  Trailing chevron  -->
+                                <Label
+                                    Grid.Row="0"
+                                    Grid.RowSpan="2"
+                                    Grid.Column="3"
+                                    FontSize="28"
+                                    Text="›"
+                                    TextColor="{AppThemeBinding Light={StaticResource Gray400},
+                                                                Dark={StaticResource Gray500}}"
+                                    VerticalOptions="Center" />
                             </Grid>
                         </Border>
                     </DataTemplate>
                 </CollectionView.ItemTemplate>
 
-                <!-- Empty state -->
                 <CollectionView.EmptyView>
-                    <StackLayout Padding="40"
-                                VerticalOptions="Center"
-                                HorizontalOptions="Center">
-                        <Label Text="No groups found for this day and type."
-                               FontSize="18"
-                               HorizontalOptions="Center"
-                               HorizontalTextAlignment="Center"
-                               TextColor="{StaticResource Gray500}" />
-                    </StackLayout>
+                    <VerticalStackLayout
+                        Padding="40,60"
+                        HorizontalOptions="Center"
+                        Spacing="0"
+                        VerticalOptions="Center">
+                        <Label Style="{StaticResource M3EmptyStateIconStyle}" Text="👥" />
+                        <Label Style="{StaticResource M3EmptyStateTitleStyle}" Text="No groups found" />
+                        <Label Style="{StaticResource M3EmptyStateSubtitleStyle}" Text="No groups for this day and meeting type." />
+                    </VerticalStackLayout>
                 </CollectionView.EmptyView>
 
             </CollectionView>
-
-        </Grid>
-
-        <!-- Loading indicator - centered and visible while loading -->
-        <StackLayout IsVisible="{Binding IsLoading}"
-                     VerticalOptions="CenterAndExpand"
-                     HorizontalOptions="CenterAndExpand">
-            <ActivityIndicator IsRunning="{Binding IsLoading}"
-                              Color="{StaticResource Primary}"
-                              Scale="1.5" />
-            <Label Text="Finding groups..."
-                   HorizontalOptions="Center"
-                   Margin="0,20,0,0"
-                   FontSize="16"
-                   TextColor="{StaticResource Gray600}" />
-        </StackLayout>
-
-    </Grid>
+        </controls:PageScaffold.ContentBody>
+    </controls:PageScaffold>
 
 </ContentPage>

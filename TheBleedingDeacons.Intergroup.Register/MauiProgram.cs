@@ -27,11 +27,11 @@ public static class MauiProgram
 	public const string UNITY_DATABASE_NAME = "unity.db";
 	public const string MAIL_DATABASE_NAME = "emails.db";
 
-	// Resolved once in SetupSerilog.
-	private const string DefaultAppName = "Badi";
-	private const string DefaultEnvironment = "Development";
-	private static string _resolvedAppName = DefaultAppName;
-	private static string _resolvedEnvironment = DefaultEnvironment;
+	//// Resolved once in SetupSerilog.
+	//private const string DefaultAppName = "Badi";
+	//private const string DefaultEnvironment = "Development";
+	//private static string _resolvedAppName = DefaultAppName;
+	//private static string _resolvedEnvironment = DefaultEnvironment;
 
 	// Factory that produces a fresh base-logger configuration (file/console/debug
 	// sinks + enrichers). Captured during SetupSerilog so BetterStackLoggerController
@@ -124,19 +124,32 @@ public static class MauiProgram
 
 		// --- HttpClient ---
 		//
-		// Register a single HttpClient built on the PLATFORM-NATIVE HTTP handler.
-		// This is critical: some shared-hosting edge WAFs fingerprint TLS (JA3/JA4)
-		// and block .NET's managed SocketsHttpHandler while allowing requests from
-		// the platform's native HTTP stack (the same stack the system browser uses).
+		// Two singletons:
 		//
-		//   Windows       → WinHttpHandler         (schannel / WinHTTP)
-		//   Android       → AndroidMessageHandler  (OkHttp)
-		//   iOS / MacCat  → NSUrlSessionHandler    (NSURLSession)
-		//   Other         → HttpClientHandler      (managed fallback)
+		//  1. The DEFAULT client (unkeyed) — platform-native handler. Used for
+		//     Unity API traffic and anything else that goes through the same WAF.
+		//     Some shared-hosting edge WAFs fingerprint TLS (JA3/JA4) and block
+		//     .NET's managed SocketsHttpHandler while allowing requests from the
+		//     platform's native HTTP stack (the same stack the system browser uses).
 		//
-		// AutomaticDecompression is enabled where supported so every request sends
-		// Accept-Encoding and the response is transparently decompressed.
+		//       Windows       → WinHttpHandler         (schannel / WinHTTP)
+		//       Android       → AndroidMessageHandler  (OkHttp)
+		//       iOS / MacCat  → NSUrlSessionHandler    (NSURLSession)
+		//       Other         → HttpClientHandler      (managed fallback)
+		//
+		//  2. A keyed "betterstack" client — SocketsHttpHandler with an aggressive
+		//     PooledConnectionIdleTimeout. Better Stack isn't behind the fingerprinting
+		//     WAF, so we don't need the native handler there, and WinHttpHandler has
+		//     a known race (dotnet/runtime#22749, #121913) where a pooled keep-alive
+		//     connection closed server-side produces WinHttpException 12152
+		//     "The server returned an invalid or unrecognized response" on the next
+		//     reuse. That fires on CloseAndFlush during app shutdown, because the
+		//     sink has been idle during the edit session and its connection has
+		//     usually timed out server-side by then. Shortening the client-side
+		//     idle timeout below Better Stack's closes the pool first, avoiding
+		//     the race entirely.
 		builder.Services.AddSingleton<HttpClient>(_ => CreateHttpClient());
+		builder.Services.AddKeyedSingleton<HttpClient>("betterstack", (_, _) => CreateBetterStackHttpClient());
 
 		// Better Stack logger controller — rebuilds the Serilog pipeline on
 		// demand when Better Stack settings change. Captures the base-logger
@@ -150,7 +163,7 @@ public static class MauiProgram
 				throw new InvalidOperationException(
 					"Serilog base-logger factory was not captured. SetupSerilog must run before the DI container is built.");
 
-			var httpClient = sp.GetRequiredService<HttpClient>();
+			var httpClient = sp.GetRequiredKeyedService<HttpClient>("betterstack");
 			return new BetterStackLoggerController(_baseLoggerFactory, httpClient);
 		});
 
@@ -229,40 +242,38 @@ public static class MauiProgram
 
 		// ── Views ─────────────────────────────────────────────────────
 		builder.Services.AddTransient<MailSettingsPage>();
-		builder.Services.AddTransient<MainPage>();
-		builder.Services.AddTransient<GroupEditPage>();
-		builder.Services.AddTransient<GroupVerifyPage>();
-		builder.Services.AddTransient<DaySelectionPage>();
-		builder.Services.AddTransient<TypeSelectionPage>();
+		builder.Services.AddSingleton<MainPage>();
+		builder.Services.AddTransient<EditGroupPage>();
+		builder.Services.AddTransient<VerifyGroupPage>();
+		builder.Services.AddSingleton<DaySelectionPage>();
+		builder.Services.AddSingleton<TypeSelectionPage>();
 		builder.Services.AddTransient<GroupSelectionPage>();
-		builder.Services.AddTransient<PositionEditPage>();
+		builder.Services.AddTransient<EditPositionPage>();
 		builder.Services.AddTransient<PositionSelectionPage>();
 		builder.Services.AddTransient<DatabaseBackupPage>();
 		builder.Services.AddTransient<EmailStatusPage>();
 		builder.Services.AddTransient<SettingsPage>();
-		builder.Services.AddTransient<UnitySettingsPage>();
-		builder.Services.AddTransient<BetterStackSettingsPage>();
+		builder.Services.AddTransient<IntegrationsSettingsPage>();		
 		builder.Services.AddTransient<AdminPage>();
 		builder.Services.AddTransient<RegistrationOverviewPage>();
 
 		// ── ViewModels ────────────────────────────────────────────────
 		builder.Services.AddTransient<MailSettingsViewModel>();
-		builder.Services.AddTransient<MainPageViewModel>();
+		builder.Services.AddSingleton<MainPageViewModel>();
 		builder.Services.AddTransient<GroupSelectionViewModel>();
 		builder.Services.AddTransient<EditGroupViewModel>();
 		builder.Services.AddTransient<VerifyGroupViewModel>();
-		builder.Services.AddTransient<TypeSelectionViewModel>();
-		builder.Services.AddTransient<DaySelectionViewModel>();
+		builder.Services.AddSingleton<TypeSelectionViewModel>();
+		builder.Services.AddSingleton<DaySelectionViewModel>();
 		builder.Services.AddTransient<PositionSelectionViewModel>();
 		builder.Services.AddTransient<PositionEditViewModel>();
 		builder.Services.AddTransient<DatabaseBackupViewModel>();
 		builder.Services.AddTransient<EmailStatusViewModel>();
 		builder.Services.AddTransient<SettingsViewModel>();
-		builder.Services.AddTransient<UnitySettingsViewModel>();
-		builder.Services.AddTransient<BetterStackSettingsViewModel>();
+		builder.Services.AddTransient<IntegrationsSettingsViewModel>();		
 		builder.Services.AddTransient<AdminViewModel>();
 		builder.Services.AddTransient<VerifyPositionViewModel>();
-		builder.Services.AddTransient<PositionVerifyPage>();
+		builder.Services.AddTransient<VerifyPositionPage>();
 		builder.Services.AddTransient<RegistrationOverviewViewModel>();
 
 #if DEBUG
@@ -317,13 +328,13 @@ public static class MauiProgram
 		var logPath = Path.Combine(FileSystem.AppDataDirectory, "logs");
 		Directory.CreateDirectory(logPath);
 
-		var appName = builder.Configuration["App:Name"] ?? DefaultAppName;
-		var environment = builder.Configuration["App:Environment"] ?? DefaultEnvironment;
+		var appName = builder.Configuration["App:Name"];
+		var environment = builder.Configuration["App:Environment"];
 
 		// Persist for the Better Stack controller which rebuilds the pipeline
 		// when settings change at runtime — it calls back into the factory below.
-		_resolvedAppName = appName;
-		_resolvedEnvironment = environment;
+		//_resolvedAppName = appName;
+		//_resolvedEnvironment = environment;
 
 		// Capture the base-logger factory so the Better Stack controller can
 		// rebuild a fresh pipeline on demand. We capture `builder.Configuration`
@@ -396,31 +407,65 @@ public static class MauiProgram
 
 	private static void RegisterGlobalExceptionHandlers()
 	{
+		// Logging from a crash path must itself be crash-proof. If Log.Fatal
+		// throws (e.g. the pipeline is already disposed, or an enricher faults
+		// on this specific exception), we must not replace the original crash
+		// with a logger crash. Belt and braces: Serilog already swallows most
+		// internal errors to SelfLog, but this is a crash path — defence in
+		// depth is essentially free.
+
 		// .NET unhandled exceptions — background threads, async void, etc.
 		AppDomain.CurrentDomain.UnhandledException += (_, args) =>
 		{
-			if (args.ExceptionObject is Exception ex)
-				Log.Fatal(ex, "Unhandled AppDomain exception (IsTerminating={IsTerminating})", args.IsTerminating);
-			else
-				Log.Fatal("Unhandled AppDomain exception: {ExceptionObject}", args.ExceptionObject);
+			try
+			{
+				if (args.ExceptionObject is Exception ex)
+					Log.Fatal(ex, "Unhandled AppDomain exception (IsTerminating={IsTerminating})", args.IsTerminating);
+				else
+					Log.Fatal("Unhandled AppDomain exception: {ExceptionObject}", args.ExceptionObject);
+			}
+			catch { /* never throw from a crash handler */ }
 
-			Log.CloseAndFlush();
+			TryFlushLogs();
 		};
 
 		// Unobserved Task exceptions — app usually survives, so log but don't close
 		TaskScheduler.UnobservedTaskException += (_, args) =>
 		{
-			Log.Error(args.Exception, "Unobserved task exception");
+			try { Log.Error(args.Exception, "Unobserved task exception"); }
+			catch { /* never throw from a crash handler */ }
 		};
 
 #if ANDROID
 		// Android-specific: Java-side unhandled exceptions bridged into .NET
 		Android.Runtime.AndroidEnvironment.UnhandledExceptionRaiser += (_, args) =>
 		{
-			Log.Fatal(args.Exception, "Unhandled Android exception");
-			Log.CloseAndFlush();
+			try { Log.Fatal(args.Exception, "Unhandled Android exception"); }
+			catch { /* never throw from a crash handler */ }
+
+			TryFlushLogs();
 		};
 #endif
+	}
+
+	/// <summary>
+	/// Close and flush all Serilog sinks with a bounded wait, never throwing.
+	/// <c>Log.CloseAndFlush()</c> is synchronous and has no timeout; if the
+	/// durable HTTP sink's final POST is slow or the endpoint is unreachable,
+	/// it can block shutdown for up to <see cref="HttpClient.Timeout"/>. Anything
+	/// still on disk after the cap will ship on the next process launch — that's
+	/// the durable sink's entire purpose.
+	/// </summary>
+	internal static void TryFlushLogs(TimeSpan? timeout = null)
+	{
+		try
+		{
+			Task.Run(() => Log.CloseAndFlush()).Wait(timeout ?? TimeSpan.FromSeconds(5));
+		}
+		catch
+		{
+			// Never throw from a shutdown / crash path.
+		}
 	}
 
 	/// <summary>
@@ -465,5 +510,60 @@ public static class MauiProgram
 		{
 			Timeout = TimeSpan.FromSeconds(100),
 		};
+	}
+
+	/// <summary>
+	/// Creates the HttpClient used exclusively by the Better Stack log sink.
+	/// Unlike <see cref="CreateHttpClient"/>, this uses the managed
+	/// <see cref="SocketsHttpHandler"/> on every platform — Better Stack's
+	/// ingest endpoint isn't behind the TLS-fingerprinting WAF that the
+	/// platform-native handler exists to work around, and SocketsHttpHandler
+	/// exposes the connection-pool knobs we need.
+	///
+	/// <para><b>PooledConnectionIdleTimeout = 30s</b> is the important one.
+	/// Without it the client holds idle keep-alive connections until the server
+	/// closes them, which on Windows with WinHttpHandler surfaces as a
+	/// WinHttpException 12152 ("The server returned an invalid or unrecognized
+	/// response") when the sink's periodic POST lands on a half-closed socket
+	/// (dotnet/runtime#22749). The typical trigger is <c>Log.CloseAndFlush()</c>
+	/// at shutdown after a long idle period. Closing client-side first makes
+	/// the next request open a fresh connection.</para>
+	///
+	/// <para><b>PooledConnectionLifetime = 5min</b> additionally recycles
+	/// connections so intermediaries that silently drop long-lived sockets
+	/// (mobile NATs, corporate proxies) don't cause the same symptom.</para>
+	/// </summary>
+	private static HttpClient CreateBetterStackHttpClient()
+	{
+		var handler = new SocketsHttpHandler
+		{
+			PooledConnectionIdleTimeout = TimeSpan.FromSeconds(30),
+			PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+			AutomaticDecompression = System.Net.DecompressionMethods.GZip
+				| System.Net.DecompressionMethods.Deflate
+				| System.Net.DecompressionMethods.Brotli,
+		};
+
+		return new HttpClient(handler, disposeHandler: true)
+		{
+			// Tighter than the default app client — we'd rather fail fast and
+			// let the durable sink retry from its on-disk buffer than block
+			// shutdown behind a slow Better Stack response.
+			Timeout = TimeSpan.FromSeconds(30),
+		};
+	}
+
+	public static string AppVersion()
+	{
+		if (DeviceInfo.Platform == DevicePlatform.WinUI)
+		{
+			return System.Diagnostics.FileVersionInfo
+				.GetVersionInfo(System.Environment.ProcessPath!)
+				.FileVersion ?? AppInfo.VersionString;
+		}
+		else
+		{
+			return AppInfo.VersionString;
+		}
 	}
 }

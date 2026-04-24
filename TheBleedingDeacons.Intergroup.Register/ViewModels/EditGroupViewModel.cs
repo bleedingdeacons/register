@@ -233,12 +233,24 @@ public partial class EditGroupViewModel : BaseViewModel
 		IsCreatingNew = false;
 		IsEditing = true;
 
+		// Clear errors BEFORE assigning field values. The [ObservableProperty]
+		// setters trigger ValidateName/Phone/Email via OnEditXChanged, and we
+		// want those validations to stick rather than being wiped afterwards.
+		ClearAllErrors();
+
 		EditName = member.AnonymousName;
 		EditPhone = member.MobileNumber;
 		EditEmail = member.PersonalEmail;
 
+		// Run validators explicitly — the change-notification setters don't
+		// fire if the new value equals the current value (e.g. editing a
+		// second member whose fields match the previous one), so rely on
+		// explicit calls rather than the OnEditXChanged side-effects.
+		ValidateName();
+		ValidatePhone();
+		ValidateEmail();
+
 		HasUnsavedChanges = false;
-		ClearAllErrors();
 		ValidateForm();
 
 		Logger.Information("Selected member {MemberName} (ID={MemberId}) for editing",
@@ -257,31 +269,47 @@ public partial class EditGroupViewModel : BaseViewModel
 		IsCreatingNew = true;
 		IsEditing = true;
 
+		// Clear errors BEFORE assigning field values — same ordering rationale
+		// as SelectMember.
+		ClearAllErrors();
+
 		EditName = string.Empty;
 		EditPhone = string.Empty;
 		EditEmail = string.Empty;
 
+		// Explicitly run each field validator. On a blank form the OnEditXChanged
+		// handlers may not fire (setters short-circuit when the value already
+		// equals the assigned value — common on a freshly-loaded page where the
+		// backing fields are already null/empty), so the required-field error
+		// flags must be set directly. Without this, IsFormValid would evaluate
+		// to true on an empty form and the Save button would incorrectly enable.
+		ValidateName();
+		ValidatePhone();
+		ValidateEmail();
+
 		HasUnsavedChanges = false;
-		ClearAllErrors();
 		ValidateForm();
 
 		Logger.Information("Starting new member creation for group {GroupName}", _group?.Name);
 	}
 
 	/// <summary>
+	/// Whether the Save button can execute. Gated on form validity and
+	/// not-currently-saving so the button is visibly disabled while
+	/// validation errors exist (rather than popping a dialog on click).
+	/// </summary>
+	private bool CanSaveMember() => IsFormValid && !IsLoading;
+
+	/// <summary>
 	/// Save the currently-edited or newly-created member.
 	/// </summary>
-	[RelayCommand]
+	[RelayCommand(CanExecute = nameof(CanSaveMember))]
 	private async Task SaveMember()
 	{
-		if (!IsFormValid)
-		{
-			ValidateName();
-			ValidatePhone();
-			ValidateEmail();
-			await Shell.Current.DisplayAlert("Validation Error", "Please fix the form errors before saving.", "OK");
-			return;
-		}
+		// Defensive guard — the CanExecute gate should prevent this path,
+		// but if the command is somehow invoked while invalid we silently
+		// no-op rather than showing a dialog.
+		if (!IsFormValid) return;
 
 		if (_group == null)
 		{
@@ -423,7 +451,11 @@ public partial class EditGroupViewModel : BaseViewModel
 		ActiveMembers.Add(member);
 
 		UpdateHasPendingRemovals();
-		HasPendingChanges = PendingRemovals.Count > 0;
+		// Undoing a removal is itself a pending change (we're putting the
+		// member back after a delete was staged), and it doesn't cancel any
+		// prior adds or edits — so keep the flag set regardless of whether
+		// there are still other pending removals in the list.
+		HasPendingChanges = true;
 		RefreshMemberCountText();
 		UpdateHasActiveMembers();
 
@@ -458,7 +490,9 @@ public partial class EditGroupViewModel : BaseViewModel
 	}
 
 	/// <summary>
-	/// OK — commit all pending removals to the database and navigate back.
+	/// Finished — commit all pending removals to the database and navigate
+	/// back, signalling the parent page (via ?edited=true) that member-list
+	/// state may have changed so it can refresh.
 	/// </summary>
 	[RelayCommand]
 	private async Task Done()
@@ -536,7 +570,7 @@ public partial class EditGroupViewModel : BaseViewModel
 		}
 
 		await ShowFeedback();
-		
+
 		// Revert pending removals — move them back to ActiveMembers
 		foreach (var member in PendingRemovals)
 		{
@@ -616,36 +650,33 @@ public partial class EditGroupViewModel : BaseViewModel
 	{
 		ClearPhoneError();
 
-		if (!string.IsNullOrWhiteSpace(EditPhone))
-		{
-			if (EditPhone.Trim().Length > 20)
-				SetPhoneError("Phone number cannot exceed 20 characters.");
-			else if (!IsValidPhoneFormat(EditPhone.Trim()))
-				SetPhoneError("Please check the phone number is valid.");
-		}
+		if (string.IsNullOrWhiteSpace(EditPhone))
+			SetPhoneError("Phone number is required.");
+		else if (EditPhone.Trim().Length > 20)
+			SetPhoneError("Phone number cannot exceed 20 characters.");
+		else if (!IsValidPhoneFormat(EditPhone.Trim()))
+			SetPhoneError("Please check the phone number is valid.");
 	}
 
 	private void ValidateEmail()
 	{
 		ClearEmailError();
 
-		if (!string.IsNullOrWhiteSpace(EditEmail))
-		{
-			if (EditEmail.Trim().Length > 255)
-				SetEmailError("Email address cannot exceed 255 characters.");
-			else if (!IsValidEmail(EditEmail.Trim()))
-				SetEmailError("Please check the email address is correct.");
-		}
+		if (string.IsNullOrWhiteSpace(EditEmail))
+			SetEmailError("Email address is required.");
+		else if (EditEmail.Trim().Length > 255)
+			SetEmailError("Email address cannot exceed 255 characters.");
+		else if (!IsValidEmail(EditEmail.Trim()))
+			SetEmailError("Please check the email address is correct.");
 	}
 
 	private void ValidateForm()
 	{
+		// The three HasXError flags now fully cover required-ness and format,
+		// so no extra IsNullOrWhiteSpace checks are needed here.
 		IsFormValid = !HasNameError &&
 					 !HasPhoneError &&
-					 !HasEmailError &&
-					 !string.IsNullOrWhiteSpace(EditName) &&
-					 !string.IsNullOrWhiteSpace(EditPhone) &&
-					 !string.IsNullOrWhiteSpace(EditEmail);
+					 !HasEmailError;
 	}
 
 	private void CheckForUnsavedChanges()

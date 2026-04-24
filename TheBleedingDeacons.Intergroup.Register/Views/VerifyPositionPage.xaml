@@ -1,0 +1,208 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="TheBleedingDeacons.Intergroup.Register.Views.VerifyPositionPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:controls="clr-namespace:TheBleedingDeacons.Intergroup.Register.Controls"
+    xmlns:entities="clr-namespace:TheBleedingDeacons.Unity.Intergroup.Entities;assembly=TheBleedingDeacons.Unity.Intergroup"
+    xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+    xmlns:viewmodels="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
+    Title="{Binding Title}"
+    x:DataType="viewmodels:VerifyPositionViewModel">
+
+    <ContentPage.Behaviors>
+        <toolkit:StatusBarBehavior StatusBarColor="{AppThemeBinding Light=White, Dark=Black}" StatusBarStyle="{AppThemeBinding Light=DarkContent, Dark=LightContent}" />
+    </ContentPage.Behaviors>
+
+    <controls:PageScaffold
+        BusyMessage="Loading..."
+        HasActionBar="True"
+        IsBusy="{Binding IsLoading}">
+
+        <!--  ═══ Body ═══  -->
+        <controls:PageScaffold.ContentBody>
+            <ScrollView>
+                <VerticalStackLayout Spacing="16">
+
+                    <!--  Header  -->
+                    <!--<VerticalStackLayout Spacing="4">
+                        <Label Text="{Binding Position.ShortDescription}"
+                               FontSize="24"
+                               FontAttributes="Bold"
+                               TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"
+                               LineBreakMode="WordWrap"/>
+                        <Label Text="{Binding HolderCountText}"
+                               Style="{StaticResource SecondaryTextStyle}"/>
+                    </VerticalStackLayout>-->
+
+                    <!--  Holder list  -->
+                    <!--
+                        Horizontal card layout with left/right scroll chevrons,
+                        matching the group-edit page. Slightly taller card
+                        (380) than the group pages because of the extra
+                        Rotation Date field.
+                    -->
+                    <Grid IsVisible="{Binding HasActiveHolders}">
+                        <CollectionView
+                            x:Name="ActiveHoldersCollectionView"
+                            HeightRequest="430"
+                            HorizontalOptions="Center"
+                            ItemsSource="{Binding ActiveHolders}"
+                            ItemsUpdatingScrollMode="KeepScrollOffset"
+                            Scrolled="ActiveHoldersCollectionView_Scrolled"
+                            SelectionMode="None">
+                            <CollectionView.ItemsLayout>
+                                <LinearItemsLayout
+                                    ItemSpacing="12"
+                                    Orientation="Horizontal"
+                                    SnapPointsAlignment="Center"
+                                    SnapPointsType="MandatorySingle" />
+                            </CollectionView.ItemsLayout>
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="entities:Member">
+                                    <Border
+                                        MaximumWidthRequest="560"
+                                        Style="{StaticResource M3CardStyle}"
+                                        WidthRequest="560">
+                                        <VerticalStackLayout Spacing="6">
+                                            <Label Style="{StaticResource FieldLabelStyle}" Text="Name" />
+                                            <Label Style="{StaticResource ValueLabelStyle}" Text="{Binding AnonymousName}" />
+
+                                            <Label Style="{StaticResource FieldLabelStyle}" Text="Personal Email" />
+                                            <controls:MaskedRevealLabel
+                                                x:Name="EmailReveal"
+                                                Margin="0,0,0,4"
+                                                BackgroundColor="Transparent"
+                                                FontSize="16"
+                                                MaskType="Email"
+                                                ShowRevealButton="False"
+                                                TextColor="{AppThemeBinding Light={StaticResource Gray900},
+                                                                            Dark={StaticResource Gray100}}"
+                                                Value="{Binding PersonalEmail}" />
+
+                                            <Label Style="{StaticResource FieldLabelStyle}" Text="Mobile Phone" />
+                                            <controls:MaskedRevealLabel
+                                                x:Name="MobileReveal"
+                                                Margin="0,0,0,4"
+                                                BackgroundColor="Transparent"
+                                                FontSize="16"
+                                                MaskType="Mobile"
+                                                ShowRevealButton="False"
+                                                TextColor="{AppThemeBinding Light={StaticResource Gray900},
+                                                                            Dark={StaticResource Gray100}}"
+                                                Value="{Binding MobileNumber}" />
+
+                                            <Label Style="{StaticResource FieldLabelStyle}" Text="Rotation Date" />
+                                            <Label Style="{StaticResource ValueLabelStyle}" Text="{Binding IntergroupPositionRotation}" />
+
+                                            <!--  Card-level Review toggle: reveals both fields while held  -->
+                                            <Button
+                                                Margin="0,8,0,0"
+                                                HeightRequest="44"
+                                                HorizontalOptions="Center"
+                                                Pressed="OnReviewPressed"
+                                                Released="OnReviewReleased"
+                                                Style="{StaticResource M3SecondaryButtonStyle}"
+                                                Text="Review"
+                                                WidthRequest="160" />
+                                        </VerticalStackLayout>
+                                    </Border>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+
+                        <!--  Scroll chevrons  -->
+                        <Button
+                            x:Name="ActiveHoldersScrollLeftButton"
+                            Margin="8,0,0,0"
+                            Padding="0"
+                            BackgroundColor="{AppThemeBinding Light={StaticResource Surface},
+                                                              Dark={StaticResource Gray900}}"
+                            Clicked="ActiveHoldersScrollLeftButton_Clicked"
+                            CornerRadius="22"
+                            FontSize="32"
+                            HeightRequest="44"
+                            HorizontalOptions="Start"
+                            IsVisible="False"
+                            Text="‹"
+                            TextColor="{AppThemeBinding Light={StaticResource TextBody},
+                                                        Dark={StaticResource TextBodyDim}}"
+                            VerticalOptions="Center"
+                            WidthRequest="44" />
+                        <Button
+                            x:Name="ActiveHoldersScrollRightButton"
+                            Margin="0,0,8,0"
+                            Padding="0"
+                            BackgroundColor="{AppThemeBinding Light={StaticResource Surface},
+                                                              Dark={StaticResource Gray900}}"
+                            Clicked="ActiveHoldersScrollRightButton_Clicked"
+                            CornerRadius="22"
+                            FontSize="32"
+                            HeightRequest="44"
+                            HorizontalOptions="End"
+                            IsVisible="False"
+                            Text="›"
+                            TextColor="{AppThemeBinding Light={StaticResource TextBody},
+                                                        Dark={StaticResource TextBodyDim}}"
+                            VerticalOptions="Center"
+                            WidthRequest="44" />
+                    </Grid>
+
+                    <!--  Empty state card  -->
+                    <Border IsVisible="{Binding HasActiveHolders, Converter={StaticResource InvertedBoolConverter}}" Style="{StaticResource M3CardStyle}">
+                        <VerticalStackLayout
+                            Padding="12"
+                            HorizontalOptions="Center"
+                            Spacing="6">
+                            <Label Style="{StaticResource M3EmptyStateTitleStyle}" Text="No Position Holders" />
+                            <Label Style="{StaticResource M3EmptyStateSubtitleStyle}" Text="Tap 'No' below to add a position holder." />
+                        </VerticalStackLayout>
+                    </Border>
+
+                </VerticalStackLayout>
+            </ScrollView>
+        </controls:PageScaffold.ContentBody>
+
+        <!--  ═══ Action bar: prompt, then No (left) / Yes (right) horizontally ═══  -->
+        <!--
+            Buttons are arranged horizontally, side by side. The pair
+            together occupies half the screen width and is centred via the
+            outer three-column Grid (*,2*,*). The action-bar Border itself
+            (in PageScaffold) sizes to its content height, so the bar is
+            just tall enough to hold the prompt + one row of buttons.
+        -->
+        <controls:PageScaffold.ActionBarBody>
+            <VerticalStackLayout Spacing="12">
+                <Label
+                    Margin="0,0,0,4"
+                    FontAttributes="Bold"
+                    FontSize="22"
+                    HorizontalOptions="Center"
+                    Text="Is this correct?"
+                    TextColor="{AppThemeBinding Light={StaticResource Gray900},
+                                                Dark={StaticResource Gray100}}" />
+                <Grid ColumnDefinitions="*,2*,*">
+                    <Grid
+                        Grid.Column="1"
+                        ColumnDefinitions="*,*"
+                        ColumnSpacing="12">
+                        <Button
+                            Grid.Column="0"
+                            Command="{Binding NoCommand}"
+                            HorizontalOptions="Fill"
+                            Style="{StaticResource M3SecondaryButtonStyle}"
+                            Text="No" />
+                        <Button
+                            Grid.Column="1"
+                            Command="{Binding YesCommand}"
+                            HorizontalOptions="Fill"
+                            Style="{StaticResource M3PrimaryButtonStyle}"
+                            Text="Yes" />
+                    </Grid>
+                </Grid>
+            </VerticalStackLayout>
+        </controls:PageScaffold.ActionBarBody>
+
+    </controls:PageScaffold>
+
+</ContentPage>

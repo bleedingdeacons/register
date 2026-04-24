@@ -1,0 +1,454 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="TheBleedingDeacons.Intergroup.Register.Views.EditGroupPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:controls="clr-namespace:TheBleedingDeacons.Intergroup.Register.Controls"
+    xmlns:converters="clr-namespace:TheBleedingDeacons.Intergroup.Register.Converters"
+    xmlns:entities="clr-namespace:TheBleedingDeacons.Unity.Intergroup.Entities;assembly=TheBleedingDeacons.Unity.Intergroup"
+    xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+    xmlns:viewmodels="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
+    Title="{Binding Title}"
+    x:DataType="viewmodels:EditGroupViewModel">
+
+    <ContentPage.Behaviors>
+        <toolkit:StatusBarBehavior StatusBarColor="{AppThemeBinding Light=White, Dark=Black}" StatusBarStyle="{AppThemeBinding Light=DarkContent, Dark=LightContent}" />
+    </ContentPage.Behaviors>
+
+    <controls:PageScaffold
+        BusyMessage="Loading..."
+        HasActionBar="True"
+        IsBusy="{Binding IsLoading}">
+
+        <!--  ═══ Body ═══  -->
+        <controls:PageScaffold.ContentBody>
+            <ScrollView>
+                <VerticalStackLayout Spacing="16">
+
+                    <!--  ═══════════════════════════════════════════════════════  -->
+                    <!--  MEMBER LIST (visible when NOT editing a specific member)  -->
+                    <!--  ═══════════════════════════════════════════════════════  -->
+                    <VerticalStackLayout IsVisible="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}" Spacing="16">
+
+                        <!--  Active Members  -->
+                        <!--
+                            HorizontalOptions="Center" centres the whole card block.
+                            When the combined card width exceeds the viewport the
+                            CollectionView scrolls normally, with the scroll window
+                            starting centred on the content.
+                            
+                            The Grid lets us overlay left/right chevron buttons on
+                            the CollectionView's edges. The chevrons' IsVisible is
+                            driven from code-behind in response to the Scrolled
+                            event, so they only appear when scrolling is possible
+                            in that direction.
+                        -->
+                        <Grid IsVisible="{Binding HasActiveMembers}">
+                            <CollectionView
+                                x:Name="ActiveMembersCollectionView"
+                                HeightRequest="360"
+                                HorizontalOptions="Center"
+                                ItemsSource="{Binding ActiveMembers}"
+                                ItemsUpdatingScrollMode="KeepScrollOffset"
+                                Scrolled="ActiveMembersCollectionView_Scrolled"
+                                SelectionMode="None">
+                                <CollectionView.ItemsLayout>
+                                    <LinearItemsLayout
+                                        ItemSpacing="12"
+                                        Orientation="Horizontal"
+                                        SnapPointsAlignment="Center"
+                                        SnapPointsType="MandatorySingle" />
+                                </CollectionView.ItemsLayout>
+                                <CollectionView.ItemTemplate>
+                                    <DataTemplate x:DataType="entities:Member">
+                                        <Border
+                                            MaximumWidthRequest="560"
+                                            Style="{StaticResource M3CardStyle}"
+                                            WidthRequest="560">
+                                            <VerticalStackLayout Spacing="6">
+                                                <Label Style="{StaticResource FieldLabelStyle}" Text="Name" />
+                                                <Label Style="{StaticResource ValueLabelStyle}" Text="{Binding AnonymousName}" />
+
+                                                <Label Style="{StaticResource FieldLabelStyle}" Text="Personal Email" />
+                                                <Label Style="{StaticResource ValueLabelStyle}" Text="{Binding PersonalEmail}" />
+
+                                                <Label Style="{StaticResource FieldLabelStyle}" Text="Mobile Phone" />
+                                                <Label Style="{StaticResource ValueLabelStyle}" Text="{Binding MobileNumber}" />
+
+                                                <!--  Card-level action row: Edit / Remove  -->
+                                                <Grid
+                                                    Margin="0,8,0,0"
+                                                    ColumnDefinitions="*,*"
+                                                    ColumnSpacing="12">
+                                                    <Button
+                                                        Grid.Column="0"
+                                                        Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:EditGroupViewModel}}, Path=SelectMemberCommand}"
+                                                        CommandParameter="{Binding .}"
+                                                        HeightRequest="44"
+                                                        Style="{StaticResource M3SecondaryButtonStyle}"
+                                                        Text="Edit" />
+                                                    <Button
+                                                        Grid.Column="1"
+                                                        Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:EditGroupViewModel}}, Path=RemoveMemberCommand}"
+                                                        CommandParameter="{Binding .}"
+                                                        HeightRequest="44"
+                                                        Style="{StaticResource M3SecondaryButtonStyle}"
+                                                        Text="Remove"
+                                                        TextColor="{AppThemeBinding Light={StaticResource DangerDark},
+                                                                                    Dark={StaticResource DangerLight}}" />
+                                                </Grid>
+                                            </VerticalStackLayout>
+                                        </Border>
+                                    </DataTemplate>
+                                </CollectionView.ItemTemplate>
+                            </CollectionView>
+
+                            <!--
+                                Left / right scroll chevrons — overlaid on the
+                                CollectionView's edges, visibility driven from
+                                code-behind via the Scrolled handler.
+                            -->
+                            <Button
+                                x:Name="ActiveMembersScrollLeftButton"
+                                Margin="8,0,0,0"
+                                Padding="0"
+                                BackgroundColor="{AppThemeBinding Light={StaticResource Surface},
+                                                                  Dark={StaticResource Gray900}}"
+                                Clicked="ActiveMembersScrollLeftButton_Clicked"
+                                CornerRadius="22"
+                                FontSize="32"
+                                HeightRequest="44"
+                                HorizontalOptions="Start"
+                                IsVisible="False"
+                                Text="‹"
+                                TextColor="{AppThemeBinding Light={StaticResource TextBody},
+                                                            Dark={StaticResource TextBodyDim}}"
+                                VerticalOptions="Center"
+                                WidthRequest="44" />
+                            <Button
+                                x:Name="ActiveMembersScrollRightButton"
+                                Margin="0,0,8,0"
+                                Padding="0"
+                                BackgroundColor="{AppThemeBinding Light={StaticResource Surface},
+                                                                  Dark={StaticResource Gray900}}"
+                                Clicked="ActiveMembersScrollRightButton_Clicked"
+                                CornerRadius="22"
+                                FontSize="32"
+                                HeightRequest="44"
+                                HorizontalOptions="End"
+                                IsVisible="False"
+                                Text="›"
+                                TextColor="{AppThemeBinding Light={StaticResource TextBody},
+                                                            Dark={StaticResource TextBodyDim}}"
+                                VerticalOptions="Center"
+                                WidthRequest="44" />
+                        </Grid>
+
+                        <!--
+                            Add button — sits below the card list, 2/3 card width,
+                            always visible whether the list has members or not.
+                        -->
+                        <Button
+                            Command="{Binding AddNewMemberCommand}"
+                            HeightRequest="44"
+                            HorizontalOptions="Center"
+                            Style="{StaticResource M3SecondaryButtonStyle}"
+                            Text="+ Add"
+                            WidthRequest="373" />
+
+                        <!--  Empty state card  -->
+                        <Border
+                            HorizontalOptions="Center"
+                            IsVisible="{Binding HasActiveMembers, Converter={StaticResource InvertedBoolConverter}}"
+                            MaximumWidthRequest="560"
+                            Style="{StaticResource M3CardStyle}"
+                            WidthRequest="560">
+                            <VerticalStackLayout
+                                Padding="12"
+                                HorizontalOptions="Center"
+                                Spacing="6">
+                                <Label Style="{StaticResource M3EmptyStateTitleStyle}" Text="No GSRs Registered" />
+                                <Label Style="{StaticResource M3EmptyStateSubtitleStyle}" Text="Tap '+ Add' above to create a new group service representative." />
+                            </VerticalStackLayout>
+                        </Border>
+
+                        <!--  Pending Removals  -->
+                        <!--
+                            Outer stack no longer constrained to 560px — with a
+                            horizontal card list and chevron buttons we want the
+                            chevrons to sit at the viewport edges, not at the
+                            edges of a single-card-wide column. The heading is
+                            centred explicitly below to preserve its alignment.
+                        -->
+                        <VerticalStackLayout IsVisible="{Binding HasPendingRemovals}" Spacing="8">
+                            <Label
+                                Margin="0,4,0,0"
+                                FontAttributes="Bold"
+                                FontSize="16"
+                                HorizontalOptions="Center"
+                                Text="Pending Removals"
+                                TextColor="{AppThemeBinding Light={StaticResource DangerDark},
+                                                            Dark={StaticResource DangerLight}}" />
+
+                            <!--
+                                CollectionView wrapped in Grid so chevron buttons
+                                can overlay the left/right edges. Same pattern as
+                                the Active Members list above.
+                            -->
+                            <Grid>
+                                <CollectionView
+                                    x:Name="PendingRemovalsCollectionView"
+                                    HeightRequest="320"
+                                    HorizontalOptions="Center"
+                                    ItemsSource="{Binding PendingRemovals}"
+                                    ItemsUpdatingScrollMode="KeepScrollOffset"
+                                    Scrolled="PendingRemovalsCollectionView_Scrolled"
+                                    SelectionMode="None">
+                                    <CollectionView.ItemsLayout>
+                                        <LinearItemsLayout
+                                            ItemSpacing="12"
+                                            Orientation="Horizontal"
+                                            SnapPointsAlignment="Center"
+                                            SnapPointsType="MandatorySingle" />
+                                    </CollectionView.ItemsLayout>
+                                    <CollectionView.ItemTemplate>
+                                        <DataTemplate x:DataType="entities:Member">
+                                            <Border
+                                                MaximumWidthRequest="560"
+                                                Style="{StaticResource DeletedCardStyle}"
+                                                WidthRequest="560">
+                                                <VerticalStackLayout Spacing="6">
+                                                    <Label Style="{StaticResource FieldLabelStyle}" Text="Name" />
+                                                    <Label
+                                                        Style="{StaticResource ValueLabelStyle}"
+                                                        Text="{Binding AnonymousName}"
+                                                        TextDecorations="Strikethrough" />
+
+                                                    <Label Style="{StaticResource FieldLabelStyle}" Text="Personal Email" />
+                                                    <Label
+                                                        Style="{StaticResource ValueLabelStyle}"
+                                                        Text="{Binding PersonalEmail}"
+                                                        TextDecorations="Strikethrough" />
+
+                                                    <Label Style="{StaticResource FieldLabelStyle}" Text="Mobile Phone" />
+                                                    <Label
+                                                        Style="{StaticResource ValueLabelStyle}"
+                                                        Text="{Binding MobileNumber}"
+                                                        TextDecorations="Strikethrough" />
+
+                                                    <Button
+                                                        Margin="0,8,0,0"
+                                                        Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:EditGroupViewModel}}, Path=UndoRemoveMemberCommand}"
+                                                        CommandParameter="{Binding .}"
+                                                        HeightRequest="44"
+                                                        HorizontalOptions="Center"
+                                                        Style="{StaticResource M3SecondaryButtonStyle}"
+                                                        Text="Undo"
+                                                        WidthRequest="160" />
+                                                </VerticalStackLayout>
+                                            </Border>
+                                        </DataTemplate>
+                                    </CollectionView.ItemTemplate>
+                                </CollectionView>
+
+                                <!--  Scroll chevrons  -->
+                                <Button
+                                    x:Name="PendingRemovalsScrollLeftButton"
+                                    Margin="8,0,0,0"
+                                    Padding="0"
+                                    BackgroundColor="{AppThemeBinding Light={StaticResource Surface},
+                                                                      Dark={StaticResource Gray900}}"
+                                    Clicked="PendingRemovalsScrollLeftButton_Clicked"
+                                    CornerRadius="22"
+                                    FontSize="32"
+                                    HeightRequest="44"
+                                    HorizontalOptions="Start"
+                                    IsVisible="False"
+                                    Text="‹"
+                                    TextColor="{AppThemeBinding Light={StaticResource TextBody},
+                                                                Dark={StaticResource TextBodyDim}}"
+                                    VerticalOptions="Center"
+                                    WidthRequest="44" />
+                                <Button
+                                    x:Name="PendingRemovalsScrollRightButton"
+                                    Margin="0,0,8,0"
+                                    Padding="0"
+                                    BackgroundColor="{AppThemeBinding Light={StaticResource Surface},
+                                                                      Dark={StaticResource Gray900}}"
+                                    Clicked="PendingRemovalsScrollRightButton_Clicked"
+                                    CornerRadius="22"
+                                    FontSize="32"
+                                    HeightRequest="44"
+                                    HorizontalOptions="End"
+                                    IsVisible="False"
+                                    Text="›"
+                                    TextColor="{AppThemeBinding Light={StaticResource TextBody},
+                                                                Dark={StaticResource TextBodyDim}}"
+                                    VerticalOptions="Center"
+                                    WidthRequest="44" />
+                            </Grid>
+                        </VerticalStackLayout>
+
+                    </VerticalStackLayout>
+
+                    <!--  ═══════════════════════════════════════════════════════  -->
+                    <!--  EDIT/CREATE FORM (visible when editing a specific member)  -->
+                    <!--  ═══════════════════════════════════════════════════════  -->
+                    <VerticalStackLayout IsVisible="{Binding IsEditing}" Spacing="16">
+
+                        <!--  Form card  -->
+                        <Border
+                            HorizontalOptions="Center"
+                            MaximumWidthRequest="560"
+                            Style="{StaticResource M3CardStyle}"
+                            WidthRequest="560">
+                            <VerticalStackLayout Spacing="6">
+
+                                <!--  Section header  -->
+                                <Label
+                                    Margin="0,0,0,8"
+                                    FontAttributes="Bold"
+                                    FontSize="20"
+                                    HorizontalOptions="Center"
+                                    TextColor="{AppThemeBinding Light={StaticResource Gray900},
+                                                                Dark={StaticResource Gray100}}">
+                                    <Label.Triggers>
+                                        <DataTrigger
+                                            Binding="{Binding IsCreatingNew}"
+                                            TargetType="Label"
+                                            Value="True">
+                                            <Setter Property="Text" Value="New Member" />
+                                        </DataTrigger>
+                                        <DataTrigger
+                                            Binding="{Binding IsCreatingNew}"
+                                            TargetType="Label"
+                                            Value="False">
+                                            <Setter Property="Text" Value="Edit Member" />
+                                        </DataTrigger>
+                                    </Label.Triggers>
+                                </Label>
+
+                                <!--  Name Field  -->
+                                <Label Style="{StaticResource FieldLabelStyle}" Text="Name" />
+                                <controls:ClearableEntry
+                                    x:Name="EditNameEntry"
+                                    Margin="0,0,0,4"
+                                    BackgroundColor="{AppThemeBinding Light={StaticResource Surface},
+                                                                      Dark={StaticResource Gray800}}"
+                                    FontSize="18"
+                                    HeightRequest="50"
+                                    Placeholder="Tap to enter name..."
+                                    PlaceholderColor="{AppThemeBinding Light={StaticResource Gray500},
+                                                                       Dark={StaticResource Gray400}}"
+                                    Text="{Binding EditName, Mode=TwoWay}"
+                                    TextColor="{AppThemeBinding Light={StaticResource Gray900},
+                                                                Dark={StaticResource Gray100}}" />
+                                <Label
+                                    Margin="0,0,0,4"
+                                    FontSize="14"
+                                    IsVisible="{Binding HasNameError}"
+                                    Text="{Binding NameError}"
+                                    TextColor="{AppThemeBinding Light={StaticResource DangerDark},
+                                                                Dark={StaticResource DangerLight}}" />
+
+                                <!--  Phone Field  -->
+                                <Label Style="{StaticResource FieldLabelStyle}" Text="Mobile Phone" />
+                                <controls:ClearableEntry
+                                    x:Name="EditPhoneEntry"
+                                    Margin="0,0,0,4"
+                                    BackgroundColor="{AppThemeBinding Light={StaticResource Surface},
+                                                                      Dark={StaticResource Gray800}}"
+                                    FontSize="18"
+                                    HeightRequest="50"
+                                    Keyboard="Telephone"
+                                    Placeholder="Tap to enter phone number..."
+                                    PlaceholderColor="{AppThemeBinding Light={StaticResource Gray500},
+                                                                       Dark={StaticResource Gray400}}"
+                                    Text="{Binding EditPhone, Mode=TwoWay}"
+                                    TextColor="{AppThemeBinding Light={StaticResource Gray900},
+                                                                Dark={StaticResource Gray100}}" />
+                                <Label
+                                    Margin="0,0,0,4"
+                                    FontSize="14"
+                                    IsVisible="{Binding HasPhoneError}"
+                                    Text="{Binding PhoneError}"
+                                    TextColor="{AppThemeBinding Light={StaticResource DangerDark},
+                                                                Dark={StaticResource DangerLight}}" />
+
+                                <!--  Email Field  -->
+                                <Label Style="{StaticResource FieldLabelStyle}" Text="Personal Email" />
+                                <controls:ClearableEntry
+                                    x:Name="EditEmailEntry"
+                                    Margin="0,0,0,4"
+                                    BackgroundColor="{AppThemeBinding Light={StaticResource Surface},
+                                                                      Dark={StaticResource Gray800}}"
+                                    FontSize="18"
+                                    HeightRequest="50"
+                                    Keyboard="Email"
+                                    Placeholder="Tap to enter email address..."
+                                    PlaceholderColor="{AppThemeBinding Light={StaticResource Gray500},
+                                                                       Dark={StaticResource Gray400}}"
+                                    Text="{Binding EditEmail, Mode=TwoWay}"
+                                    TextColor="{AppThemeBinding Light={StaticResource Gray900},
+                                                                Dark={StaticResource Gray100}}" />
+                                <Label
+                                    Margin="0,0,0,4"
+                                    FontSize="14"
+                                    IsVisible="{Binding HasEmailError}"
+                                    Text="{Binding EmailError}"
+                                    TextColor="{AppThemeBinding Light={StaticResource DangerDark},
+                                                                Dark={StaticResource DangerLight}}" />
+
+                            </VerticalStackLayout>
+                        </Border>
+
+                    </VerticalStackLayout>
+
+                </VerticalStackLayout>
+            </ScrollView>
+        </controls:PageScaffold.ContentBody>
+
+        <!--  ═══ Action bar: swaps between list-mode (Finished) and edit-mode (Save/Cancel) ═══  -->
+        <!--
+            Buttons are arranged horizontally, side by side. The pair
+            together occupies half the screen width and is centred via the
+            outer three-column Grid (*,2*,*). The action-bar Border itself
+            (in PageScaffold) sizes to its content height, so the bar is
+            just tall enough to hold one row of buttons.
+        -->
+        <controls:PageScaffold.ActionBarBody>
+            <Grid ColumnDefinitions="*,2*,*">
+                <!--  List mode (IsEditing = false): single Finished button filling the middle 50%  -->
+                <Button
+                    Grid.Column="1"
+                    Command="{Binding DoneCommand}"
+                    HorizontalOptions="Fill"
+                    IsVisible="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}"
+                    Style="{StaticResource M3PrimaryButtonStyle}"
+                    Text="Finished" />
+
+                <!--  Edit mode (IsEditing = true): Cancel (left) / Save (right) side-by-side in the middle 50%  -->
+                <Grid
+                    Grid.Column="1"
+                    ColumnDefinitions="*,*"
+                    ColumnSpacing="12"
+                    IsVisible="{Binding IsEditing}">
+                    <Button
+                        Grid.Column="0"
+                        Command="{Binding CancelEditCommand}"
+                        HorizontalOptions="Fill"
+                        Style="{StaticResource M3SecondaryButtonStyle}"
+                        Text="Cancel" />
+                    <Button
+                        Grid.Column="1"
+                        Command="{Binding SaveMemberCommand}"
+                        HorizontalOptions="Fill"
+                        Style="{StaticResource M3PrimaryButtonStyle}"
+                        Text="{Binding SaveButtonText}" />
+                </Grid>
+            </Grid>
+        </controls:PageScaffold.ActionBarBody>
+
+    </controls:PageScaffold>
+
+</ContentPage>
