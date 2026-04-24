@@ -12,7 +12,7 @@ public partial class MainPageViewModel : BaseViewModel
 {
 	private static readonly ILogger Logger = AppLogger.ForContext<MainPageViewModel>();
 
-	private const string BaseTitle = "Intergroup Registration";
+	private const string BaseTitle = "Intergroup Attendance Register";
 
 	private readonly IConfigurationService _configService;
 
@@ -33,16 +33,7 @@ public partial class MainPageViewModel : BaseViewModel
 		_configService = configService;
 		Title = BaseTitle;
 
-		if (DeviceInfo.Platform == DevicePlatform.WinUI)
-		{
-			AppVersion = System.Diagnostics.FileVersionInfo
-				.GetVersionInfo(System.Environment.ProcessPath!)
-				.FileVersion ?? AppInfo.VersionString;
-		}
-		else
-		{
-			AppVersion = AppInfo.VersionString;
-		}
+		AppVersion = MauiProgram.AppVersion();
 	}
 
 	// Called each time the page appears so meeting state refreshes.

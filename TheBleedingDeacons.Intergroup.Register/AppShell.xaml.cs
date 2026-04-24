@@ -19,8 +19,7 @@ public partial class AppShell : Shell
         Routing.RegisterRoute(nameof(MailSettingsPage), typeof(MailSettingsPage));
         Routing.RegisterRoute(nameof(DatabaseBackupPage), typeof(DatabaseBackupPage));
         Routing.RegisterRoute(nameof(EmailStatusPage), typeof(EmailStatusPage));
-        Routing.RegisterRoute(nameof(UnitySettingsPage), typeof(UnitySettingsPage));
-        Routing.RegisterRoute(nameof(BetterStackSettingsPage), typeof(BetterStackSettingsPage));
+        Routing.RegisterRoute(nameof(IntegrationsSettingsPage), typeof(IntegrationsSettingsPage));
         Routing.RegisterRoute(nameof(VerifyPositionPage), typeof(VerifyPositionPage));
     }
 }

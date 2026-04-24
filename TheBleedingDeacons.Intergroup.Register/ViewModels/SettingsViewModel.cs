@@ -75,18 +75,18 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 			await Shell.Current.GoToAsync(nameof(MailSettingsPage));
 		}
 
+		/// <summary>
+		/// Navigate to the combined Integrations settings page. Replaces the
+		/// previous two separate <c>NavigateToUnitySetting</c> and
+		/// <c>NavigateToBetterStackSetting</c> commands — both Unity API and
+		/// Better Stack configuration now live under a single page with an
+		/// unsaved-changes guard.
+		/// </summary>
 		[RelayCommand]
-		private async Task NavigateToUnitySetting()
+		private async Task NavigateToIntegrationsSetting()
 		{
 			await ShowFeedback();
-			await Shell.Current.GoToAsync(nameof(UnitySettingsPage));
-		}
-
-		[RelayCommand]
-		private async Task NavigateToBetterStackSetting()
-		{
-			await ShowFeedback();
-			await Shell.Current.GoToAsync(nameof(BetterStackSettingsPage));
+			await Shell.Current.GoToAsync(nameof(IntegrationsSettingsPage));
 		}
 
 		[RelayCommand]

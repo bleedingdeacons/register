@@ -27,11 +27,11 @@ public static class MauiProgram
 	public const string UNITY_DATABASE_NAME = "unity.db";
 	public const string MAIL_DATABASE_NAME = "emails.db";
 
-	// Resolved once in SetupSerilog.
-	private const string DefaultAppName = "Badi";
-	private const string DefaultEnvironment = "Development";
-	private static string _resolvedAppName = DefaultAppName;
-	private static string _resolvedEnvironment = DefaultEnvironment;
+	//// Resolved once in SetupSerilog.
+	//private const string DefaultAppName = "Badi";
+	//private const string DefaultEnvironment = "Development";
+	//private static string _resolvedAppName = DefaultAppName;
+	//private static string _resolvedEnvironment = DefaultEnvironment;
 
 	// Factory that produces a fresh base-logger configuration (file/console/debug
 	// sinks + enrichers). Captured during SetupSerilog so BetterStackLoggerController
@@ -253,8 +253,7 @@ public static class MauiProgram
 		builder.Services.AddTransient<DatabaseBackupPage>();
 		builder.Services.AddTransient<EmailStatusPage>();
 		builder.Services.AddTransient<SettingsPage>();
-		builder.Services.AddTransient<UnitySettingsPage>();
-		builder.Services.AddTransient<BetterStackSettingsPage>();
+		builder.Services.AddTransient<IntegrationsSettingsPage>();		
 		builder.Services.AddTransient<AdminPage>();
 		builder.Services.AddTransient<RegistrationOverviewPage>();
 
@@ -271,8 +270,7 @@ public static class MauiProgram
 		builder.Services.AddTransient<DatabaseBackupViewModel>();
 		builder.Services.AddTransient<EmailStatusViewModel>();
 		builder.Services.AddTransient<SettingsViewModel>();
-		builder.Services.AddTransient<UnitySettingsViewModel>();
-		builder.Services.AddTransient<BetterStackSettingsViewModel>();
+		builder.Services.AddTransient<IntegrationsSettingsViewModel>();		
 		builder.Services.AddTransient<AdminViewModel>();
 		builder.Services.AddTransient<VerifyPositionViewModel>();
 		builder.Services.AddTransient<VerifyPositionPage>();
@@ -330,13 +328,13 @@ public static class MauiProgram
 		var logPath = Path.Combine(FileSystem.AppDataDirectory, "logs");
 		Directory.CreateDirectory(logPath);
 
-		var appName = builder.Configuration["App:Name"] ?? DefaultAppName;
-		var environment = builder.Configuration["App:Environment"] ?? DefaultEnvironment;
+		var appName = builder.Configuration["App:Name"];
+		var environment = builder.Configuration["App:Environment"];
 
 		// Persist for the Better Stack controller which rebuilds the pipeline
 		// when settings change at runtime — it calls back into the factory below.
-		_resolvedAppName = appName;
-		_resolvedEnvironment = environment;
+		//_resolvedAppName = appName;
+		//_resolvedEnvironment = environment;
 
 		// Capture the base-logger factory so the Better Stack controller can
 		// rebuild a fresh pipeline on demand. We capture `builder.Configuration`
@@ -553,5 +551,19 @@ public static class MauiProgram
 			// shutdown behind a slow Better Stack response.
 			Timeout = TimeSpan.FromSeconds(30),
 		};
+	}
+
+	public static string AppVersion()
+	{
+		if (DeviceInfo.Platform == DevicePlatform.WinUI)
+		{
+			return System.Diagnostics.FileVersionInfo
+				.GetVersionInfo(System.Environment.ProcessPath!)
+				.FileVersion ?? AppInfo.VersionString;
+		}
+		else
+		{
+			return AppInfo.VersionString;
+		}
 	}
 }

@@ -1,0 +1,272 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="TheBleedingDeacons.Intergroup.Register.Views.IntegrationsSettingsPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:controls="clr-namespace:TheBleedingDeacons.Intergroup.Register.Controls"
+    xmlns:tc="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+    xmlns:vm="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
+    Title="Integrations"
+    x:DataType="vm:IntegrationsSettingsViewModel">
+
+    <ContentPage.Resources>
+        <tc:BoolToObjectConverter
+            x:Key="BoolToColorConverter"
+            FalseObject="Green"
+            TrueObject="Red" />
+        <tc:BoolToObjectConverter
+            x:Key="BoolToTestButtonTextConverter"
+            FalseObject="Test Connection"
+            TrueObject="Testing Connection..." />
+        <tc:BoolToObjectConverter
+            x:Key="BoolToSaveButtonTextConverter"
+            FalseObject="Save Settings"
+            TrueObject="Saving..." />
+    </ContentPage.Resources>
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="15">
+
+            <Label
+                FontAttributes="Bold"
+                FontSize="24"
+                Text="Integrations" />
+
+            <Label
+                FontAttributes="Italic"
+                FontSize="12"
+                IsVisible="{Binding HasUnsavedChanges}"
+                Text="Unsaved changes"
+                TextColor="{AppThemeBinding Light=#D32F2F,
+                                            Dark=#EF5350}" />
+
+            <!--
+                ═══════════════════════════════════════════════════════
+                Unity API
+                ═══════════════════════════════════════════════════════
+            -->
+            <Label
+                Margin="0,10,0,0"
+                FontAttributes="Bold"
+                FontSize="20"
+                Text="Unity API" />
+
+            <!--  Unity Status Message  -->
+            <Frame
+                Padding="15"
+                BackgroundColor="{Binding IsUnityStatusError, Converter={StaticResource BoolToColorConverter}}"
+                BorderColor="Transparent"
+                IsVisible="{Binding IsUnityStatusVisible}">
+                <Label
+                    FontAttributes="Bold"
+                    Text="{Binding UnityStatusMessage}"
+                    TextColor="White" />
+            </Frame>
+
+            <!--  Unity Connection Settings  -->
+            <Frame BackgroundColor="{AppThemeBinding Light=White, Dark=#2D2D30}" BorderColor="{AppThemeBinding Light=LightGray, Dark=Gray}">
+                <VerticalStackLayout Spacing="15">
+
+                    <Label
+                        FontAttributes="Bold"
+                        FontSize="18"
+                        Text="API Connection" />
+
+                    <VerticalStackLayout>
+                        <Label Text="WordPress Site URL *" />
+                        <controls:ClearableEntry
+                            Keyboard="Url"
+                            Placeholder="https://your-site.com"
+                            Text="{Binding UnityBaseUrl}" />
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout>
+                        <Label Text="API Key *" />
+                        <controls:ClearableEntry
+                            IsPassword="True"
+                            Placeholder="Enter your Integrity API key"
+                            Text="{Binding UnityApiKey}" />
+                    </VerticalStackLayout>
+
+                </VerticalStackLayout>
+            </Frame>
+
+            <!--  Unity Help Section  -->
+            <Frame BackgroundColor="{AppThemeBinding Light=#E3F2FD, Dark=#1E3A8A}" BorderColor="{AppThemeBinding Light=#2196F3, Dark=#3B82F6}">
+                <VerticalStackLayout>
+                    <Label
+                        FontAttributes="Bold"
+                        Text="&#x1F4A1; Setup"
+                        TextColor="{AppThemeBinding Light=#1976D2,
+                                                    Dark=#60A5FA}" />
+                    <Label TextColor="{AppThemeBinding Light=#1565C0, Dark=#93C5FD}">
+                        <Label.FormattedText>
+                            <FormattedString>
+                                <Span Text="• Enter your WordPress site URL (e.g. https://example.com)" />
+                                <Span Text="&#x0a;• The API key is generated in the Integrity plugin settings" />
+                                <Span Text="&#x0a;• Use Test Connection to verify your settings" />
+                            </FormattedString>
+                        </Label.FormattedText>
+                    </Label>
+                </VerticalStackLayout>
+            </Frame>
+
+            <!--  Unity Action Buttons  -->
+            <VerticalStackLayout Spacing="10">
+                <Button
+                    BackgroundColor="{AppThemeBinding Light=#4CAF50,
+                                                      Dark=#22C55E}"
+                    Command="{Binding TestUnityConnectionCommand}"
+                    IsEnabled="{Binding IsUnityFormValid}"
+                    Text="{Binding IsUnityTesting, Converter={StaticResource BoolToTestButtonTextConverter}}"
+                    TextColor="White">
+                    <Button.Triggers>
+                        <DataTrigger
+                            Binding="{Binding IsUnityTesting}"
+                            TargetType="Button"
+                            Value="True">
+                            <Setter Property="BackgroundColor" Value="Gray" />
+                        </DataTrigger>
+                    </Button.Triggers>
+                </Button>
+
+                <Button
+                    BackgroundColor="{AppThemeBinding Light=#2196F3,
+                                                      Dark=#3B82F6}"
+                    Command="{Binding SaveUnitySettingsCommand}"
+                    IsEnabled="{Binding IsUnityFormValid}"
+                    Text="{Binding IsUnitySaving, Converter={StaticResource BoolToSaveButtonTextConverter}}"
+                    TextColor="White">
+                    <Button.Triggers>
+                        <DataTrigger
+                            Binding="{Binding IsUnitySaving}"
+                            TargetType="Button"
+                            Value="True">
+                            <Setter Property="BackgroundColor" Value="Gray" />
+                        </DataTrigger>
+                    </Button.Triggers>
+                </Button>
+            </VerticalStackLayout>
+
+            <!--
+                ═══════════════════════════════════════════════════════
+                Section divider
+                ═══════════════════════════════════════════════════════
+            -->
+            <BoxView
+                Margin="0,15,0,5"
+                HeightRequest="1"
+                Color="{AppThemeBinding Light=#E0E0E0,
+                                        Dark=#424242}" />
+
+            <!--
+                ═══════════════════════════════════════════════════════
+                Better Stack
+                ═══════════════════════════════════════════════════════
+            -->
+            <Label
+                FontAttributes="Bold"
+                FontSize="20"
+                Text="Better Stack" />
+
+            <!--  Better Stack Status Message  -->
+            <Frame
+                Padding="15"
+                BackgroundColor="{Binding IsBetterStackStatusError, Converter={StaticResource BoolToColorConverter}}"
+                BorderColor="Transparent"
+                IsVisible="{Binding IsBetterStackStatusVisible}">
+                <Label
+                    FontAttributes="Bold"
+                    Text="{Binding BetterStackStatusMessage}"
+                    TextColor="White" />
+            </Frame>
+
+            <!--  Better Stack Connection Settings  -->
+            <Frame BackgroundColor="{AppThemeBinding Light=White, Dark=#2D2D30}" BorderColor="{AppThemeBinding Light=LightGray, Dark=Gray}">
+                <VerticalStackLayout Spacing="15">
+
+                    <Label
+                        FontAttributes="Bold"
+                        FontSize="18"
+                        Text="Better Stack Connection" />
+
+                    <VerticalStackLayout>
+                        <Label Text="Ingesting Endpoint *" />
+                        <controls:ClearableEntry
+                            Keyboard="Url"
+                            Placeholder="e.g. https://in.logs.betterstack.com"
+                            Text="{Binding BetterStackEndpoint}" />
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout>
+                        <Label Text="Source Token *" />
+                        <controls:ClearableEntry
+                            IsPassword="True"
+                            Placeholder="Enter your Better Stack source token"
+                            Text="{Binding BetterStackSourceToken}" />
+                    </VerticalStackLayout>
+
+                </VerticalStackLayout>
+            </Frame>
+
+            <!--  Better Stack Help Section  -->
+            <Frame BackgroundColor="{AppThemeBinding Light=#E3F2FD, Dark=#1E3A8A}" BorderColor="{AppThemeBinding Light=#2196F3, Dark=#3B82F6}">
+                <VerticalStackLayout>
+                    <Label
+                        FontAttributes="Bold"
+                        Text="&#x1F4A1; Setup"
+                        TextColor="{AppThemeBinding Light=#1976D2,
+                                                    Dark=#60A5FA}" />
+                    <Label TextColor="{AppThemeBinding Light=#1565C0, Dark=#93C5FD}">
+                        <Label.FormattedText>
+                            <FormattedString>
+                                <Span Text="• Go to Better Stack → Logs → Sources to create a source" />
+                                <Span Text="&#x0a;• Copy the Source Token from the source details" />
+                                <Span Text="&#x0a;• The ingesting endpoint is shown alongside the token" />
+                                <Span Text="&#x0a;• Use Test Connection to verify your settings" />
+                            </FormattedString>
+                        </Label.FormattedText>
+                    </Label>
+                </VerticalStackLayout>
+            </Frame>
+
+            <!--  Better Stack Action Buttons  -->
+            <VerticalStackLayout Spacing="10">
+                <Button
+                    BackgroundColor="{AppThemeBinding Light=#4CAF50,
+                                                      Dark=#22C55E}"
+                    Command="{Binding TestBetterStackConnectionCommand}"
+                    IsEnabled="{Binding IsBetterStackFormValid}"
+                    Text="{Binding IsBetterStackTesting, Converter={StaticResource BoolToTestButtonTextConverter}}"
+                    TextColor="White">
+                    <Button.Triggers>
+                        <DataTrigger
+                            Binding="{Binding IsBetterStackTesting}"
+                            TargetType="Button"
+                            Value="True">
+                            <Setter Property="BackgroundColor" Value="Gray" />
+                        </DataTrigger>
+                    </Button.Triggers>
+                </Button>
+
+                <Button
+                    BackgroundColor="{AppThemeBinding Light=#2196F3,
+                                                      Dark=#3B82F6}"
+                    Command="{Binding SaveBetterStackSettingsCommand}"
+                    IsEnabled="{Binding IsBetterStackFormValid}"
+                    Text="{Binding IsBetterStackSaving, Converter={StaticResource BoolToSaveButtonTextConverter}}"
+                    TextColor="White">
+                    <Button.Triggers>
+                        <DataTrigger
+                            Binding="{Binding IsBetterStackSaving}"
+                            TargetType="Button"
+                            Value="True">
+                            <Setter Property="BackgroundColor" Value="Gray" />
+                        </DataTrigger>
+                    </Button.Triggers>
+                </Button>
+            </VerticalStackLayout>
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>
