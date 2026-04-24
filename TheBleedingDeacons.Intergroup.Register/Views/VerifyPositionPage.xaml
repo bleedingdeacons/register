@@ -45,7 +45,7 @@
                     <Grid IsVisible="{Binding HasActiveHolders}">
                         <CollectionView
                             x:Name="ActiveHoldersCollectionView"
-                            HeightRequest="380"
+                            HeightRequest="430"
                             HorizontalOptions="Center"
                             ItemsSource="{Binding ActiveHolders}"
                             ItemsUpdatingScrollMode="KeepScrollOffset"

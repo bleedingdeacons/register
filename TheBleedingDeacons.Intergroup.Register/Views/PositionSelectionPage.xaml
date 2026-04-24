@@ -1,112 +1,118 @@
 ﻿<?xml version="1.0" encoding="utf-8" ?>
-<ContentPage x:Class="TheBleedingDeacons.Intergroup.Register.Views.PositionSelectionPage"
-             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             xmlns:vm="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
-             xmlns:entities="clr-namespace:TheBleedingDeacons.Unity.Intergroup.Entities;assembly=TheBleedingDeacons.Unity.Intergroup"
-             xmlns:controls="clr-namespace:TheBleedingDeacons.Intergroup.Register.Controls"
-             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
-             x:DataType="vm:PositionSelectionViewModel"
-             Title="{Binding Title}">
+<ContentPage
+    x:Class="TheBleedingDeacons.Intergroup.Register.Views.PositionSelectionPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:controls="clr-namespace:TheBleedingDeacons.Intergroup.Register.Controls"
+    xmlns:entities="clr-namespace:TheBleedingDeacons.Unity.Intergroup.Entities;assembly=TheBleedingDeacons.Unity.Intergroup"
+    xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+    xmlns:vm="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
+    Title="{Binding Title}"
+    x:DataType="vm:PositionSelectionViewModel">
 
     <ContentPage.Behaviors>
-        <toolkit:StatusBarBehavior StatusBarColor="{AppThemeBinding Light=White, Dark=Black}"
-                                   StatusBarStyle="{AppThemeBinding Light=DarkContent, Dark=LightContent}"/>
+        <toolkit:StatusBarBehavior StatusBarColor="{AppThemeBinding Light=White, Dark=Black}" StatusBarStyle="{AppThemeBinding Light=DarkContent, Dark=LightContent}" />
     </ContentPage.Behaviors>
 
-    <controls:PageScaffold IsBusy="{Binding IsLoading}"
-                           BusyMessage="Loading positions..."
-                           ContextHeaderIsVisible="True"
-                           ContextHeaderText="{Binding Header}"
-                           ContentPadding="0">
-
+    <controls:PageScaffold
+        BusyMessage="Loading positions..."
+        ContentPadding="0"
+        IsBusy="{Binding IsLoading}">
         <controls:PageScaffold.ContentBody>
-            <CollectionView ItemsSource="{Binding Positions}"
-                            IsVisible="{Binding IsDataLoaded}"
-                            SelectionMode="None">
+            <CollectionView
+                IsVisible="{Binding IsDataLoaded}"
+                ItemsSource="{Binding Positions}"
+                SelectionMode="None">
 
                 <CollectionView.ItemsLayout>
-                    <LinearItemsLayout Orientation="Vertical" ItemSpacing="0"/>
+                    <LinearItemsLayout ItemSpacing="8" Orientation="Vertical" />
                 </CollectionView.ItemsLayout>
 
                 <CollectionView.Header>
-                    <Grid HeightRequest="8"/>
+                    <Grid HeightRequest="8" />
                 </CollectionView.Header>
 
                 <CollectionView.Footer>
-                    <Grid HeightRequest="16"/>
+                    <Grid HeightRequest="16" />
                 </CollectionView.Footer>
 
                 <CollectionView.ItemTemplate>
                     <DataTemplate x:DataType="entities:Position">
-                        <Border Style="{StaticResource M3ListItemCardStyle}"
-                                Margin="16,0,16,8">
+                        <Border
+                            Margin="16,0,16,16"
+                            HorizontalOptions="Center"
+                            MaximumWidthRequest="560"
+                            Style="{StaticResource M3ListItemCardStyle}"
+                            WidthRequest="560">
 
                             <Border.GestureRecognizers>
-                                <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type vm:PositionSelectionViewModel}}, Path=SelectPositionCommand}"
-                                                      CommandParameter="{Binding .}"/>
+                                <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type vm:PositionSelectionViewModel}}, Path=SelectPositionCommand}" CommandParameter="{Binding .}" />
                             </Border.GestureRecognizers>
 
-                            <Grid ColumnDefinitions="Auto,*,Auto"
-                                  ColumnSpacing="12"
-                                  RowDefinitions="Auto,Auto">
+                            <Grid
+                                ColumnDefinitions="24,*,Auto,Auto"
+                                ColumnSpacing="12"
+                                RowDefinitions="Auto,Auto">
 
-                                <!-- Leading registered tick -->
-                                <Label Grid.Row="0" Grid.RowSpan="2" Grid.Column="0"
-                                       Text="✓"
-                                       FontSize="22"
-                                       FontAttributes="Bold"
-                                       TextColor="{AppThemeBinding Light={StaticResource SuccessAccent}, Dark={StaticResource SuccessAccentDim}}"
-                                       VerticalOptions="Center"
-                                       IsVisible="{Binding Registered}"
-                                       WidthRequest="24"
-                                       HorizontalTextAlignment="Center"/>
+                                <!--  Leading registered tick  -->
+                                <Label
+                                    Grid.Row="0"
+                                    Grid.RowSpan="2"
+                                    Grid.Column="0"
+                                    FontAttributes="Bold"
+                                    FontSize="22"
+                                    HorizontalTextAlignment="Center"
+                                    IsVisible="{Binding Registered}"
+                                    Text="✓"
+                                    TextColor="{AppThemeBinding Light={StaticResource SuccessAccent},
+                                                                Dark={StaticResource SuccessAccentDim}}"
+                                    VerticalOptions="Center" />
+                                <!--  Position name  -->
+                                <Label
+                                    Grid.Row="0"
+                                    Grid.Column="1"
+                                    FontAttributes="Bold"
+                                    FontSize="17"
+                                    LineBreakMode="TailTruncation"
+                                    Text="{Binding LongName}"
+                                    TextColor="{AppThemeBinding Light={StaticResource Gray900},
+                                                                Dark={StaticResource Gray100}}"
+                                    VerticalOptions="Center" />
 
-                                <BoxView Grid.Row="0" Grid.RowSpan="2" Grid.Column="0"
-                                         WidthRequest="24"
-                                         Color="Transparent"
-                                         IsVisible="{Binding Registered, Converter={StaticResource InvertedBoolConverter}}"/>
-
-                                <!-- Position name -->
-                                <Label Grid.Row="0" Grid.Column="1"
-                                       Text="{Binding LongName}"
-                                       FontSize="17"
-                                       FontAttributes="Bold"
-                                       LineBreakMode="TailTruncation"
-                                       TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"
-                                       VerticalOptions="Center"/>
-
-                                <!-- Registered chip -->
-                                <Border Grid.Row="1" Grid.Column="1"
-                                        Style="{StaticResource M3RegisteredChipStyle}"
-                                        IsVisible="{Binding Registered}"
-                                        Margin="0,4,0,0">
-                                    <Label Text="Registered"
-                                           Style="{StaticResource M3RegisteredChipLabelStyle}"/>
+                                <!--  Registered chip  -->
+                                <Border
+                                    Grid.Row="1"
+                                    Grid.Column="1"
+                                    Margin="0,4,0,0"
+                                    IsVisible="{Binding Registered}"
+                                    Style="{StaticResource M3RegisteredChipStyle}">
+                                    <Label Style="{StaticResource M3RegisteredChipLabelStyle}" Text="Registered" />
                                 </Border>
 
-                                <!-- Trailing chevron -->
-                                <Label Grid.Row="0" Grid.RowSpan="2" Grid.Column="2"
-                                       Text="›"
-                                       FontSize="28"
-                                       TextColor="{AppThemeBinding Light={StaticResource Gray400}, Dark={StaticResource Gray500}}"
-                                       VerticalOptions="Center"/>
+                                <!--  Trailing chevron  -->
+                                <Label
+                                    Grid.Row="0"
+                                    Grid.RowSpan="2"
+                                    Grid.Column="3"
+                                    FontSize="28"
+                                    Text="›"
+                                    TextColor="{AppThemeBinding Light={StaticResource Gray400},
+                                                                Dark={StaticResource Gray500}}"
+                                    VerticalOptions="Center" />
                             </Grid>
                         </Border>
                     </DataTemplate>
                 </CollectionView.ItemTemplate>
 
                 <CollectionView.EmptyView>
-                    <VerticalStackLayout Padding="40,60"
-                                         VerticalOptions="Center"
-                                         HorizontalOptions="Center"
-                                         Spacing="0">
-                        <Label Text="👥"
-                               Style="{StaticResource M3EmptyStateIconStyle}"/>
-                        <Label Text="No positions found"
-                               Style="{StaticResource M3EmptyStateTitleStyle}"/>
-                        <Label Text="No positions are currently available."
-                               Style="{StaticResource M3EmptyStateSubtitleStyle}"/>
+                    <VerticalStackLayout
+                        Padding="40,60"
+                        HorizontalOptions="Center"
+                        Spacing="0"
+                        VerticalOptions="Center">
+                        <Label Style="{StaticResource M3EmptyStateIconStyle}" Text="👥" />
+                        <Label Style="{StaticResource M3EmptyStateTitleStyle}" Text="No positions found" />
+                        <Label Style="{StaticResource M3EmptyStateSubtitleStyle}" Text="No positions are currently available." />
                     </VerticalStackLayout>
                 </CollectionView.EmptyView>
 
