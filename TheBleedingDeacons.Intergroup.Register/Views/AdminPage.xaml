@@ -106,12 +106,6 @@
                         </Border>
 
                         <Label
-                            Margin="0,40,0,0"
-                            HorizontalOptions="Center"
-                            Style="{StaticResource M3EmptyStateIconStyle}"
-                            Text="📋" />
-
-                        <Label
                             HorizontalOptions="Center"
                             Style="{StaticResource M3EmptyStateTitleStyle}"
                             Text="Ready to Begin" />
@@ -315,12 +309,6 @@
                         ═══════════════════════════════════════════════════════
                     -->
                     <VerticalStackLayout IsVisible="{Binding IsCompleted}" Spacing="12">
-
-                        <Label
-                            Margin="0,20,0,0"
-                            HorizontalOptions="Center"
-                            Style="{StaticResource M3EmptyStateIconStyle}"
-                            Text="🎉" />
 
                         <Label
                             HorizontalOptions="Center"

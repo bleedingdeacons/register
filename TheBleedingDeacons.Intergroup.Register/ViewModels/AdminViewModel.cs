@@ -182,7 +182,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 			var config = await _configService.LoadUnityConfigurationAsync();
 			if (!config.IsValid())
 			{
-				ShowStatus("Unity API not configured. Go to Settings → Unity API Settings first.", true);
+				ShowStatus("Unity API not configured, Go to Settings → Unity API Settings first.", true);
 				HasSyncError = true;
 				return;
 			}
