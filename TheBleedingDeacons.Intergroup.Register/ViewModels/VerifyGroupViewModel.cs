@@ -125,10 +125,29 @@ public partial class VerifyGroupViewModel : BaseViewModel
 		if (query.TryGetValue("edited", out var editedObj) &&
 			editedObj?.ToString() == "true")
 		{
+			// Pick up the optional autoRegister flag now (off the query dict,
+			// while we're still on the caller's thread) so the async
+			// continuation below doesn't race with a subsequent navigation
+			// that mutates the same dictionary.
+			bool autoRegister =
+				query.TryGetValue("autoRegister", out var autoObj) &&
+				autoObj?.ToString() == "true";
+
 			MainThread.BeginInvokeOnMainThread(async () =>
 			{
 				if (GroupId > 0)
 					await LoadGroupAsync(GroupId);
+
+				// Single-GSR shortcut completion: after the reload has
+				// refreshed ActiveGsrs and re-evaluated CanRegister, fire
+				// Yes automatically if the gate allows it. CanExecute is
+				// the same invariant the button itself respects, so an
+				// invalid record just leaves the user on the verify page
+				// with Yes disabled rather than silently failing.
+				if (autoRegister && YesCommand.CanExecute(null))
+				{
+					await YesCommand.ExecuteAsync(null);
+				}
 			});
 			return;
 		}
@@ -208,10 +227,17 @@ public partial class VerifyGroupViewModel : BaseViewModel
 			["group"] = Group
 		};
 
-		// If no GSRs exist, skip straight to the add-member flow on the edit page
+		// If no GSRs exist, skip straight to the add-member flow on the edit page.
+		// If exactly one GSR exists, the user has effectively already chosen which
+		// record to fix — skip the picker and open that member directly for editing.
+		// With multiple GSRs we still land on the list so the user can pick.
 		if (!HasActiveGsrs)
 		{
 			parameters["addMember"] = true;
+		}
+		else if (ActiveGsrs.Count == 1)
+		{
+			parameters["editMember"] = ActiveGsrs[0];
 		}
 
 		await ShowFeedback();

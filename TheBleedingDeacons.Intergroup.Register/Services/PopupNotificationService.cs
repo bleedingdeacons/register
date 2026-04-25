@@ -1,4 +1,5 @@
-﻿using CommunityToolkit.Maui.Views;
+﻿using CommunityToolkit.Maui;
+using CommunityToolkit.Maui.Views;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -26,7 +27,13 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 
 			if (currentPage is Page page)
 			{
-				await page.ShowPopupAsync(popup);
+				// CommunityToolkit.Maui v2 wraps every popup in its own
+				// rounded Border (with a visible stroke) on top of whatever
+				// the popup XAML defines. That stroke shows up as the white
+				// outline around our M3 card. Setting PopupOptions.Shape to
+				// null disables the toolkit's wrapping Border entirely so
+				// only the inner M3CardStyle Border is rendered.
+				await page.ShowPopupAsync(popup, new PopupOptions { Shape = null });
 			}
 		}
 
