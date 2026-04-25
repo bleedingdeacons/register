@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView
+    x:Class="TheBleedingDeacons.Intergroup.Register.Controls.InteractiveEntry"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    x:Name="RootView">
+
+    <!--
+        SimpleEntry — union of ClearableEntry and CloseableEntry, plus an Undo step.
+        
+        Trailing-button behaviour is a small state machine:
+        
+        • Unfocused AND has a non-empty value           → show Clear (red)
+        • Unfocused AND undo pending (Clear was tapped) → show Undo  (blue)
+        • Focused   AND has a non-empty value           → show Close (green)
+        • Anything else (empty/idle states)              → no button
+        
+        Pressing Clear snapshots the current text, empties the field, and offers
+        Undo in the same slot. Pressing Undo restores the snapshotted text.
+        Pressing Close dismisses the keyboard without touching the text.
+        Re-focusing the entry cancels any pending undo.
+        
+        The trailing buttons keep the bold "ClearableEntry" style — solid colour
+        background, white text label — and nest inside the SimpleEntry's outer
+        rounded edge: top-right and bottom-right corners follow the outer
+        CornerRadius, left side is flat against the entry text. Each visible
+        state owns its own wrapping Border so the rounded shape can be filled
+        with the right colour without per-button corner-radius bindings.
+    -->
+
+    <Border
+        BackgroundColor="{Binding BackgroundColor, Source={x:Reference RootView}}"
+        Stroke="{Binding BorderColor, Source={x:Reference RootView}}"
+        StrokeThickness="{Binding BorderThickness, Source={x:Reference RootView}}">
+        <Border.StrokeShape>
+            <RoundRectangle CornerRadius="{Binding CornerRadius, Source={x:Reference RootView}}" />
+        </Border.StrokeShape>
+
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <!--  Text Entry  -->
+            <Entry
+                x:Name="InternalEntry"
+                Grid.Column="0"
+                Margin="0"
+                BackgroundColor="Transparent"
+                Focused="OnEntryFocused"
+                FontSize="{Binding FontSize, Source={x:Reference RootView}}"
+                HeightRequest="{Binding ControlHeight, Source={x:Reference RootView}}"
+                HorizontalTextAlignment="{Binding HorizontalTextAlignment, Source={x:Reference RootView}}"
+                IsPassword="{Binding IsPassword, Source={x:Reference RootView}}"
+                IsReadOnly="{Binding IsReadOnly, Source={x:Reference RootView}}"
+                Keyboard="{Binding Keyboard, Source={x:Reference RootView}}"
+                MaxLength="{Binding MaxLength, Source={x:Reference RootView}}"
+                Placeholder="{Binding Placeholder, Source={x:Reference RootView}}"
+                PlaceholderColor="{Binding PlaceholderColor, Source={x:Reference RootView}}"
+                Text="{Binding Text, Source={x:Reference RootView}}"
+                TextChanged="OnTextChanged"
+                TextColor="{Binding TextColor, Source={x:Reference RootView}}"
+                Unfocused="OnEntryUnfocused"
+                VerticalTextAlignment="{Binding VerticalTextAlignment, Source={x:Reference RootView}}" />
+
+            <!--
+                Clear button — red surface, white "Clear" label.
+                Wrapper Border carries the asymmetric corner radius (TR/BR rounded,
+                TL/BL flat). The inner Button is transparent so only the wrapper's
+                shape and colour are visible. CornerRadius on ClearButtonShape is
+                kept in sync with the outer SimpleEntry CornerRadius from code-behind.
+            -->
+            <Border
+                x:Name="ClearButtonWrapper"
+                Grid.Column="1"
+                BackgroundColor="{Binding ClearButtonColor, Source={x:Reference RootView}}"
+                IsVisible="False"
+                Stroke="Transparent"
+                StrokeThickness="0">
+                <Border.StrokeShape>
+                    <RoundRectangle x:Name="ClearButtonShape" CornerRadius="0,5,0,5" />
+                </Border.StrokeShape>
+                <Button
+                    x:Name="ClearButton"
+                    Margin="0"
+                    Padding="12,0"
+                    BackgroundColor="Transparent"
+                    BorderWidth="0"
+                    Clicked="OnClearClicked"
+                    CornerRadius="0"
+                    FontSize="16"
+                    Text="Clear"
+                    TextColor="{Binding ClearButtonTextColor, Source={x:Reference RootView}}" />
+            </Border>
+
+            <!--
+                Close button — green surface, white "Close" label.
+                Same shape mechanics as the Clear wrapper.
+            -->
+            <Border
+                x:Name="CloseButtonWrapper"
+                Grid.Column="1"
+                BackgroundColor="{Binding CloseButtonColor, Source={x:Reference RootView}}"
+                IsVisible="False"
+                Stroke="Transparent"
+                StrokeThickness="0">
+                <Border.StrokeShape>
+                    <RoundRectangle x:Name="CloseButtonShape" CornerRadius="0,5,0,5" />
+                </Border.StrokeShape>
+                <Button
+                    x:Name="CloseButton"
+                    Margin="0"
+                    Padding="12,0"
+                    BackgroundColor="Transparent"
+                    BorderWidth="0"
+                    Clicked="OnCloseClicked"
+                    CornerRadius="0"
+                    FontSize="16"
+                    Text="Done"
+                    TextColor="{Binding CloseButtonTextColor, Source={x:Reference RootView}}" />
+            </Border>
+
+            <!--
+                Undo button — blue surface, white "Undo" label. Replaces Clear in
+                the same slot after a Clear tap, until focus returns to the entry.
+            -->
+            <Border
+                x:Name="UndoButtonWrapper"
+                Grid.Column="1"
+                BackgroundColor="{Binding UndoButtonColor, Source={x:Reference RootView}}"
+                IsVisible="False"
+                Stroke="Transparent"
+                StrokeThickness="0">
+                <Border.StrokeShape>
+                    <RoundRectangle x:Name="UndoButtonShape" CornerRadius="0,5,0,5" />
+                </Border.StrokeShape>
+                <Button
+                    x:Name="UndoButton"
+                    Margin="0"
+                    Padding="12,0"
+                    BackgroundColor="Transparent"
+                    BorderWidth="0"
+                    Clicked="OnUndoClicked"
+                    CornerRadius="0"
+                    FontSize="16"
+                    Text="Undo"
+                    TextColor="{Binding UndoButtonTextColor, Source={x:Reference RootView}}" />
+            </Border>
+        </Grid>
+    </Border>
+
+</ContentView>

@@ -207,6 +207,9 @@
 	<!-- TODO: Re-add Integrity.Client as a NuGet package or relative project reference -->
 
 	<ItemGroup>
+		<Compile Update="Controls\InteractiveEntry.xaml.cs">
+		  <DependentUpon>InteractiveEntry.xaml</DependentUpon>
+		</Compile>
 		<Compile Update="Views\GroupEditPage.xaml.cs">
 			<DependentUpon>GroupEditPage.xaml</DependentUpon>
 		</Compile>

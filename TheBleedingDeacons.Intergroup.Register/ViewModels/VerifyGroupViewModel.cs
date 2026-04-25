@@ -342,7 +342,7 @@ public partial class VerifyGroupViewModel : BaseViewModel
 		}
 
 		HasActiveGsrs = ActiveGsrs.Count > 0;
-		NoButtonText = HasActiveGsrs ? "No" : "Register";
+		NoButtonText = HasActiveGsrs ? "No" : "Sign-up";
 
 		var count = ActiveGsrs.Count;
 		GsrCountText = count switch

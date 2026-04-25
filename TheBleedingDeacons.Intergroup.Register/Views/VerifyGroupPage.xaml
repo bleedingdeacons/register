@@ -151,7 +151,7 @@
                             HorizontalOptions="Center"
                             Spacing="6">
                             <Label Style="{StaticResource M3EmptyStateTitleStyle}" Text="No GSRs Registered" />
-                            <Label Style="{StaticResource M3EmptyStateSubtitleStyle}" Text="Tap 'No' below to add a group service representative." />
+                            <Label Style="{StaticResource M3EmptyStateSubtitleStyle}" Text="Tap 'Sign-Up' below join intergroup as a service representative." />
                         </VerticalStackLayout>
                     </Border>
 
@@ -265,13 +265,13 @@
                     </Grid>
                 </Grid>
 
-                <!--  No active GSRs: single No button, half-width, centred  -->
+                <!--  No active GSRs: single Sign-up button, half-width, centred — styled like the Yes button  -->
                 <Grid ColumnDefinitions="*,2*,*" IsVisible="{Binding HasActiveGsrs, Converter={StaticResource InvertedBoolConverter}}">
                     <Button
                         Grid.Column="1"
                         Command="{Binding NoCommand}"
                         HorizontalOptions="Fill"
-                        Style="{StaticResource M3SecondaryButtonStyle}"
+                        Style="{StaticResource M3PrimaryButtonStyle}"
                         Text="{Binding NoButtonText}" />
                 </Grid>
             </VerticalStackLayout>
