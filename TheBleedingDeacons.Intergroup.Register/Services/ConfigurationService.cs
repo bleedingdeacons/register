@@ -19,6 +19,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		private const string UNITY_ACTIVE_MEETING_KEY = "unity_active_meeting_id";
 		private const string BETTERSTACK_SOURCE_TOKEN_KEY = "betterstack_source_token";
 		private const string REGISTRATION_LOG_ENABLED_KEY = "registration_log_enabled";
+		private const string AUTO_REGISTER_POSITIONS_KEY = "auto_register_positions_on_group";
 
 #if USE_DEV_CREDENTIALS
 		private const string DEV_CREDENTIALS_RESOURCE =
@@ -294,6 +295,51 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			catch (Exception ex)
 			{
 				Logger.Warning(ex, "Failed to save registration log toggle");
+			}
+		}
+
+		// =================================================================
+		// Auto-Register Positions on Group Registration Toggle
+		// =================================================================
+
+		/// <summary>
+		/// Reads the toggle from Preferences. Defaults to <c>true</c> when the
+		/// preference has never been written — the cascade saves an officer
+		/// from tapping twice when they're also their group's GSR, which is
+		/// the common case. Operators who want the old one-tap-per-entity
+		/// behaviour can turn it off in Settings.
+		/// </summary>
+		public bool IsAutoRegisterPositionsOnGroupEnabled
+		{
+			get
+			{
+				try
+				{
+					var raw = Preferences.Get(AUTO_REGISTER_POSITIONS_KEY, string.Empty);
+					if (string.IsNullOrEmpty(raw)) return true;
+					return bool.TryParse(raw, out var value) ? value : true;
+				}
+				catch (Exception ex)
+				{
+					// If Preferences is unavailable, fail safe by treating the
+					// toggle as on — matches the default for fresh installs
+					// and keeps behaviour consistent across a broken-prefs edge case.
+					Logger.Warning(ex, "Failed to read auto-register-positions toggle — defaulting to enabled");
+					return true;
+				}
+			}
+		}
+
+		public void SetAutoRegisterPositionsOnGroupEnabled(bool enabled)
+		{
+			try
+			{
+				Preferences.Set(AUTO_REGISTER_POSITIONS_KEY, enabled ? "true" : "false");
+				Logger.Information("Auto-register positions on group {State}", enabled ? "ENABLED" : "DISABLED");
+			}
+			catch (Exception ex)
+			{
+				Logger.Warning(ex, "Failed to save auto-register-positions toggle");
 			}
 		}
 

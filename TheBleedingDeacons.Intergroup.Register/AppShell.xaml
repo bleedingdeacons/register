@@ -1,46 +1,33 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<Shell x:Class="TheBleedingDeacons.Intergroup.Register.AppShell"
-       xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-       xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-       xmlns:local="clr-namespace:TheBleedingDeacons.Intergroup.Register.Views"
-       Shell.FlyoutBehavior="Flyout">
+<Shell
+    x:Class="TheBleedingDeacons.Intergroup.Register.AppShell"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:local="clr-namespace:TheBleedingDeacons.Intergroup.Register.Views"
+    Shell.FlyoutBehavior="Flyout">
 
-    <ShellContent Title="Home"
-                  Icon="home.png"
-                  ContentTemplate="{DataTemplate local:MainPage}"
-                  Route="MainPage" />
+    <ShellContent
+        Title="Home"
+        ContentTemplate="{DataTemplate local:MainPage}"
+        Icon="home.png"
+        Route="MainPage" />
 
-    <ShellContent Title="Registrations"
-                  Icon="home.png"
-                  ContentTemplate="{DataTemplate local:RegistrationOverviewPage}"
-                  Route="RegistrationOverviewPage" />
+    <ShellContent
+        Title="Registrations"
+        ContentTemplate="{DataTemplate local:RegistrationOverviewPage}"
+        Icon="registrations.png"
+        Route="RegistrationOverviewPage" />
 
-    <ShellContent Title="Admin"
-          Icon="admin.png"
-          ContentTemplate="{DataTemplate local:AdminPage}"
-          Route="AdminPage" />
+    <ShellContent
+        Title="Administration"
+        ContentTemplate="{DataTemplate local:AdminPage}"
+        Icon="admin.png"
+        Route="AdminPage" />
 
-    <ShellContent Title="Settings"
-              Icon="settings.png"
-              ContentTemplate="{DataTemplate local:SettingsPage}"
-              Route="SettingsPage" />
-
-    <ShellContent Title="Mail"
-          Icon="settings.png"
-          ContentTemplate="{DataTemplate local:MailSettingsPage}"
-          Route="MailSettingsPage"
-          IsVisible="False" />
-
-    <ShellContent Title="Database"
-      Icon="database.png"
-      ContentTemplate="{DataTemplate local:DatabaseBackupPage}"
-      Route="DatabaseBackupPage"
-      IsVisible="False" />
-
-    <ShellContent Title="Email Status"
-      Icon="settings.png"
-      ContentTemplate="{DataTemplate local:EmailStatusPage}"
-      Route="EmailStatusPage"
-      IsVisible="False" />
+    <ShellContent
+        Title="Settings"
+        ContentTemplate="{DataTemplate local:SettingsPage}"
+        Icon="settings.png"
+        Route="SettingsPage" />
 
 </Shell>

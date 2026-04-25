@@ -37,5 +37,20 @@ namespace TheBleedingDeacons.Intergroup.Register.Services.Interfaces
 		/// next registration action; no restart required.
 		/// </summary>
 		void SetRegistrationEventLogEnabled(bool enabled);
+
+		/// <summary>
+		/// When true, registering a group also registers any intergroup position
+		/// held by one of its members in the same operation. Useful when an
+		/// officer also serves as GSR for their home group and would otherwise
+		/// need to be registered twice.
+		/// Defaults to true; callers should treat a missing value as true.
+		/// </summary>
+		bool IsAutoRegisterPositionsOnGroupEnabled { get; }
+
+		/// <summary>
+		/// Persists the auto-register-positions toggle. Takes effect on the
+		/// next group registration; no restart required.
+		/// </summary>
+		void SetAutoRegisterPositionsOnGroupEnabled(bool enabled);
 	}
 }

@@ -97,6 +97,13 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			string? gsrProxyName = null,
 			CancellationToken ct = default)
 		{
+			// IDs of positions that were also flipped to Registered=true as a
+			// side effect of this group registration. Captured inside the DB
+			// transaction and used outside it to append to the event log.
+			// Empty when the toggle is off, when we're unregistering, or when
+			// no member of this group holds a position.
+			var cascadedPositionIds = new List<int>();
+
 			// ── Primary store: SQLite ────────────────────────────────
 			try
 			{
@@ -115,6 +122,52 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 				group.Registered = registered;
 				group.GsrProxy = gsrProxy;
 				group.GsrProxyName = gsrProxy ? gsrProxyName : null;
+
+				// ── Cascade: also register positions held by this group's members ──
+				//
+				// Only on the register path (registered=true). The un-register
+				// path intentionally does NOT cascade: a position holder may
+				// have been deliberately registered separately, may hold their
+				// position through a different group's registration, or may
+				// still be in attendance even if their home group steps out.
+				// Silently flipping their row off would erase intent we can't
+				// reconstruct.
+				//
+				// We look up candidate position IDs from the live DB (not from
+				// the passed-in entity graph) so the decision is based on the
+				// canonical persisted membership, not whatever the ViewModel
+				// happened to hand us. Idempotent: positions already flagged
+				// Registered stay that way, and we don't log duplicate entries
+				// for them.
+				if (registered && _configService.IsAutoRegisterPositionsOnGroupEnabled)
+				{
+					var candidateIds = await dbContext.Members
+						.Where(m => m.HomeGroupId == groupId && m.IntergroupPositionId != null)
+						.Select(m => m.IntergroupPositionId!.Value)
+						.Distinct()
+						.ToListAsync(ct);
+
+					if (candidateIds.Count > 0)
+					{
+						var positionsToFlip = await dbContext.Positions
+							.Where(p => candidateIds.Contains(p.Id) && !p.Registered)
+							.ToListAsync(ct);
+
+						foreach (var position in positionsToFlip)
+						{
+							position.Registered = true;
+							cascadedPositionIds.Add(position.Id);
+						}
+
+						if (positionsToFlip.Count > 0)
+						{
+							Logger.Information(
+								"Auto-registered {Count} position(s) {PositionIds} as cascade from group {GroupId}",
+								positionsToFlip.Count, cascadedPositionIds, groupId);
+						}
+					}
+				}
+
 				await dbContext.SaveChangesAsync(ct);
 			}
 			catch (Exception ex)
@@ -133,6 +186,25 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			if (_configService.IsRegistrationEventLogEnabled)
 			{
 				await _eventLog.AppendGroupAsync(groupId, registered, gsrProxy, gsrProxyName, ct);
+
+				// Mirror the position flips into the event log so a replay
+				// after a crash rebuilds the same state. A failure here is
+				// warned-only — the DB write is the authoritative record
+				// and has already succeeded; the log is defence in depth.
+				foreach (var positionId in cascadedPositionIds)
+				{
+					try
+					{
+						await _eventLog.AppendPositionAsync(positionId, true, ct);
+					}
+					catch (Exception ex)
+					{
+						Logger.Warning(
+							ex,
+							"Failed to append cascaded position {PositionId} to event log",
+							positionId);
+					}
+				}
 			}
 		}
 

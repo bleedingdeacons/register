@@ -1,145 +1,241 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
-             xmlns:vm="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
-             x:Class="TheBleedingDeacons.Intergroup.Register.Views.SettingsPage"
-             x:DataType="vm:SettingsViewModel"
-             Title="Settings">
+<ContentPage
+    x:Class="TheBleedingDeacons.Intergroup.Register.Views.SettingsPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+    xmlns:vm="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
+    Title="Settings"
+    x:DataType="vm:SettingsViewModel">
 
     <ScrollView>
-        <StackLayout Orientation="Vertical"
-                     Spacing="20"
-                     Margin="20"
-                     VerticalOptions="Start">
+        <StackLayout
+            Margin="20"
+            Orientation="Vertical"
+            Spacing="20"
+            VerticalOptions="Start">
 
-            <Label Text="Settings"
-                   FontSize="32"
-                   FontAttributes="Bold"
-                   HorizontalOptions="Center"
-                   Margin="0,0,0,30"/>
+            <Label
+                Margin="0,0,0,30"
+                FontAttributes="Bold"
+                FontSize="32"
+                HorizontalOptions="Center"
+                Text="Settings" />
 
-            <Button x:Name="MailSettingButton"
-                    Text="Mail Settings"
-                    FontSize="18"
-                    BackgroundColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
-                    TextColor="White"
-                    CornerRadius="8"
-                    HeightRequest="60"
-                    Command="{Binding NavigateToMailSettingCommand}"/>
+            <Button
+                x:Name="MailSettingButton"
+                BackgroundColor="{AppThemeBinding Light={StaticResource Primary},
+                                                  Dark={StaticResource PrimaryDark}}"
+                Command="{Binding NavigateToMailSettingCommand}"
+                CornerRadius="8"
+                FontSize="18"
+                HeightRequest="60"
+                Text="Mail Settings"
+                TextColor="White" />
 
-            <Button x:Name="IntegrationsSettingButton"
-                    Text="Integrations"
-                    FontSize="18"
-                    BackgroundColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
-                    TextColor="White"
-                    CornerRadius="8"
-                    HeightRequest="60"
-                    Command="{Binding NavigateToIntegrationsSettingCommand}"/>
+            <Button
+                x:Name="IntegrationsSettingButton"
+                BackgroundColor="{AppThemeBinding Light={StaticResource Primary},
+                                                  Dark={StaticResource PrimaryDark}}"
+                Command="{Binding NavigateToIntegrationsSettingCommand}"
+                CornerRadius="8"
+                FontSize="18"
+                HeightRequest="60"
+                Text="Integrations"
+                TextColor="White" />
 
-            <Button x:Name="BackupButton"
-                    Text="Database Backup"
-                    FontSize="18"
-                    BackgroundColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
-                    TextColor="White"
-                    CornerRadius="8"
-                    HeightRequest="60"
-                    Command="{Binding NavigateToBackupCommand}"/>
+            <Button
+                x:Name="BackupButton"
+                BackgroundColor="{AppThemeBinding Light={StaticResource Primary},
+                                                  Dark={StaticResource PrimaryDark}}"
+                Command="{Binding NavigateToBackupCommand}"
+                CornerRadius="8"
+                FontSize="18"
+                HeightRequest="60"
+                Text="Database Backup"
+                TextColor="White" />
 
-            <Button x:Name="EmailStatusButton"
-                    Text="Email Status"
-                    FontSize="18"
-                    BackgroundColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
-                    TextColor="White"
-                    CornerRadius="8"
-                    HeightRequest="60"
-                    Command="{Binding NavigateToMailStatusCommand}"/>
+            <Button
+                x:Name="EmailStatusButton"
+                BackgroundColor="{AppThemeBinding Light={StaticResource Primary},
+                                                  Dark={StaticResource PrimaryDark}}"
+                Command="{Binding NavigateToMailStatusCommand}"
+                CornerRadius="8"
+                FontSize="18"
+                HeightRequest="60"
+                Text="Email Status"
+                TextColor="White" />
 
-            <!-- ═══════════════════════════════════════════════════════
-                 Durability
-                 ═══════════════════════════════════════════════════════ -->
-            <BoxView HeightRequest="1"
-                     Color="{AppThemeBinding Light=#E0E0E0, Dark=#424242}"
-                     Margin="0,10,0,0"/>
+            <!--
+                ═══════════════════════════════════════════════════════
+                Durability
+                ═══════════════════════════════════════════════════════
+            -->
+            <BoxView
+                Margin="0,10,0,0"
+                HeightRequest="1"
+                Color="{AppThemeBinding Light=#E0E0E0,
+                                        Dark=#424242}" />
 
-            <Label Text="Durability"
-                   FontSize="14"
-                   FontAttributes="Bold"
-                   TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}"
-                   HorizontalOptions="Start"/>
+            <Label
+                FontAttributes="Bold"
+                FontSize="14"
+                HorizontalOptions="Start"
+                Text="Durability"
+                TextColor="{AppThemeBinding Light={StaticResource Gray600},
+                                            Dark={StaticResource Gray300}}" />
 
-            <Border StrokeShape="RoundRectangle 10"
-                    StrokeThickness="1"
-                    Stroke="{AppThemeBinding Light=#E0E0E0, Dark=#424242}"
-                    BackgroundColor="{AppThemeBinding Light=White, Dark=#2D2D30}"
-                    Padding="15,12">
-                <Grid ColumnDefinitions="*,Auto"
-                      RowDefinitions="Auto,Auto"
-                      ColumnSpacing="12"
-                      RowSpacing="4">
+            <Border
+                Padding="15,12"
+                BackgroundColor="{AppThemeBinding Light=White,
+                                                  Dark=#2D2D30}"
+                Stroke="{AppThemeBinding Light=#E0E0E0,
+                                         Dark=#424242}"
+                StrokeShape="RoundRectangle 10"
+                StrokeThickness="1">
+                <Grid
+                    ColumnDefinitions="*,Auto"
+                    ColumnSpacing="12"
+                    RowDefinitions="Auto,Auto"
+                    RowSpacing="4">
 
-                    <Label Grid.Row="0" Grid.Column="0"
-                           Text="Registration Event Log"
-                           FontSize="16"
-                           FontAttributes="Bold"
-                           VerticalOptions="Center"/>
+                    <Label
+                        Grid.Row="0"
+                        Grid.Column="0"
+                        FontAttributes="Bold"
+                        FontSize="16"
+                        Text="Registration Event Log"
+                        VerticalOptions="Center" />
 
-                    <Switch Grid.Row="0" Grid.Column="1"
-                            Grid.RowSpan="2"
-                            VerticalOptions="Center"
-                            IsToggled="{Binding IsRegistrationEventLogEnabled, Mode=TwoWay}"/>
+                    <Switch
+                        Grid.Row="0"
+                        Grid.RowSpan="2"
+                        Grid.Column="1"
+                        IsToggled="{Binding IsRegistrationEventLogEnabled, Mode=TwoWay}"
+                        VerticalOptions="Center" />
 
-                    <Label Grid.Row="1" Grid.Column="0"
-                           Text="Records each registration to a crash-durable log so nothing is lost if the app is killed mid-meeting. Recommended on."
-                           FontSize="13"
-                           TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray300}}"
-                           LineBreakMode="WordWrap"/>
+                    <Label
+                        Grid.Row="1"
+                        Grid.Column="0"
+                        FontSize="13"
+                        LineBreakMode="WordWrap"
+                        Text="Records each registration to a crash-durable log so nothing is lost if the app is killed mid-meeting. Recommended on."
+                        TextColor="{AppThemeBinding Light={StaticResource Gray600},
+                                                    Dark={StaticResource Gray300}}" />
                 </Grid>
             </Border>
 
-            <!-- ═══════════════════════════════════════════════════════
-                 Reset Device
-                 ═══════════════════════════════════════════════════════ -->
-            <BoxView HeightRequest="1"
-                     Color="{AppThemeBinding Light=#E0E0E0, Dark=#424242}"
-                     Margin="0,10,0,0"/>
+            <!--
+                ═══════════════════════════════════════════════════════
+                Registration
+                ═══════════════════════════════════════════════════════
+            -->
+            <BoxView
+                Margin="0,10,0,0"
+                HeightRequest="1"
+                Color="{AppThemeBinding Light=#E0E0E0,
+                                        Dark=#424242}" />
 
-            <Label Text="Danger Zone"
-                   FontSize="14"
-                   FontAttributes="Bold"
-                   TextColor="{AppThemeBinding Light=#D32F2F, Dark=#EF5350}"
-                   HorizontalOptions="Start"
-                   Margin="0,0,0,0"/>
+            <Label
+                FontAttributes="Bold"
+                FontSize="14"
+                HorizontalOptions="Start"
+                Text="Registration"
+                TextColor="{AppThemeBinding Light={StaticResource Gray600},
+                                            Dark={StaticResource Gray300}}" />
 
-            <Label Text="{Binding PurgeStatusMessage}"
-                   FontSize="14"
-                   IsVisible="{Binding IsPurgeStatusVisible}"
-                   HorizontalOptions="Center">
+            <Border
+                Padding="15,12"
+                BackgroundColor="{AppThemeBinding Light=White,
+                                                  Dark=#2D2D30}"
+                Stroke="{AppThemeBinding Light=#E0E0E0,
+                                         Dark=#424242}"
+                StrokeShape="RoundRectangle 10"
+                StrokeThickness="1">
+                <Grid
+                    ColumnDefinitions="*,Auto"
+                    ColumnSpacing="12"
+                    RowDefinitions="Auto,Auto"
+                    RowSpacing="4">
+
+                    <Label
+                        Grid.Row="0"
+                        Grid.Column="0"
+                        FontAttributes="Bold"
+                        FontSize="16"
+                        Text="Auto-register Officers"
+                        VerticalOptions="Center" />
+
+                    <Switch
+                        Grid.Row="0"
+                        Grid.RowSpan="2"
+                        Grid.Column="1"
+                        IsToggled="{Binding IsAutoRegisterPositionsOnGroupEnabled, Mode=TwoWay}"
+                        VerticalOptions="Center" />
+
+                    <Label
+                        Grid.Row="1"
+                        Grid.Column="0"
+                        FontSize="13"
+                        LineBreakMode="WordWrap"
+                        Text="When a group is registered, also register any intergroup position held by a member of that group. Saves tapping twice when an officer is also their group's GSR."
+                        TextColor="{AppThemeBinding Light={StaticResource Gray600},
+                                                    Dark={StaticResource Gray300}}" />
+                </Grid>
+            </Border>
+
+            <!--
+                ═══════════════════════════════════════════════════════
+                Reset Device
+                ═══════════════════════════════════════════════════════
+            -->
+            <BoxView
+                Margin="0,10,0,0"
+                HeightRequest="1"
+                Color="{AppThemeBinding Light=#E0E0E0,
+                                        Dark=#424242}" />
+
+            <Label
+                Margin="0,0,0,0"
+                FontAttributes="Bold"
+                FontSize="14"
+                HorizontalOptions="Start"
+                Text="Danger Zone"
+                TextColor="{AppThemeBinding Light=#D32F2F,
+                                            Dark=#EF5350}" />
+
+            <Label
+                FontSize="14"
+                HorizontalOptions="Center"
+                IsVisible="{Binding IsPurgeStatusVisible}"
+                Text="{Binding PurgeStatusMessage}">
                 <Label.Triggers>
-                    <DataTrigger TargetType="Label"
-                                 Binding="{Binding IsPurgeStatusError}"
-                                 Value="True">
-                        <Setter Property="TextColor"
-                                Value="{AppThemeBinding Light=#D32F2F, Dark=#EF5350}"/>
+                    <DataTrigger
+                        Binding="{Binding IsPurgeStatusError}"
+                        TargetType="Label"
+                        Value="True">
+                        <Setter Property="TextColor" Value="{AppThemeBinding Light=#D32F2F, Dark=#EF5350}" />
                     </DataTrigger>
-                    <DataTrigger TargetType="Label"
-                                 Binding="{Binding IsPurgeStatusError}"
-                                 Value="False">
-                        <Setter Property="TextColor"
-                                Value="{AppThemeBinding Light=#388E3C, Dark=#66BB6A}"/>
+                    <DataTrigger
+                        Binding="{Binding IsPurgeStatusError}"
+                        TargetType="Label"
+                        Value="False">
+                        <Setter Property="TextColor" Value="{AppThemeBinding Light=#388E3C, Dark=#66BB6A}" />
                     </DataTrigger>
                 </Label.Triggers>
             </Label>
 
-            <Button x:Name="PurgeDatabaseButton"
-                    Text="Reset Device"
-                    FontSize="18"
-                    BackgroundColor="{AppThemeBinding Light=#D32F2F, Dark=#C62828}"
-                    TextColor="White"
-                    CornerRadius="8"
-                    HeightRequest="60"
-                    IsEnabled="{Binding IsPurging, Converter={toolkit:InvertedBoolConverter}}"
-                    Command="{Binding PurgeDatabaseCommand}"/>
+            <Button
+                x:Name="PurgeDatabaseButton"
+                BackgroundColor="{AppThemeBinding Light=#D32F2F,
+                                                  Dark=#C62828}"
+                Command="{Binding PurgeDatabaseCommand}"
+                CornerRadius="8"
+                FontSize="18"
+                HeightRequest="60"
+                IsEnabled="{Binding IsPurging, Converter={toolkit:InvertedBoolConverter}}"
+                Text="Reset Device"
+                TextColor="White" />
 
         </StackLayout>
     </ScrollView>

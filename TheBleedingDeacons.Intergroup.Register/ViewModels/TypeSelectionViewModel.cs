@@ -14,7 +14,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 
 		public TypeSelectionViewModel()
 		{
-			Title = "Select Meeting Type";
+			Title = "Meeting Type";
 		}
 
 		[RelayCommand]

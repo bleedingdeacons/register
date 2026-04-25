@@ -64,6 +64,25 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 			}
 		}
 
+		/// <summary>
+		/// Two-way bound to a Switch on SettingsPage. When on, registering a
+		/// group via the Verify flow also registers any intergroup position
+		/// held by one of its members. See
+		/// <see cref="IConfigurationService.IsAutoRegisterPositionsOnGroupEnabled"/>.
+		/// Same "no local backing field" approach as the event log toggle:
+		/// Preferences is the source of truth.
+		/// </summary>
+		public bool IsAutoRegisterPositionsOnGroupEnabled
+		{
+			get => _configService.IsAutoRegisterPositionsOnGroupEnabled;
+			set
+			{
+				if (_configService.IsAutoRegisterPositionsOnGroupEnabled == value) return;
+				_configService.SetAutoRegisterPositionsOnGroupEnabled(value);
+				OnPropertyChanged();
+			}
+		}
+
 		// =================================================================
 		// Navigation
 		// =================================================================
@@ -138,6 +157,21 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 
 				using var dbContext = _dbContextFactory.CreateDbContext();
 				await dbContext.PurgeDatabaseAsync();
+
+				// Clear the active intergroup meeting selection. The
+				// meeting ID is stored in Preferences and refers to a
+				// row that we've just deleted — leaving it behind would
+				// leave the app pointing at a meeting that no longer
+				// exists. Same "log but don't fail" policy as the event
+				// log deletion below: the DB purge has already succeeded.
+				try
+				{
+					await _configService.SaveActiveIntergroupMeetingAsync(null);
+				}
+				catch (Exception ex)
+				{
+					Logger.Warning(ex, "Failed to clear active intergroup meeting during device reset");
+				}
 
 				// Delete the registration event log if it exists. We do
 				// this after the DB purge succeeds, not before — if the
