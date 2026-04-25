@@ -64,6 +64,17 @@ public partial class VerifyPositionViewModel : BaseViewModel
 	private bool isLoading;
 
 	/// <summary>
+	/// Identifies which page initiated this Verify flow, so that on
+	/// successful register we know whether to reset to MainPage (the
+	/// standard registration flow) or just pop back to the Registrations
+	/// overview so its list re-evaluates with the new state.
+	/// Empty / unset → MainPage behaviour (default).
+	/// "overview" → pop back to RegistrationOverviewPage.
+	/// </summary>
+	[ObservableProperty]
+	private string entrySource = string.Empty;
+
+	/// <summary>
 	/// Active holders for the position, displayed as a list.
 	/// </summary>
 	public ObservableCollection<Member> ActiveHolders { get; } = new();
@@ -125,6 +136,16 @@ public partial class VerifyPositionViewModel : BaseViewModel
 			if (parsedPositionId > 0)
 			{
 				PositionId = parsedPositionId;
+
+				// Capture optional entrySource so Yes() knows whether to reset
+				// to MainPage or pop back to the page that opened us. Only set
+				// on the initial nav; the edited-return branch above retains it.
+				if (query.TryGetValue("entrySource", out var entrySourceObj) &&
+					entrySourceObj is string entrySourceStr)
+				{
+					EntrySource = entrySourceStr;
+				}
+
 				MainThread.BeginInvokeOnMainThread(async () =>
 				{
 					await LoadPositionAsync(parsedPositionId);
@@ -197,7 +218,16 @@ public partial class VerifyPositionViewModel : BaseViewModel
 			await _popupService.ShowCountdownPopupAsync(
 				"Complete",
 				$"Thanks {Position.ShortDescription}",
-				async () => await Shell.Current.GoToAsync("//MainPage")
+				async () =>
+				{
+					// Symmetric with VerifyGroupViewModel.Yes() — return to
+					// the Registrations overview when that's where we came
+					// from, so its OnAppearing reload re-evaluates the row.
+					if (string.Equals(EntrySource, "overview", StringComparison.OrdinalIgnoreCase))
+						await Shell.Current.GoToAsync("..");
+					else
+						await Shell.Current.GoToAsync("//MainPage");
+				}
 			);
 		}
 		catch (Exception ex)

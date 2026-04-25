@@ -69,6 +69,17 @@ public partial class VerifyGroupViewModel : BaseViewModel
 	[ObservableProperty]
 	private string noButtonText = "No";
 
+	/// <summary>
+	/// Identifies which page initiated this Verify flow, so that on
+	/// successful register we know whether to reset to MainPage (the
+	/// standard registration flow) or just pop back to the Registrations
+	/// overview so its list re-evaluates with the new state.
+	/// Empty / unset → MainPage behaviour (default).
+	/// "overview" → pop back to RegistrationOverviewPage.
+	/// </summary>
+	[ObservableProperty]
+	private string entrySource = string.Empty;
+
 	// If the user toggles "Standing in", re-gate the Yes button.
 	partial void OnStandingInChanged(bool value) => UpdateCanRegister();
 
@@ -137,6 +148,16 @@ public partial class VerifyGroupViewModel : BaseViewModel
 			if (parsedGroupId > 0)
 			{
 				GroupId = parsedGroupId;
+
+				// Capture optional entrySource so Yes() knows whether to reset
+				// to MainPage or pop back to the page that opened us. Only set
+				// on the initial nav; the edited-return branch above retains it.
+				if (query.TryGetValue("entrySource", out var entrySourceObj) &&
+					entrySourceObj is string entrySourceStr)
+				{
+					EntrySource = entrySourceStr;
+				}
+
 				MainThread.BeginInvokeOnMainThread(async () =>
 				{
 					await LoadGroupAsync(parsedGroupId);
@@ -225,7 +246,18 @@ public partial class VerifyGroupViewModel : BaseViewModel
 			await _popupService.ShowCountdownPopupAsync(
 				"Complete",
 				$"Thanks {Group.Name}",
-				async () => await Shell.Current.GoToAsync("//MainPage")
+				async () =>
+				{
+					// When the user reached this Verify page from the
+					// Registrations overview, pop back so its OnAppearing
+					// reload re-evaluates the list (registered count, the
+					// row's IsToggleEnabled etc.). The standard registration
+					// flow keeps the historical "reset to MainPage" exit.
+					if (string.Equals(EntrySource, "overview", StringComparison.OrdinalIgnoreCase))
+						await Shell.Current.GoToAsync("..");
+					else
+						await Shell.Current.GoToAsync("//MainPage");
+				}
 			);
 		}
 		catch (Exception ex)
