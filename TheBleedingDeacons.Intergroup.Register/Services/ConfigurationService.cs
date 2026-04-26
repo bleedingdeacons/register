@@ -20,6 +20,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		private const string BETTERSTACK_SOURCE_TOKEN_KEY = "betterstack_source_token";
 		private const string REGISTRATION_LOG_ENABLED_KEY = "registration_log_enabled";
 		private const string AUTO_REGISTER_POSITIONS_KEY = "auto_register_positions_on_group";
+		private const string SINGLE_GSR_SHORTCUT_KEY = "single_gsr_shortcut_enabled";
 
 #if USE_DEV_CREDENTIALS
 		private const string DEV_CREDENTIALS_RESOURCE =
@@ -340,6 +341,50 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			catch (Exception ex)
 			{
 				Logger.Warning(ex, "Failed to save auto-register-positions toggle");
+			}
+		}
+
+		// =================================================================
+		// Single-GSR Shortcut Toggle
+		// =================================================================
+
+		/// <summary>
+		/// Reads the toggle from Preferences. Defaults to <c>false</c> when the
+		/// preference has never been written — fresh installs get the explicit
+		/// "always pick from the list, then tap Yes" flow. Operators who want
+		/// the one-tap shortcut for single-GSR groups can turn it on in Settings.
+		/// </summary>
+		public bool IsSingleGsrShortcutEnabled
+		{
+			get
+			{
+				try
+				{
+					var raw = Preferences.Get(SINGLE_GSR_SHORTCUT_KEY, string.Empty);
+					if (string.IsNullOrEmpty(raw)) return false;
+					return bool.TryParse(raw, out var value) ? value : false;
+				}
+				catch (Exception ex)
+				{
+					// If Preferences is unavailable, fail safe by treating the
+					// shortcut as off — matches the default for fresh installs
+					// and keeps behaviour consistent across a broken-prefs edge case.
+					Logger.Warning(ex, "Failed to read single-GSR shortcut toggle — defaulting to disabled");
+					return false;
+				}
+			}
+		}
+
+		public void SetSingleGsrShortcutEnabled(bool enabled)
+		{
+			try
+			{
+				Preferences.Set(SINGLE_GSR_SHORTCUT_KEY, enabled ? "true" : "false");
+				Logger.Information("Single-GSR shortcut {State}", enabled ? "ENABLED" : "DISABLED");
+			}
+			catch (Exception ex)
+			{
+				Logger.Warning(ex, "Failed to save single-GSR shortcut toggle");
 			}
 		}
 

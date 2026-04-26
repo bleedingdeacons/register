@@ -35,6 +35,7 @@ public partial class EditGroupViewModel : BaseViewModel
 	private readonly IDbContextFactory<UnityDbContext> _contextFactory;
 	private readonly IPopupNotification _popupService;
 	private readonly IPhoneNumberService _phoneService;
+	private readonly IConfigurationService _configService;
 
 	// The group whose GSRs are being managed
 	private Group? _group;
@@ -139,11 +140,13 @@ public partial class EditGroupViewModel : BaseViewModel
 	public EditGroupViewModel(
 		IDbContextFactory<UnityDbContext> contextFactory,
 		IPopupNotification popupService,
-		IPhoneNumberService phoneService)
+		IPhoneNumberService phoneService,
+		IConfigurationService configService)
 	{
 		_contextFactory = contextFactory;
 		_popupService = popupService;
 		_phoneService = phoneService;
+		_configService = configService;
 
 		ValidateForm();
 	}
@@ -581,12 +584,20 @@ public partial class EditGroupViewModel : BaseViewModel
 			return;
 		}
 
-		// When this edit was entered via the single-GSR shortcut, signal to
-		// the verify page that it should auto-fire the Yes/register command
-		// on return. CanExecuteYes still gates the actual registration, so
-		// if validation somehow fails the user just lands back on the verify
-		// page with the Yes button enabled or disabled as normal.
-		var returnRoute = _enteredViaSingleGsrShortcut
+		// When this edit was entered via the single-GSR shortcut AND the
+		// shortcut is still enabled in Settings, signal to the verify page
+		// that it should auto-fire the Yes/register command on return.
+		// CanExecuteYes still gates the actual registration, so if validation
+		// somehow fails the user just lands back on the verify page with the
+		// Yes button enabled or disabled as normal. Re-checking the toggle
+		// here (rather than relying solely on the producer-side gate in
+		// VerifyGroupViewModel.No) keeps the on/off behaviour consistent
+		// even if a future caller sets _enteredViaSingleGsrShortcut without
+		// going through the verify flow.
+		var autoRegister = _enteredViaSingleGsrShortcut &&
+						   _configService.IsSingleGsrShortcutEnabled;
+
+		var returnRoute = autoRegister
 			? "..?edited=true&autoRegister=true"
 			: "..?edited=true";
 

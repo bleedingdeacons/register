@@ -83,6 +83,27 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 			}
 		}
 
+		/// <summary>
+		/// Two-way bound to a Switch on SettingsPage. When on, the verify-group
+		/// flow takes a shortcut whenever a group has exactly one GSR: tapping
+		/// "No" opens that GSR's edit form directly (skipping the picker), and
+		/// tapping "Finished" on that edit form auto-registers attendance on
+		/// return. See
+		/// <see cref="IConfigurationService.IsSingleGsrShortcutEnabled"/>.
+		/// Same "no local backing field" approach as the other toggles:
+		/// Preferences is the source of truth.
+		/// </summary>
+		public bool IsSingleGsrShortcutEnabled
+		{
+			get => _configService.IsSingleGsrShortcutEnabled;
+			set
+			{
+				if (_configService.IsSingleGsrShortcutEnabled == value) return;
+				_configService.SetSingleGsrShortcutEnabled(value);
+				OnPropertyChanged();
+			}
+		}
+
 		// =================================================================
 		// Navigation
 		// =================================================================

@@ -184,6 +184,46 @@
                 </Grid>
             </Border>
 
+            <Border
+                Padding="15,12"
+                BackgroundColor="{AppThemeBinding Light=White,
+                                                  Dark=#2D2D30}"
+                Stroke="{AppThemeBinding Light=#E0E0E0,
+                                         Dark=#424242}"
+                StrokeShape="RoundRectangle 10"
+                StrokeThickness="1">
+                <Grid
+                    ColumnDefinitions="*,Auto"
+                    ColumnSpacing="12"
+                    RowDefinitions="Auto,Auto"
+                    RowSpacing="4">
+
+                    <Label
+                        Grid.Row="0"
+                        Grid.Column="0"
+                        FontAttributes="Bold"
+                        FontSize="16"
+                        Text="Single-GSR Shortcut"
+                        VerticalOptions="Center" />
+
+                    <Switch
+                        Grid.Row="0"
+                        Grid.RowSpan="2"
+                        Grid.Column="1"
+                        IsToggled="{Binding IsSingleGsrShortcutEnabled, Mode=TwoWay}"
+                        VerticalOptions="Center" />
+
+                    <Label
+                        Grid.Row="1"
+                        Grid.Column="0"
+                        FontSize="13"
+                        LineBreakMode="WordWrap"
+                        Text="When a group has only one Group Service Representative, tapping No skips the picker and opens that record's edit form directly. Tapping Finished returns straight to registration without an extra Yes tap."
+                        TextColor="{AppThemeBinding Light={StaticResource Gray600},
+                                                    Dark={StaticResource Gray300}}" />
+                </Grid>
+            </Border>
+
             <!--
                 ═══════════════════════════════════════════════════════
                 Reset Device

@@ -52,5 +52,22 @@ namespace TheBleedingDeacons.Intergroup.Register.Services.Interfaces
 		/// next group registration; no restart required.
 		/// </summary>
 		void SetAutoRegisterPositionsOnGroupEnabled(bool enabled);
+
+		/// <summary>
+		/// When true, the verify-group flow takes a shortcut whenever a group
+		/// has exactly one GSR: tapping "No" opens that GSR's edit form
+		/// directly (skipping the picker), and tapping "Finished" on that
+		/// edit form auto-registers attendance on return. When false, the
+		/// flow always lands on the GSR list and Finished returns to Verify
+		/// without registering — the user must tap "Yes" themselves.
+		/// Defaults to false; callers should treat a missing value as false.
+		/// </summary>
+		bool IsSingleGsrShortcutEnabled { get; }
+
+		/// <summary>
+		/// Persists the single-GSR shortcut toggle. Takes effect on the next
+		/// verify-group entry; no restart required.
+		/// </summary>
+		void SetSingleGsrShortcutEnabled(bool enabled);
 	}
 }

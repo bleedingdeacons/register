@@ -35,6 +35,7 @@ public partial class VerifyGroupViewModel : BaseViewModel
 	private readonly IAttendanceRegistration<Group> _attendanceRegistration;
 	private readonly IGroupRepository _groupRepository;
 	private readonly IPopupNotification _popupService;
+	private readonly IConfigurationService _configService;
 
 	[ObservableProperty]
 	private Group? group;
@@ -106,11 +107,13 @@ public partial class VerifyGroupViewModel : BaseViewModel
 	public VerifyGroupViewModel(
 		IAttendanceRegistration<Group> attendanceRegistration,
 		IGroupRepository groupRepository,
-		IPopupNotification popupService)
+		IPopupNotification popupService,
+		IConfigurationService configService)
 	{
 		_attendanceRegistration = attendanceRegistration;
 		_groupRepository = groupRepository;
 		_popupService = popupService;
+		_configService = configService;
 	}
 
 	#region Query Attributes Handling
@@ -228,14 +231,16 @@ public partial class VerifyGroupViewModel : BaseViewModel
 		};
 
 		// If no GSRs exist, skip straight to the add-member flow on the edit page.
-		// If exactly one GSR exists, the user has effectively already chosen which
-		// record to fix — skip the picker and open that member directly for editing.
-		// With multiple GSRs we still land on the list so the user can pick.
+		// If exactly one GSR exists AND the single-GSR shortcut is enabled, the
+		// user has effectively already chosen which record to fix — skip the
+		// picker and open that member directly for editing. With multiple GSRs
+		// (or when the shortcut is disabled in Settings) we still land on the
+		// list so the user can pick.
 		if (!HasActiveGsrs)
 		{
 			parameters["addMember"] = true;
 		}
-		else if (ActiveGsrs.Count == 1)
+		else if (ActiveGsrs.Count == 1 && _configService.IsSingleGsrShortcutEnabled)
 		{
 			parameters["editMember"] = ActiveGsrs[0];
 		}
