@@ -49,12 +49,22 @@ public class ReconciliationService
 {
 	private static readonly ILogger Logger = AppLogger.ForContext<ReconciliationService>();
 
+	/// <summary>
+	/// Sentinel key written into the modified-members "changed properties"
+	/// set to indicate that one or more of the five GDPR compliance fields
+	/// differs from the snapshot. Not a real property name on
+	/// <see cref="Member"/>; chosen so it can never collide with a
+	/// <c>nameof(Member.X)</c> result.
+	/// </summary>
+	private const string GdprComplianceKey = "__gdpr_compliance__";
+
 	private readonly SnapshotService _snapshotService;
 	private readonly UnitySyncService _syncService;
 	private readonly IConfigurationService _configService;
 	private readonly Func<Task<UnityRestSharp>> _clientFactory;
 	private readonly IDbContextFactory<UnityDbContext> _dbContextFactory;
 	private readonly RegistrationEventLog _eventLog;
+	private readonly ComplianceEventLog _complianceLog;
 
 	public ReconciliationService(
 		SnapshotService snapshotService,
@@ -62,7 +72,8 @@ public class ReconciliationService
 		IConfigurationService configService,
 		Func<Task<UnityRestSharp>> clientFactory,
 		IDbContextFactory<UnityDbContext> dbContextFactory,
-		RegistrationEventLog eventLog)
+		RegistrationEventLog eventLog,
+		ComplianceEventLog complianceLog)
 	{
 		_snapshotService = snapshotService;
 		_syncService = syncService;
@@ -70,6 +81,7 @@ public class ReconciliationService
 		_clientFactory = clientFactory;
 		_dbContextFactory = dbContextFactory;
 		_eventLog = eventLog;
+		_complianceLog = complianceLog;
 	}
 
 	// =====================================================================
@@ -83,6 +95,7 @@ public class ReconciliationService
 		int UnregisteredGroups,
 		int RegisteredPositions,
 		int UnregisteredPositions,
+		int RecordedCompliance,
 		int ApiErrors,
 		int ApiWarnings,
 		UnitySyncService.SyncResult Resync,
@@ -117,6 +130,21 @@ public class ReconciliationService
 				replay.GroupsApplied, replay.PositionsApplied, replay.MissingEntities);
 		}
 
+		// Same dance for the compliance log — independent of attendance,
+		// so a reconcile that finds only one of the two log files will
+		// still replay correctly. The order between the two doesn't
+		// matter (different fields, no shared keys), but doing
+		// registration first matches the order the data was originally
+		// written if both logs received entries in the same session.
+		if (_complianceLog.HasPendingEntries())
+		{
+			Logger.Information("ReconcileAsync: compliance log has pending entries — replaying before diff");
+			var replay = await _complianceLog.ReplayIntoDatabaseAsync(db, ct);
+			Logger.Information(
+				"Compliance replay applied {Applied} member(s); {Missing} skipped (not in DB)",
+				replay.Applied, replay.MissingEntities);
+		}
+
 		var hasSnapshot = await _snapshotService.HasSnapshotAsync(ct);
 		if (!hasSnapshot)
 		{
@@ -131,6 +159,7 @@ public class ReconciliationService
 		int createdMembers = 0, modifiedMembers = 0;
 		int registeredGroups = 0, unregisteredGroups = 0;
 		int registeredPositions = 0, unregisteredPositions = 0;
+		int recordedCompliance = 0;
 		int apiErrors = 0;
 		int apiWarnings = 0;
 
@@ -223,6 +252,91 @@ public class ReconciliationService
 			{
 				apiErrors++;
 				Logger.Error(ex, "Exception updating member {Id} on Unity", member.Id);
+			}
+		}
+
+		// ── Phase 2.5: Push GDPR compliance changes to Unity ─────────
+		//
+		// Compliance changes ride on a dedicated endpoint
+		// (POST /members/{id}/compliance) rather than the general
+		// member-update path because the server applies special rules
+		// there: it normalises accepted_at, defaults method to "api"
+		// when missing, and clears version/method/statement on a
+		// revocation. Going through UpdateMemberAsync would silently
+		// drop the GDPR fields (UpdateMemberRequest carries none) and
+		// even if it carried them, it wouldn't trigger the compliance
+		// audit-log entries on the server side.
+		//
+		// We re-iterate the same modifiedMemberChanges list — anything
+		// flagged with the GdprComplianceKey sentinel goes through this
+		// loop in addition to (not instead of) the Phase 2 update.
+		// Members may legitimately have both kinds of change in the
+		// same session (e.g. an officer corrects a phone number AND
+		// records an acceptance); each pushes to its own endpoint.
+		foreach (var (member, changedProps) in modifiedMemberChanges)
+		{
+			if (member.Id < 0) continue; // temp members handled above
+			if (!changedProps.Contains(GdprComplianceKey)) continue;
+
+			// Skip "noise" changes where the snapshot had no value
+			// recorded and the local value is also effectively unset.
+			// This shouldn't happen via ComplianceService — it always
+			// stamps GdprAccepted — but defends against a third party
+			// nulling fields back out without going through the service.
+			if (member.GdprAccepted is null)
+			{
+				Logger.Debug(
+					"Skipping compliance push for member {Id}: GdprAccepted is null (no recorded state)",
+					member.Id);
+				continue;
+			}
+
+			try
+			{
+				// AcceptedAt is sent as ISO 8601 round-trip ("o") so
+				// the wire payload is timezone-explicit. The server
+				// accepts any DateTime-parseable string and normalises
+				// to its own UTC Y-m-d H:i:s storage; we send "o" to
+				// avoid relying on the server's parser to guess UTC
+				// from a naïve local-style timestamp.
+				var acceptedAt = member.GdprAcceptedAt?
+					.ToUniversalTime()
+					.ToString("o");
+
+				var request = new RecordComplianceRequest
+				{
+					Accepted = member.GdprAccepted.Value,
+					AcceptedAt = acceptedAt,
+					// On revocations these will be null on the entity
+					// (ComplianceService and replay both clear them);
+					// JsonIgnore-when-null on RecordComplianceRequest
+					// drops them from the wire payload, which is what
+					// the server expects.
+					Version = member.GdprAcceptanceVersion,
+					Method = member.GdprAcceptanceMethod,
+					Statement = member.GdprAcceptanceStatement,
+				};
+
+				var response = await client.RecordComplianceAsync(member.Id, request, ct);
+				if (response.Success)
+				{
+					recordedCompliance++;
+					Logger.Information(
+						"Recorded compliance for member {Name} (ID={Id}, accepted={Accepted}) on Unity",
+						member.AnonymousName, member.Id, member.GdprAccepted);
+				}
+				else
+				{
+					apiWarnings++;
+					Logger.Warning(
+						"Failed to record compliance for member {Id} on Unity: {Error}",
+						member.Id, response.Error?.Message);
+				}
+			}
+			catch (Exception ex)
+			{
+				apiErrors++;
+				Logger.Error(ex, "Exception recording compliance for member {Id} on Unity", member.Id);
 			}
 		}
 
@@ -391,11 +505,23 @@ public class ReconciliationService
 			{
 				Logger.Error(ex, "Reconciliation succeeded but failed to purge registration log");
 			}
+
+			// Compliance log purges independently — a registration-log
+			// purge failure shouldn't keep the compliance log alive
+			// (and vice versa). Each is loud-failed via its own catch.
+			try
+			{
+				await _complianceLog.PurgeAsync(ct);
+			}
+			catch (Exception ex)
+			{
+				Logger.Error(ex, "Reconciliation succeeded but failed to purge compliance log");
+			}
 		}
 		else
 		{
 			Logger.Warning(
-				"Reconciliation had {Errors} API error(s) — keeping registration log for next reconcile attempt",
+				"Reconciliation had {Errors} API error(s) — keeping event logs for next reconcile attempt",
 				apiErrors);
 		}
 
@@ -403,16 +529,19 @@ public class ReconciliationService
 			"Reconciliation complete: {Created} created, {Modified} modified, " +
 			"{RegGroups} groups registered, {UnregGroups} unregistered, " +
 			"{RegPos} positions registered, {UnregPos} unregistered, " +
+			"{Compliance} compliance recorded, " +
 			"{Errors} API errors, {Warnings} API warnings",
 			createdMembers, modifiedMembers,
 			registeredGroups, unregisteredGroups,
 			registeredPositions, unregisteredPositions,
+			recordedCompliance,
 			apiErrors, apiWarnings);
 
 		return new ReconcileResult(
 			createdMembers, modifiedMembers,
 			registeredGroups, unregisteredGroups,
 			registeredPositions, unregisteredPositions,
+			recordedCompliance,
 			apiErrors, apiWarnings, syncResult, snapshotResult);
 	}
 
@@ -454,6 +583,23 @@ public class ReconciliationService
 			if (original.HomeGroupId != member.HomeGroupId) changed.Add(nameof(Member.HomeGroupId));
 			if (original.IntergroupPositionId != member.IntergroupPositionId) changed.Add(nameof(Member.IntergroupPositionId));
 			if (original.IntergroupPositionRotation != member.IntergroupPositionRotation) changed.Add(nameof(Member.IntergroupPositionRotation));
+
+			// Treat the five GDPR fields as a single unit: any field
+			// difference flags the synthetic key "GdprCompliance",
+			// because they're pushed via the dedicated compliance
+			// endpoint as one atomic action rather than via the general
+			// member-update endpoint. If we mapped each field to a
+			// nameof key the push phase would have to OR them together
+			// anyway, and getting that wrong would silently drop
+			// changes — better to centralise the union here.
+			if (original.GdprAccepted != member.GdprAccepted
+				|| original.GdprAcceptedAt != member.GdprAcceptedAt
+				|| original.GdprAcceptanceVersion != member.GdprAcceptanceVersion
+				|| original.GdprAcceptanceMethod != member.GdprAcceptanceMethod
+				|| original.GdprAcceptanceStatement != member.GdprAcceptanceStatement)
+			{
+				changed.Add(GdprComplianceKey);
+			}
 
 			if (changed.Count > 0)
 				result.Add((member, changed));

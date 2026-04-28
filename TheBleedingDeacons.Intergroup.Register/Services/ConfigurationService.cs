@@ -21,6 +21,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		private const string REGISTRATION_LOG_ENABLED_KEY = "registration_log_enabled";
 		private const string AUTO_REGISTER_POSITIONS_KEY = "auto_register_positions_on_group";
 		private const string SINGLE_GSR_SHORTCUT_KEY = "single_gsr_shortcut_enabled";
+		private const string COMPLIANCE_LOG_ENABLED_KEY = "compliance_log_enabled";
 
 #if USE_DEV_CREDENTIALS
 		private const string DEV_CREDENTIALS_RESOURCE =
@@ -341,6 +342,50 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			catch (Exception ex)
 			{
 				Logger.Warning(ex, "Failed to save auto-register-positions toggle");
+			}
+		}
+
+		// =================================================================
+		// Compliance Event Log Toggle
+		// =================================================================
+
+		/// <summary>
+		/// Reads the toggle from Preferences. Defaults to <c>true</c> when
+		/// the preference has never been written — same default-on policy
+		/// as <see cref="IsRegistrationEventLogEnabled"/>, so fresh installs
+		/// get the durability layer for both compliance and attendance
+		/// without having to opt in.
+		/// </summary>
+		public bool IsComplianceEventLogEnabled
+		{
+			get
+			{
+				try
+				{
+					var raw = Preferences.Get(COMPLIANCE_LOG_ENABLED_KEY, string.Empty);
+					if (string.IsNullOrEmpty(raw)) return true;
+					return bool.TryParse(raw, out var value) ? value : true;
+				}
+				catch (Exception ex)
+				{
+					// Fail safe by treating the log as on — same logic
+					// as the registration log toggle.
+					Logger.Warning(ex, "Failed to read compliance log toggle — defaulting to enabled");
+					return true;
+				}
+			}
+		}
+
+		public void SetComplianceEventLogEnabled(bool enabled)
+		{
+			try
+			{
+				Preferences.Set(COMPLIANCE_LOG_ENABLED_KEY, enabled ? "true" : "false");
+				Logger.Information("Compliance event log {State}", enabled ? "ENABLED" : "DISABLED");
+			}
+			catch (Exception ex)
+			{
+				Logger.Warning(ex, "Failed to save compliance log toggle");
 			}
 		}
 

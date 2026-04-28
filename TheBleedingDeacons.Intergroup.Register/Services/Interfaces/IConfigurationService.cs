@@ -54,6 +54,21 @@ namespace TheBleedingDeacons.Intergroup.Register.Services.Interfaces
 		void SetAutoRegisterPositionsOnGroupEnabled(bool enabled);
 
 		/// <summary>
+		/// When true, each compliance acceptance / revocation is also
+		/// appended to the crash-durable compliance event log. When false,
+		/// the log is not written — but any existing log file is still
+		/// replayed on the next reconcile, and purge still runs on success.
+		/// Defaults to true; callers should treat a missing value as true.
+		/// </summary>
+		bool IsComplianceEventLogEnabled { get; }
+
+		/// <summary>
+		/// Persists the compliance event log toggle. Takes effect on the
+		/// next compliance action; no restart required.
+		/// </summary>
+		void SetComplianceEventLogEnabled(bool enabled);
+
+		/// <summary>
 		/// When true, the verify-group flow takes a shortcut whenever a group
 		/// has exactly one GSR: tapping "No" opens that GSR's edit form
 		/// directly (skipping the picker), and tapping "Finished" on that

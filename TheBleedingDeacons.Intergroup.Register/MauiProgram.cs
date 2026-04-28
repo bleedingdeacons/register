@@ -88,6 +88,7 @@ public static class MauiProgram
 		RegisterGlobalExceptionHandlers();
 
 		builder.Services.AddSingleton<RegistrationEventLog>();
+		builder.Services.AddSingleton<ComplianceEventLog>();
 
 		// Add configuration service
 		builder.Services.AddSingleton<IConfigurationService, ConfigurationService>();
@@ -203,6 +204,15 @@ public static class MauiProgram
 		builder.Services.AddScoped<AttendanceService>();
 		builder.Services.AddScoped<IAttendanceRegistration<Group>>(sp => sp.GetRequiredService<AttendanceService>());
 		builder.Services.AddScoped<IAttendanceRegistration<Position>>(sp => sp.GetRequiredService<AttendanceService>());
+
+		// Compliance follows the same shape as AttendanceService — see
+		// ComplianceService.cs for the rationale. Scoped lifetime keeps
+		// it consistent with AttendanceService, even though the service
+		// itself holds no per-request state; the lifetime matches the
+		// DbContextFactory it depends on so all the Register-app
+		// services share one disposal policy.
+		builder.Services.AddScoped<ComplianceService>();
+		builder.Services.AddScoped<IComplianceRegistration>(sp => sp.GetRequiredService<ComplianceService>());
 
 		builder.Services.AddScoped<DataService>();
 		builder.Services.AddMemoryCache();

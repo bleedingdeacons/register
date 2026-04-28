@@ -270,6 +270,17 @@ public class UnitySyncService
 			HomeGroupId = m.HomeGroupId,
 			IntergroupPositionId = m.IntergroupPositionId,
 			IntergroupPositionRotation = string.IsNullOrWhiteSpace(m.IntergroupPositionRotation) ? null : m.IntergroupPositionRotation,
+			// Flatten the GdprCompliance sub-object into the entity's
+			// individual columns. Older Unity servers omit the sub-object
+			// entirely (api Member.GdprCompliance is null) — leave the
+			// fields null in that case rather than synthesising a
+			// "never accepted" record that would be indistinguishable
+			// from an actively-recorded revocation.
+			GdprAccepted = m.GdprCompliance?.Accepted,
+			GdprAcceptedAt = m.GdprCompliance?.AcceptedAt,
+			GdprAcceptanceVersion = NullIfEmpty(m.GdprCompliance?.Version),
+			GdprAcceptanceMethod = NullIfEmpty(m.GdprCompliance?.Method),
+			GdprAcceptanceStatement = NullIfEmpty(m.GdprCompliance?.Statement),
 		}).ToList();
 
 	private static List<Entities.Position> MapPositions(
