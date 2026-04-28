@@ -151,7 +151,7 @@ public class ReconciliationService
 			Logger.Warning("ReconcileAsync: no snapshot exists — performing plain sync + snapshot");
 			var sync = await _syncService.SyncAsync(ct);
 			var snap = await _snapshotService.CaptureAsync(ct);
-			return new ReconcileResult(0, 0, 0, 0, 0, 0, 0, 0, sync, snap);
+			return new ReconcileResult(0, 0, 0, 0, 0, 0, 0, 0, 0, sync, snap);
 		}
 
 		using var client = await _clientFactory();

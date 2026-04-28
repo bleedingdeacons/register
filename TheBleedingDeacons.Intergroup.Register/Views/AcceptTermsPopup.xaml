@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<toolkit:Popup
+    x:Class="TheBleedingDeacons.Intergroup.Register.Views.AcceptTermsPopup"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+    xmlns:vm="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
+    x:DataType="vm:AcceptTermsPopupViewModel"
+    BackgroundColor="Transparent"
+    CanBeDismissedByTappingOutsideOfPopup="False">
+
+    <Border
+        x:DataType="vm:AcceptTermsPopupViewModel"
+        MaximumHeightRequest="640"
+        Style="{StaticResource M3CardStyle}"
+        WidthRequest="640">
+
+        <Grid
+            Padding="32"
+            RowDefinitions="Auto,*,Auto"
+            RowSpacing="24">
+
+            <!--  Title  -->
+            <Label
+                Grid.Row="0"
+                FontAttributes="Bold"
+                FontSize="32"
+                HorizontalOptions="Center"
+                HorizontalTextAlignment="Center"
+                LineBreakMode="WordWrap"
+                Text="{Binding Title}"
+                TextColor="{AppThemeBinding Light={StaticResource Gray900},
+                                            Dark={StaticResource Gray100}}" />
+
+            <!--  Body (scrollable so longer policy text still fits)  -->
+            <ScrollView Grid.Row="1" VerticalScrollBarVisibility="Default">
+                <Label
+                    FontSize="18"
+                    HorizontalOptions="Fill"
+                    HorizontalTextAlignment="Start"
+                    LineBreakMode="WordWrap"
+                    Text="{Binding Message}"
+                    TextColor="{AppThemeBinding Light={StaticResource Gray900},
+                                                Dark={StaticResource Gray100}}" />
+            </ScrollView>
+
+            <!--  Decline / Accept buttons  -->
+            <Grid
+                Grid.Row="2"
+                ColumnDefinitions="*,*"
+                ColumnSpacing="16">
+
+                <Button
+                    Grid.Column="0"
+                    Command="{Binding DeclineCommand}"
+                    Style="{StaticResource M3SecondaryButtonStyle}"
+                    Text="Decline" />
+
+                <Button
+                    Grid.Column="1"
+                    Command="{Binding AcceptCommand}"
+                    Style="{StaticResource M3PrimaryButtonStyle}"
+                    Text="I Agree" />
+            </Grid>
+
+        </Grid>
+    </Border>
+</toolkit:Popup>

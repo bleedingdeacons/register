@@ -18,6 +18,35 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 	{
 		private static readonly ILogger Logger = AppLogger.ForContext<PopupNotificationService>();
 
+		public async Task<bool> ShowCompliance(string title, string text)
+		{
+			var popup = new AcceptTermsPopup(title, text);
+
+			// Resolve the active page the same way ShowCountdownPopupAsync
+			// does — Application.Current.Windows is the supported path on
+			// MAUI now that MainPage is deprecated.
+			var currentPage = Application.Current?.Windows?.FirstOrDefault()?.Page;
+
+			if (currentPage is not Page page)
+			{
+				// No host page to attach to. Treat as "did not consent" so
+				// callers default to the safe branch (don't proceed as if
+				// the user agreed). Mirrors ShowErrorAsync's defensive
+				// handling of the same condition.
+				Logger.Warning(
+					"ShowCompliance called with no active page. Title={Title}", title);
+				return false;
+			}
+
+			// Same Shape=null trick used for the countdown popup: stops the
+			// CommunityToolkit wrapper from drawing its own bordered card
+			// around our M3CardStyle Border.
+			await page.ShowPopupAsync(popup, new PopupOptions { Shape = null });
+
+			// AcceptTermsPopup completes Result on Accept / Decline / close.
+			return await popup.Result;
+		}
+
 		public async Task ShowCountdownPopupAsync(string title, string message, Func<Task> navigationAction)
 		{
 			var popup = new CountdownPopup(title, message, navigationAction);

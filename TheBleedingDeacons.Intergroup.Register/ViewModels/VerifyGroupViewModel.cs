@@ -5,6 +5,7 @@ using Serilog;
 using TheBleedingDeacons.Intergroup.Register.Extensions;
 using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Support;
+using TheBleedingDeacons.Intergroup.Register.Utilities;
 using TheBleedingDeacons.Intergroup.Register.Views;
 using TheBleedingDeacons.Unity.Intergroup.Entities;
 using TheBleedingDeacons.Unity.Intergroup.Repositories.Interfaces;
@@ -36,6 +37,7 @@ public partial class VerifyGroupViewModel : BaseViewModel
 	private readonly IGroupRepository _groupRepository;
 	private readonly IPopupNotification _popupService;
 	private readonly IConfigurationService _configService;
+	private readonly IComplianceRegistration _complianceRegistration;
 
 	[ObservableProperty]
 	private Group? group;
@@ -108,12 +110,14 @@ public partial class VerifyGroupViewModel : BaseViewModel
 		IAttendanceRegistration<Group> attendanceRegistration,
 		IGroupRepository groupRepository,
 		IPopupNotification popupService,
-		IConfigurationService configService)
+		IConfigurationService configService,
+		IComplianceRegistration complianceRegistration)
 	{
 		_attendanceRegistration = attendanceRegistration;
 		_groupRepository = groupRepository;
 		_popupService = popupService;
 		_configService = configService;
+		_complianceRegistration = complianceRegistration;
 	}
 
 	#region Query Attributes Handling
@@ -268,6 +272,25 @@ public partial class VerifyGroupViewModel : BaseViewModel
 
 		try
 		{
+			// GDPR gate. Any active GSR who has not previously accepted
+			// the privacy policy must do so now before their data is
+			// committed as a registered attendance. Show the popup once
+			// for the whole batch — declining aborts the registration
+			// silently, accepting records acceptance for every member
+			// who didn't already have it on file.
+			var unaccepted = ActiveGsrs.Where(m => m.GdprAccepted != true).ToList();
+			if (unaccepted.Count > 0)
+			{
+				var consentGiven = await PromptForComplianceAsync(unaccepted);
+				if (!consentGiven)
+				{
+					Logger.Information(
+						"Group {GroupName} registration aborted: GDPR consent declined for {Count} member(s)",
+						Group.Name, unaccepted.Count);
+					return;
+				}
+			}
+
 			// Set proxy state on entity so AttendanceService persists it
 			Group.GsrProxy = StandingIn;
 			Group.GsrProxyName = StandingIn ? StandinName : null;
@@ -306,6 +329,72 @@ public partial class VerifyGroupViewModel : BaseViewModel
 	#endregion
 
 	#region Private Methods
+
+	/// <summary>
+	/// Shows the compliance popup with the policy text from
+	/// <c>Resources/Raw/Compliance.txt</c>, and on Accept records
+	/// acceptance for every supplied member via
+	/// <see cref="IComplianceRegistration.RecordAcceptance"/>. Returns
+	/// <c>true</c> when consent was given (and recorded), <c>false</c>
+	/// when the user declined or the popup was dismissed without an
+	/// explicit choice.
+	/// </summary>
+	private async Task<bool> PromptForComplianceAsync(IEnumerable<Member> members)
+	{
+		ComplianceText policy;
+		try
+		{
+			policy = await ComplianceTextLoader.LoadAsync();
+		}
+		catch (Exception ex)
+		{
+			// If we can't load the policy text we cannot show a meaningful
+			// dialog. Treat as "did not consent" — the safe default — and
+			// log so the operator can investigate.
+			Logger.Error(ex, "Failed to load compliance text; aborting consent prompt");
+			return false;
+		}
+
+		bool accepted = await _popupService.ShowCompliance(policy.Title, policy.Body);
+		if (!accepted)
+			return false;
+
+		// Record acceptance for every member that didn't already have it.
+		// One timestamp per call so the batch reads as a single coordinated
+		// event in the audit log.
+		var ts = DateTime.UtcNow;
+		foreach (var member in members)
+		{
+			try
+			{
+				await _complianceRegistration.RecordAcceptance(
+					member,
+					version: policy.Version,
+					statement: policy.Body,
+					method: "register-app",
+					acceptedAtUtc: ts);
+
+				// Mirror the in-memory entity so the page's bindings reflect
+				// the new state immediately — ComplianceService updates a
+				// freshly-loaded Member instance, not the one the VM holds.
+				member.GdprAccepted = true;
+				member.GdprAcceptedAt = ts;
+			}
+			catch (Exception ex)
+			{
+				// Per-member failure is logged but doesn't abort the batch
+				// — the DB write inside ComplianceService already swallows
+				// its own errors, so a throw here would be unusual. If it
+				// does happen, the registration still proceeds because the
+				// user did consent in the UI.
+				Logger.Warning(ex,
+					"Failed to record GDPR acceptance for member {MemberId} ({Name})",
+					member.Id, member.AnonymousName);
+			}
+		}
+
+		return true;
+	}
 
 	private async Task LoadGroupAsync(int groupId)
 	{

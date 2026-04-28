@@ -17,5 +17,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services.Interfaces
 		/// changed in one place.
 		/// </summary>
 		Task ShowErrorAsync(string title, string message);
+
+		Task<bool> ShowCompliance(string title, string text);
 	}
 }

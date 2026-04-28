@@ -429,3 +429,7 @@ Properties/launchSettings.json
 
 # Register dev configuration
 **/devsettings.json
+/Utils/TheBleedingDeacons.Intergroup.Register.zip
+/Utils/TheBleedingDeacons.Unity.Client.zip
+/Utils/TheBleedingDeacons.Unity.Intergroup.zip
+/Utils/TheBleedingDeacons.Unity.Models.zip
