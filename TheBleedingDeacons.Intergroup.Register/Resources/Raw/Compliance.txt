@@ -7,3 +7,5 @@ Your information will be processed only for meeting administration, service comm
 You may request access to, correction of, or deletion of your personal information at any time.
 
 Please confirm that you understand and agree to the storage and processing of your details for these purposes.
+
+v1.0.0 - 2026-04-28

@@ -1,4 +1,4 @@
-﻿using System.Security.Cryptography;
+﻿\xEF\xBB\xBFusing System.Security.Cryptography;
 using System.Text;
 
 namespace TheBleedingDeacons.Intergroup.Register.Utilities;
@@ -9,12 +9,18 @@ namespace TheBleedingDeacons.Intergroup.Register.Utilities;
 /// rest of the codebase needs:
 ///
 ///   • Title    — the first line, with the markdown emphasis markers (<c>*…*</c>) stripped.
-///   • Body     — everything after the title, with leading/trailing whitespace trimmed.
-///   • Version  — a deterministic short hash of the body, suitable for the
-///                <see cref="Services.Interfaces.IComplianceRegistration.RecordAcceptance"/>
-///                <c>version</c> argument. Changes automatically when the
-///                policy text changes, so we never record acceptance of a
-///                statement and stamp it with a stale version string.
+///   • Body     — everything between the title and the version stamp,
+///                with leading/trailing whitespace trimmed. The version
+///                line itself is removed from the body so it isn't shown
+///                to the user as part of the policy prose.
+///   • Version  — the last non-empty line, when it looks like a version
+///                stamp (e.g. <c>v1.0.0 - 2026-04-28</c>). Used as the
+///                <c>version</c> argument to
+///                <see cref="Services.Interfaces.IComplianceRegistration.RecordAcceptance"/>.
+///                When the file has no recognisable version stamp we fall
+///                back to a deterministic short hash of the body, so old
+///                or test files still produce a stable stamp rather than
+///                blowing up the loader.
 ///
 /// The asset is read once and cached for the process lifetime — the file is
 /// embedded in the app bundle and never changes at runtime, so re-reading
@@ -42,35 +48,91 @@ public static class ComplianceTextLoader
         using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
         var raw = await reader.ReadToEndAsync();
 
-        // Normalise line endings so the title-line parse is platform-independent.
+        // Normalise line endings so the title/version parses are platform-independent.
         var normalised = raw.Replace("\r\n", "\n").Replace('\r', '\n').Trim();
 
         // Title = first non-empty line, with leading/trailing markdown
         // emphasis markers stripped. The shipped file starts with
         // "*Data Privacy & Consent*" — keep the wording, drop the markers.
         var firstNewline = normalised.IndexOf('\n');
-        string titleLine, body;
+        string titleLine, afterTitle;
         if (firstNewline < 0)
         {
             titleLine = normalised;
-            body = string.Empty;
+            afterTitle = string.Empty;
         }
         else
         {
             titleLine = normalised[..firstNewline];
-            body = normalised[(firstNewline + 1)..].Trim();
+            afterTitle = normalised[(firstNewline + 1)..];
         }
 
         var title = StripEmphasis(titleLine);
 
-        // Short content hash. SHA-256 → first 8 hex chars is plenty for a
-        // policy version stamp (collisions only matter for distinguishing
-        // *successive* versions of the same file, not arbitrary inputs)
-        // and stays well under the server's 50-char cap.
-        var hashBytes = SHA256.HashData(Encoding.UTF8.GetBytes(body));
-        var version = "v" + Convert.ToHexString(hashBytes)[..8].ToLowerInvariant();
+        // Version = last non-empty line if it looks like a version stamp.
+        // We walk lines from the end so trailing blank lines or accidental
+        // whitespace at the foot of the file don't throw the parse off.
+        // Splitting by '\n' (already normalised above) gives us indexable lines.
+        var lines = afterTitle.Split('\n');
+        int versionLineIndex = -1;
+        string? version = null;
+
+        for (int i = lines.Length - 1; i >= 0; i--)
+        {
+            var candidate = lines[i].Trim();
+            if (candidate.Length == 0) continue;
+
+            if (LooksLikeVersionStamp(candidate))
+            {
+                version = candidate;
+                versionLineIndex = i;
+            }
+
+            // First non-empty line from the end decides the outcome —
+            // either it's the version, or there isn't one. Don't keep
+            // searching upward; an earlier "v…" inside the policy prose
+            // shouldn't be picked up.
+            break;
+        }
+
+        // Body is everything after the title, with the version line (and
+        // any trailing blanks below it) removed. When there's no version
+        // line, the body is simply afterTitle.
+        string body;
+        if (versionLineIndex >= 0)
+        {
+            body = string.Join('\n', lines, 0, versionLineIndex).Trim();
+        }
+        else
+        {
+            body = afterTitle.Trim();
+        }
+
+        // Fallback: if the file didn't carry an explicit version stamp,
+        // derive a deterministic short hash of the body. Keeps older or
+        // test fixtures working and ensures every accepted statement is
+        // still paired with *something* identifying for the audit trail.
+        if (version is null)
+        {
+            var hashBytes = SHA256.HashData(Encoding.UTF8.GetBytes(body));
+            version = "v" + Convert.ToHexString(hashBytes)[..8].ToLowerInvariant();
+        }
 
         return new ComplianceText(title, body, version);
+    }
+
+    /// <summary>
+    /// Heuristic for "this line is a version stamp", not policy prose.
+    /// Accepts strings that start with <c>v</c> or <c>V</c> followed
+    /// immediately by a digit — covers <c>v1</c>, <c>v1.0.0</c>,
+    /// <c>v1.0.0 - 2026-04-28</c>, and similar. Anything else (including
+    /// a stray sentence that happens to begin with "v") is rejected.
+    /// </summary>
+    private static bool LooksLikeVersionStamp(string line)
+    {
+        if (line.Length < 2) return false;
+        if (line[0] != 'v' && line[0] != 'V') return false;
+        return char.IsDigit(line[1]);
     }
 
     /// <summary>
@@ -93,11 +155,13 @@ public static class ComplianceTextLoader
 }
 
 /// <summary>
-/// Parsed compliance text record. Body and Version always travel together
-/// — the version is a hash of the body, so a body update implies a version
-/// update without any manual bookkeeping.
+/// Parsed compliance text record. The version is read from the policy
+/// file's trailing <c>v…</c> line when present, otherwise derived from a
+/// short hash of the body — either way the body and version are kept in
+/// sync, so an accepted statement is always paired with an identifier
+/// that points back at exactly the text the user saw.
 /// </summary>
 /// <param name="Title">Display title for the popup (no emphasis markers).</param>
-/// <param name="Body">Full policy body shown to the user and recorded as the acceptance statement.</param>
-/// <param name="Version">Stable short hash identifying this exact body text.</param>
+/// <param name="Body">Full policy body shown to the user and recorded as the acceptance statement. Excludes the version line.</param>
+/// <param name="Version">Version stamp identifying this exact body text (e.g. <c>v1.0.0 - 2026-04-28</c>).</param>
 public sealed record ComplianceText(string Title, string Body, string Version);
