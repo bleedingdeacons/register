@@ -11,12 +11,12 @@
 
     <Border
         x:DataType="vm:AcceptTermsPopupViewModel"
-        MaximumHeightRequest="640"
+        MaximumHeightRequest="700"
         Style="{StaticResource M3CardStyle}"
         WidthRequest="640">
 
         <Grid
-            Padding="32"
+            Padding="24"
             RowDefinitions="Auto,*,Auto"
             RowSpacing="24">
 

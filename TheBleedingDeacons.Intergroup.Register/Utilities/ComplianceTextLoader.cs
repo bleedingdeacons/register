@@ -1,4 +1,4 @@
-﻿\xEF\xBB\xBFusing System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using System.Text;
 
 namespace TheBleedingDeacons.Intergroup.Register.Utilities;
