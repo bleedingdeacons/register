@@ -37,6 +37,22 @@ public class MemberConfiguration : IEntityTypeConfiguration<Member>
         builder.Property(m => m.Updated)
             .HasPrecision(3);
 
+        // GDPR compliance fields. Lengths chosen to match the Unity
+        // server's validation (version/method ≤ 50, statement ≤ 2000).
+        // GdprAcceptedAt uses the same precision as Updated so timestamp
+        // comparisons in the snapshot diff round-trip cleanly.
+        builder.Property(m => m.GdprAcceptedAt)
+            .HasPrecision(3);
+
+        builder.Property(m => m.GdprAcceptanceVersion)
+            .HasMaxLength(50);
+
+        builder.Property(m => m.GdprAcceptanceMethod)
+            .HasMaxLength(50);
+
+        builder.Property(m => m.GdprAcceptanceStatement)
+            .HasMaxLength(2000);
+
         // HomeGroup FK is configured from GroupConfiguration (WithOne → HasForeignKey)
 
         // Many-to-one: multiple members can hold the same position

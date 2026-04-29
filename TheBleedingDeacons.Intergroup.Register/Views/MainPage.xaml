@@ -1,27 +1,28 @@
 ﻿<?xml version="1.0" encoding="utf-8" ?>
-<ContentPage x:Class="TheBleedingDeacons.Intergroup.Register.Views.MainPage"
-             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             xmlns:vm="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
-             xmlns:controls="clr-namespace:TheBleedingDeacons.Intergroup.Register.Controls"
-             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
-             x:DataType="vm:MainPageViewModel"
-             Title="{Binding Title}">
+<ContentPage
+    x:Class="TheBleedingDeacons.Intergroup.Register.Views.MainPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:controls="clr-namespace:TheBleedingDeacons.Intergroup.Register.Controls"
+    xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+    xmlns:vm="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
+    Title="{Binding Title}"
+    x:DataType="vm:MainPageViewModel">
 
     <ContentPage.Behaviors>
-        <toolkit:StatusBarBehavior StatusBarColor="{AppThemeBinding Light=White, Dark=Black}"
-                                   StatusBarStyle="{AppThemeBinding Light=DarkContent, Dark=LightContent}"/>
+        <toolkit:StatusBarBehavior StatusBarColor="{AppThemeBinding Light=White, Dark=Black}" StatusBarStyle="{AppThemeBinding Light=DarkContent, Dark=LightContent}" />
     </ContentPage.Behaviors>
 
     <Shell.TitleView>
         <Grid>
-            <Label FontSize="Large"
-                   Text="{Binding AppVersion}"
-                   Opacity="0.5"
-                   VerticalOptions="Center"
-                   HorizontalOptions="End"
-                   Margin="0,0,8,0"
-                   TextColor="Yellow"/>
+            <Label
+                Margin="0,0,8,0"
+                FontSize="Large"
+                HorizontalOptions="End"
+                Opacity="0.5"
+                Text="{Binding AppVersion}"
+                TextColor="Yellow"
+                VerticalOptions="Center" />
         </Grid>
     </Shell.TitleView>
 
@@ -30,69 +31,80 @@
             <ScrollView>
                 <VerticalStackLayout Spacing="24">
 
-                    <!-- ════ Admin warning (only when meeting not started) ════ -->
-                    <Border Style="{StaticResource WarningBannerStyle}"
-                            IsVisible="{Binding IsMeetingSelected, Converter={StaticResource InvertedBoolConverter}}">
-                        <Grid ColumnDefinitions="Auto,*,Auto"
-                              ColumnSpacing="12"
-                              VerticalOptions="Center">
-                            <Label Grid.Column="0"
-                                   Text="⚠️"
-                                   FontSize="22"
-                                   VerticalOptions="Center"/>
-                            <Label Grid.Column="1"
-                                   Text="Meeting not started. Go to Admin to start today's meeting. Internet connection is required."
-                                   FontSize="14"
-                                   LineBreakMode="WordWrap"
-                                   VerticalOptions="Center"
-                                   TextColor="{AppThemeBinding Light={StaticResource TextBody}, Dark={StaticResource TextBodyDim}}"/>
-                            <Button Grid.Column="2"
-                                    Text="Admin"
-                                    Command="{Binding GoToAdminCommand}"
-                                    Style="{StaticResource M3TextButtonStyle}"/>
+                    <!--  ════ Admin info (only when meeting not started) ════  -->
+                    <Border IsVisible="{Binding IsMeetingSelected, Converter={StaticResource InvertedBoolConverter}}" Style="{StaticResource InfoBannerStyle}">
+                        <Grid
+                            ColumnDefinitions="Auto,*,Auto"
+                            ColumnSpacing="12"
+                            VerticalOptions="Center">
+                            <Label
+                                Grid.Column="0"
+                                FontSize="22"
+                                Text="ℹ️"
+                                VerticalOptions="Center" />
+                            <Label
+                                Grid.Column="1"
+                                FontSize="14"
+                                LineBreakMode="WordWrap"
+                                Text="To begin registration go to administration page and start intergroup meeting."
+                                TextColor="{AppThemeBinding Light={StaticResource TextBody},
+                                                            Dark={StaticResource TextBodyDim}}"
+                                VerticalOptions="Center" />
+                            <Button
+                                Grid.Column="2"
+                                Command="{Binding GoToAdminCommand}"
+                                Style="{StaticResource M3TextButtonStyle}"
+                                Text="Admin" />
                         </Grid>
                     </Border>
 
-                    <!-- ════ Hero image ════ -->
-                    <Image Source="badi.png"
-                           HeightRequest="160"
-                           Aspect="AspectFit"
-                           Margin="0,8,0,0"/>
+                    <!--  ════ Hero image ════  -->
+                    <Image
+                        Margin="0,8,0,0"
+                        Aspect="AspectFit"
+                        HeightRequest="160"
+                        Source="badi.png" />
 
-                    <!-- ════ Welcome ════ -->
-                    <VerticalStackLayout Spacing="4" HorizontalOptions="Center">
-                        <Label Text="Attendance Register"
-                               FontSize="28"
-                               FontAttributes="Bold"
-                               HorizontalOptions="Center"
-                               TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"/>
-                        <Label Text="Welcome to Bristol and District Intergroup"
-                               FontSize="15"
-                               HorizontalOptions="Center"
-                               HorizontalTextAlignment="Center"
-                               Style="{StaticResource SecondaryTextStyle}"/>
+                    <!--  ════ Welcome ════  -->
+                    <VerticalStackLayout HorizontalOptions="Center" Spacing="4">
+                        <Label
+                            FontAttributes="Bold"
+                            FontSize="28"
+                            HorizontalOptions="Center"
+                            Text="Attendance Register"
+                            TextColor="{AppThemeBinding Light={StaticResource Gray900},
+                                                        Dark={StaticResource Gray100}}" />
+                        <Label
+                            FontSize="15"
+                            HorizontalOptions="Center"
+                            HorizontalTextAlignment="Center"
+                            Style="{StaticResource SecondaryTextStyle}"
+                            Text="Welcome to Bristol and District Intergroup" />
                     </VerticalStackLayout>
 
-                    <!-- ════ Two primary tiles ════ -->
-                    <Grid ColumnDefinitions="*,*"
-                          ColumnSpacing="12"
-                          Margin="0,8,0,0">
+                    <!--  ════ Two primary tiles ════  -->
+                    <Grid
+                        Margin="0,8,0,0"
+                        ColumnDefinitions="*,*"
+                        ColumnSpacing="12">
 
-                        <Button Grid.Column="0"
-                                x:Name="RegisterBtn"
-                                Style="{StaticResource M3TileButtonStyle}"
-                                Text="Group Service Representative"
-                                Command="{Binding SelectTypeCommand}"
-                                IsEnabled="{Binding IsButtonsEnabled}"
-                                HeightRequest="160"/>
+                        <Button
+                            x:Name="RegisterBtn"
+                            Grid.Column="0"
+                            Command="{Binding SelectTypeCommand}"
+                            HeightRequest="160"
+                            IsEnabled="{Binding IsButtonsEnabled}"
+                            Style="{StaticResource M3TileButtonStyle}"
+                            Text="Group Service Representative" />
 
-                        <Button Grid.Column="1"
-                                x:Name="RegisterLOBtn"
-                                Style="{StaticResource M3TileButtonStyle}"
-                                Text="Intergroup Officer"
-                                Command="{Binding SelectPositionCommand}"
-                                IsEnabled="{Binding IsButtonsEnabled}"
-                                HeightRequest="160"/>
+                        <Button
+                            x:Name="RegisterLOBtn"
+                            Grid.Column="1"
+                            Command="{Binding SelectPositionCommand}"
+                            HeightRequest="160"
+                            IsEnabled="{Binding IsButtonsEnabled}"
+                            Style="{StaticResource M3TileButtonStyle}"
+                            Text="Intergroup Officer" />
                     </Grid>
 
                 </VerticalStackLayout>

@@ -35,9 +35,19 @@ public partial class EditGroupViewModel : BaseViewModel
 	private readonly IDbContextFactory<UnityDbContext> _contextFactory;
 	private readonly IPopupNotification _popupService;
 	private readonly IPhoneNumberService _phoneService;
+	private readonly IConfigurationService _configService;
 
 	// The group whose GSRs are being managed
 	private Group? _group;
+
+	// True when this page was opened via the single-GSR shortcut from the
+	// verify flow (editMember param). On Done we forward an autoRegister
+	// flag back to the verify page so the user doesn't have to tap Yes
+	// again — saving the only GSR's details and pressing Finished is a
+	// strong enough signal that they want to register attendance now.
+	// Cancel deliberately does NOT honour this — bailing out of the edit
+	// must not auto-register.
+	private bool _enteredViaSingleGsrShortcut;
 
 	/// <summary>
 	/// The currently selected member being edited (null when not editing).
@@ -130,11 +140,13 @@ public partial class EditGroupViewModel : BaseViewModel
 	public EditGroupViewModel(
 		IDbContextFactory<UnityDbContext> contextFactory,
 		IPopupNotification popupService,
-		IPhoneNumberService phoneService)
+		IPhoneNumberService phoneService,
+		IConfigurationService configService)
 	{
 		_contextFactory = contextFactory;
 		_popupService = popupService;
 		_phoneService = phoneService;
+		_configService = configService;
 
 		ValidateForm();
 	}
@@ -151,6 +163,10 @@ public partial class EditGroupViewModel : BaseViewModel
 			Logger.Information("Edit mode: group {GroupName} with {MemberCount} members",
 				group.Name, group.Members.Count);
 
+			// Reset the shortcut flag for this fresh entry. It will be
+			// re-set below if the navigation included an editMember param.
+			_enteredViaSingleGsrShortcut = false;
+
 			PendingRemovals.Clear();
 			HasPendingChanges = false;
 			UpdateHasPendingRemovals();
@@ -165,6 +181,24 @@ public partial class EditGroupViewModel : BaseViewModel
 			{
 				// Replace this with whatever your existing Add button does
 				await AddNewMember();
+			});
+		}
+
+		// When the verify flow detects exactly one GSR and the user reports
+		// the details aren't correct, it forwards that single member here so
+		// we can skip the picker step and open the edit form directly. We go
+		// through SelectMemberCommand rather than touching state by hand so
+		// validation, error-clearing and HasUnsavedChanges all behave the
+		// same as a normal tap on the member row.
+		if (query.TryGetValue("editMember", out var editObj) &&
+			editObj is Member memberToEdit)
+		{
+			_enteredViaSingleGsrShortcut = true;
+
+			MainThread.BeginInvokeOnMainThread(() =>
+			{
+				if (SelectMemberCommand.CanExecute(memberToEdit))
+					SelectMemberCommand.Execute(memberToEdit);
 			});
 		}
 	}
@@ -550,7 +584,24 @@ public partial class EditGroupViewModel : BaseViewModel
 			return;
 		}
 
-		await Shell.Current.GoToAsync($"..?edited=true");
+		// When this edit was entered via the single-GSR shortcut AND the
+		// shortcut is still enabled in Settings, signal to the verify page
+		// that it should auto-fire the Yes/register command on return.
+		// CanExecuteYes still gates the actual registration, so if validation
+		// somehow fails the user just lands back on the verify page with the
+		// Yes button enabled or disabled as normal. Re-checking the toggle
+		// here (rather than relying solely on the producer-side gate in
+		// VerifyGroupViewModel.No) keeps the on/off behaviour consistent
+		// even if a future caller sets _enteredViaSingleGsrShortcut without
+		// going through the verify flow.
+		var autoRegister = _enteredViaSingleGsrShortcut &&
+						   _configService.IsSingleGsrShortcutEnabled;
+
+		var returnRoute = autoRegister
+			? "..?edited=true&autoRegister=true"
+			: "..?edited=true";
+
+		await Shell.Current.GoToAsync(returnRoute);
 	}
 
 	/// <summary>

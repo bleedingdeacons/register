@@ -164,6 +164,7 @@
                                             <Switch Grid.Row="0" Grid.Column="2"
                                                     Grid.RowSpan="2"
                                                     VerticalOptions="Center"
+                                                    IsEnabled="{Binding IsToggleEnabled}"
                                                     IsToggled="{Binding IsRegistered, Mode=TwoWay}"/>
 
                                             <!-- Details text button -->
@@ -249,6 +250,7 @@
                                             <Switch Grid.Row="0" Grid.Column="2"
                                                     Grid.RowSpan="2"
                                                     VerticalOptions="Center"
+                                                    IsEnabled="{Binding IsToggleEnabled}"
                                                     IsToggled="{Binding IsRegistered, Mode=TwoWay}"/>
 
                                             <Button Grid.Row="0" Grid.Column="3"

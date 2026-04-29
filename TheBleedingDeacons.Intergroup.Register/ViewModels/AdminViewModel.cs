@@ -57,6 +57,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 		[NotifyPropertyChangedFor(nameof(IsFinishing))]
 		[NotifyPropertyChangedFor(nameof(IsCompleted))]
 		[NotifyPropertyChangedFor(nameof(IsBusy))]
+		[NotifyCanExecuteChangedFor(nameof(SyncAgainCommand))]
 		private MeetingPhase phase = MeetingPhase.NotStarted;
 
 		public bool IsNotStarted => Phase == MeetingPhase.NotStarted;
@@ -89,6 +90,23 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 		[ObservableProperty]
 		private bool hasFinishSyncError = false;
 
+		// ── Connectivity ─────────────────────────────────────────────
+
+		/// <summary>
+		/// True when the device currently reports an Internet-capable network
+		/// connection. Tracked live via <see cref="Connectivity.ConnectivityChanged"/>
+		/// so the Start Meeting / Retry Sync buttons re-evaluate their
+		/// CanExecute as soon as the user toggles airplane mode, walks out of
+		/// Wi-Fi range, etc. Both commands need to hit the Unity API so they
+		/// require Internet — not just any network — before they're allowed
+		/// to fire.
+		/// </summary>
+		[ObservableProperty]
+		[NotifyCanExecuteChangedFor(nameof(StartMeetingCommand))]
+		[NotifyCanExecuteChangedFor(nameof(RetrySyncCommand))]
+		[NotifyCanExecuteChangedFor(nameof(SyncAgainCommand))]
+		private bool isOnline = Connectivity.Current.NetworkAccess == NetworkAccess.Internet;
+
 		// ── Active meeting ───────────────────────────────────────────
 
 		[ObservableProperty]
@@ -120,8 +138,33 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 			_configService = configService;
 			_dbContextFactory = dbContextFactory;
 
+			// Live connectivity tracking — the static Connectivity event
+			// holds a reference to the handler, so it MUST be unsubscribed
+			// in Dispose() or this VM will leak.
+			Connectivity.Current.ConnectivityChanged += OnConnectivityChanged;
+
 			// Restore phase if a meeting is already active (app restarted mid-session)
 			RestorePhaseAsync().SafeFireAndForget("RestorePhase");
+		}
+
+		private void OnConnectivityChanged(object? sender, ConnectivityChangedEventArgs e)
+		{
+			// Connectivity events fire on a background thread on Android;
+			// marshal back to UI so the bound CanExecute / IsEnabled updates
+			// don't trip cross-thread checks.
+			MainThread.BeginInvokeOnMainThread(() =>
+			{
+				IsOnline = e.NetworkAccess == NetworkAccess.Internet;
+			});
+		}
+
+		protected override void Dispose(bool disposing)
+		{
+			if (disposing)
+			{
+				Connectivity.Current.ConnectivityChanged -= OnConnectivityChanged;
+			}
+			base.Dispose(disposing);
 		}
 
 		// =============================================================
@@ -130,15 +173,16 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 
 		/// <summary>
 		/// Step 1: Sync from Unity and capture a snapshot, then show
-		/// the meeting selection list.
+		/// the meeting selection list. Disabled while offline — the sync
+		/// has to reach the Unity API to do anything useful.
 		/// </summary>
-		[RelayCommand]
+		[RelayCommand(CanExecute = nameof(CanStartMeeting))]
 		private async Task StartMeeting()
 		{
 			var config = await _configService.LoadUnityConfigurationAsync();
 			if (!config.IsValid())
 			{
-				ShowStatus("Unity API not configured. Go to Settings → Unity API Settings first.", true);
+				ShowStatus("Unity API not configured, Go to Settings → Unity API Settings first.", true);
 				HasSyncError = true;
 				return;
 			}
@@ -184,13 +228,42 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 		}
 
 		/// <summary>
-		/// Retry sync after a previous failure.
+		/// Retry sync after a previous failure. Same connectivity guard
+		/// as StartMeeting — retrying without Internet would just hit the
+		/// same network failure again.
 		/// </summary>
-		[RelayCommand]
+		[RelayCommand(CanExecute = nameof(CanStartMeeting))]
 		private async Task RetrySync()
 		{
 			await StartMeeting();
 		}
+
+		/// <summary>
+		/// Re-pull from Unity while the user is still on the meeting-
+		/// selection screen — useful if a meeting was added in Unity after
+		/// the initial sync. Disabled once an intergroup meeting has been
+		/// selected (the session is committed at that point) and while
+		/// offline. The button itself is only shown during SelectMeeting.
+		/// </summary>
+		[RelayCommand(CanExecute = nameof(CanSyncAgain))]
+		private async Task SyncAgain()
+		{
+			await StartMeeting();
+		}
+
+		/// <summary>
+		/// Shared CanExecute for StartMeeting and RetrySync. Re-evaluated
+		/// whenever IsOnline changes via [NotifyCanExecuteChangedFor].
+		/// </summary>
+		private bool CanStartMeeting() => IsOnline;
+
+		/// <summary>
+		/// Sync Again is allowed only while online AND no meeting has yet
+		/// been committed to. Once Phase moves into InProgress the session
+		/// is locked to the chosen meeting, so re-pulling Unity data would
+		/// risk losing in-flight registrations.
+		/// </summary>
+		private bool CanSyncAgain() => IsOnline && !IsInProgress;
 
 		/// <summary>
 		/// Step 2: User selects an intergroup meeting from the list.

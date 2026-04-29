@@ -330,7 +330,7 @@
 
                                 <!--  Name Field  -->
                                 <Label Style="{StaticResource FieldLabelStyle}" Text="Name" />
-                                <controls:ClearableEntry
+                                <controls:InteractiveEntry
                                     x:Name="EditNameEntry"
                                     Margin="0,0,0,4"
                                     BackgroundColor="{AppThemeBinding Light={StaticResource Surface},
@@ -353,7 +353,7 @@
 
                                 <!--  Phone Field  -->
                                 <Label Style="{StaticResource FieldLabelStyle}" Text="Mobile Phone" />
-                                <controls:ClearableEntry
+                                <controls:InteractiveEntry
                                     x:Name="EditPhoneEntry"
                                     Margin="0,0,0,4"
                                     BackgroundColor="{AppThemeBinding Light={StaticResource Surface},
@@ -377,7 +377,7 @@
 
                                 <!--  Email Field  -->
                                 <Label Style="{StaticResource FieldLabelStyle}" Text="Personal Email" />
-                                <controls:ClearableEntry
+                                <controls:InteractiveEntry
                                     x:Name="EditEmailEntry"
                                     Margin="0,0,0,4"
                                     BackgroundColor="{AppThemeBinding Light={StaticResource Surface},

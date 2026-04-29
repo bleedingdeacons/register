@@ -28,8 +28,8 @@
 		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
 		<DefaultLanguage>en-gb</DefaultLanguage>
 		<Copyright>Don't take yourself too damn seriously</Copyright>
-		<AssemblyVersion>1.0.5.0</AssemblyVersion>
-		<FileVersion>1.0.5.0</FileVersion>
+		<AssemblyVersion>1.0.6.1</AssemblyVersion>
+		<FileVersion>1.0.6.1</FileVersion>
 		<Platforms>AnyCPU</Platforms>
 		<AndroidSigningKeyStore>register.keystore</AndroidSigningKeyStore>
 	</PropertyGroup>
@@ -207,6 +207,9 @@
 	<!-- TODO: Re-add Integrity.Client as a NuGet package or relative project reference -->
 
 	<ItemGroup>
+		<Compile Update="Controls\InteractiveEntry.xaml.cs">
+		  <DependentUpon>InteractiveEntry.xaml</DependentUpon>
+		</Compile>
 		<Compile Update="Views\GroupEditPage.xaml.cs">
 			<DependentUpon>GroupEditPage.xaml</DependentUpon>
 		</Compile>

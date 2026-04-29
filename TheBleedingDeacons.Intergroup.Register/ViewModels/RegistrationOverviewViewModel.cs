@@ -174,10 +174,17 @@ public partial class RegistrationOverviewViewModel : BaseViewModel
 	{
 		if (_suppressToggleHandlers) return;
 
+		// IMPORTANT: compare `desired` against the *persisted* registration
+		// state (Entity.Registered) — NOT row.IsRegistered. By the time
+		// this handler runs the source-generated setter has already pushed
+		// `desired` into the field, so row.IsRegistered == desired and
+		// neither branch below would ever match.
+		bool currentlyRegistered = row.Entity.Registered;
+
 		// When registering, defer to the Verify flow so the GSR can be
 		// chosen / confirmed. The Verify page performs the actual
 		// Register() call and navigates back.
-		if (desired && !row.IsRegistered)
+		if (desired && !currentlyRegistered)
 		{
 			// Flip the switch back to its previous state — Verify will
 			// flip it forward on successful registration when we reload.
@@ -186,7 +193,7 @@ public partial class RegistrationOverviewViewModel : BaseViewModel
 			return;
 		}
 
-		if (!desired && row.IsRegistered)
+		if (!desired && currentlyRegistered)
 		{
 			bool confirmed = await Shell.Current.DisplayAlert(
 				"Unregister Group",
@@ -202,6 +209,7 @@ public partial class RegistrationOverviewViewModel : BaseViewModel
 			try
 			{
 				await _groupAttendance.Unregister(row.Entity);
+				row.ApplyNewState(false);
 				Logger.Information("Unregistered group {Name} from overview page", row.Entity.Name);
 				UpdateSummaries();
 			}
@@ -218,14 +226,18 @@ public partial class RegistrationOverviewViewModel : BaseViewModel
 	{
 		if (_suppressToggleHandlers) return;
 
-		if (desired && !row.IsRegistered)
+		// See note in OnGroupToggledAsync — compare against the persisted
+		// Entity.Registered, not the just-toggled row.IsRegistered.
+		bool currentlyRegistered = row.Entity.Registered;
+
+		if (desired && !currentlyRegistered)
 		{
 			row.RevertToggle();
 			await NavigateToPositionVerify(row.Entity.Id);
 			return;
 		}
 
-		if (!desired && row.IsRegistered)
+		if (!desired && currentlyRegistered)
 		{
 			bool confirmed = await Shell.Current.DisplayAlert(
 				"Unregister Officer",
@@ -241,6 +253,7 @@ public partial class RegistrationOverviewViewModel : BaseViewModel
 			try
 			{
 				await _positionAttendance.Unregister(row.Entity);
+				row.ApplyNewState(false);
 				Logger.Information("Unregistered position {Name} from overview page", row.Entity.ShortDescription);
 				UpdateSummaries();
 			}
@@ -273,13 +286,21 @@ public partial class RegistrationOverviewViewModel : BaseViewModel
 
 	private static Task NavigateToGroupVerify(int groupId)
 	{
-		var parameters = new Dictionary<string, object> { { "groupId", groupId.ToString() } };
+		var parameters = new Dictionary<string, object>
+		{
+			{ "groupId", groupId.ToString() },
+			{ "entrySource", "overview" }
+		};
 		return Shell.Current.GoToAsync(nameof(VerifyGroupPage), parameters);
 	}
 
 	private static Task NavigateToPositionVerify(int positionId)
 	{
-		var parameters = new Dictionary<string, object> { { "positionId", positionId.ToString() } };
+		var parameters = new Dictionary<string, object>
+		{
+			{ "positionId", positionId.ToString() },
+			{ "entrySource", "overview" }
+		};
 		return Shell.Current.GoToAsync(nameof(VerifyPositionPage), parameters);
 	}
 }
@@ -314,12 +335,34 @@ public partial class OverviewGroup : ObservableObject
 
 	partial void OnIsRegisteredChanged(bool value)
 	{
+		// Re-evaluate IsToggleEnabled — once unregistered, a row with no
+		// GSR locks itself off; once registered, it can always be turned
+		// off again.
+		OnPropertyChanged(nameof(IsToggleEnabled));
+
 		// If we're reverting the toggle programmatically, don't fire
 		// the handler — only user-driven changes should trigger work.
 		if (value == _lastAppliedValue) return;
 		_lastAppliedValue = value;
 		_ = _onToggled(this, value);
 	}
+
+	/// <summary>
+	/// True when the group has either a confirmed GSR member or a named
+	/// proxy. Registering with no representative present is meaningless,
+	/// so the toggle is disabled in that case.
+	/// </summary>
+	public bool HasRepresentative =>
+		(Entity.GsrProxy && !string.IsNullOrWhiteSpace(Entity.GsrProxyName))
+		|| Entity.Members?.Any(m => m.IsGsr) == true;
+
+	/// <summary>
+	/// Switch is enabled when the group has a representative, or — for
+	/// edge cases where a previously-registered group had its GSR
+	/// removed elsewhere — when it's already registered (so the user
+	/// can still turn it off).
+	/// </summary>
+	public bool IsToggleEnabled => HasRepresentative || IsRegistered;
 
 	public string DisplayGsr
 	{
@@ -367,10 +410,27 @@ public partial class OverviewPosition : ObservableObject
 
 	partial void OnIsRegisteredChanged(bool value)
 	{
+		OnPropertyChanged(nameof(IsToggleEnabled));
+
 		if (value == _lastAppliedValue) return;
 		_lastAppliedValue = value;
 		_ = _onToggled(this, value);
 	}
+
+	/// <summary>
+	/// True when the position has at least one assigned holder.
+	/// Registering an empty position is meaningless, so the toggle is
+	/// disabled in that case.
+	/// </summary>
+	public bool HasHolder => Entity.Holders?.Any() == true;
+
+	/// <summary>
+	/// Switch is enabled when the position has a holder, or — for the
+	/// edge case where it's already registered but the holder was
+	/// removed elsewhere — when it's already registered (so the user
+	/// can still turn it off).
+	/// </summary>
+	public bool IsToggleEnabled => HasHolder || IsRegistered;
 
 	public string DisplayHolder
 	{

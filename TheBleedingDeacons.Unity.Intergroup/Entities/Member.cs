@@ -25,6 +25,46 @@ public class Member
     /// </summary>
     public DateTime? Updated { get; set; }
 
+    // ── GDPR compliance ──────────────────────────────────────────────
+    //
+    // Mirrors the five fields the Unity API serialises under the
+    // `gdpr_compliance` JSON sub-object on member responses, but stored
+    // flat here for simpler change-tracking and snapshot diffs in
+    // reconciliation. Nullable because pre-compliance-feature snapshots
+    // and members from older Unity servers carry no value.
+
+    /// <summary>
+    /// Whether the member has currently recorded acceptance of the
+    /// privacy policy. Null when no state has ever been recorded;
+    /// false records an explicit revocation.
+    /// </summary>
+    public bool? GdprAccepted { get; set; }
+
+    /// <summary>
+    /// UTC timestamp at which the current state was recorded (acceptance
+    /// or revocation). Null when never recorded.
+    /// </summary>
+    public DateTime? GdprAcceptedAt { get; set; }
+
+    /// <summary>
+    /// The privacy policy version that was accepted. Null after a
+    /// revocation, or when no acceptance has been recorded.
+    /// </summary>
+    public string? GdprAcceptanceVersion { get; set; }
+
+    /// <summary>
+    /// How the acceptance was captured. Set to <c>"register-app"</c>
+    /// by <see cref="Services.ComplianceService"/> for offline-recorded
+    /// acceptances; <c>"web-form"</c>, <c>"api"</c>, etc. when set
+    /// elsewhere. Null after a revocation.
+    /// </summary>
+    public string? GdprAcceptanceMethod { get; set; }
+
+    /// <summary>
+    /// The exact statement the member accepted. Null after a revocation.
+    /// </summary>
+    public string? GdprAcceptanceStatement { get; set; }
+
     // FK to the member's home group (nullable — some members may not have a home group)
     public int? HomeGroupId { get; set; }
     public Group? HomeGroup { get; set; }

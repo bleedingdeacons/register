@@ -88,6 +88,7 @@ public static class MauiProgram
 		RegisterGlobalExceptionHandlers();
 
 		builder.Services.AddSingleton<RegistrationEventLog>();
+		builder.Services.AddSingleton<ComplianceEventLog>();
 
 		// Add configuration service
 		builder.Services.AddSingleton<IConfigurationService, ConfigurationService>();
@@ -203,6 +204,15 @@ public static class MauiProgram
 		builder.Services.AddScoped<AttendanceService>();
 		builder.Services.AddScoped<IAttendanceRegistration<Group>>(sp => sp.GetRequiredService<AttendanceService>());
 		builder.Services.AddScoped<IAttendanceRegistration<Position>>(sp => sp.GetRequiredService<AttendanceService>());
+
+		// Compliance follows the same shape as AttendanceService — see
+		// ComplianceService.cs for the rationale. Scoped lifetime keeps
+		// it consistent with AttendanceService, even though the service
+		// itself holds no per-request state; the lifetime matches the
+		// DbContextFactory it depends on so all the Register-app
+		// services share one disposal policy.
+		builder.Services.AddScoped<ComplianceService>();
+		builder.Services.AddScoped<IComplianceRegistration>(sp => sp.GetRequiredService<ComplianceService>());
 
 		builder.Services.AddScoped<DataService>();
 		builder.Services.AddMemoryCache();
@@ -375,7 +385,12 @@ public static class MauiProgram
 			.Enrich.WithProperty("DeviceModel", DeviceInfo.Model)
 			.Enrich.WithProperty("DeviceName", DeviceInfo.Name)
 			.Enrich.WithProperty("ProcessId", Environment.ProcessId)
-			.Enrich.WithProperty("MachineName", Environment.MachineName)
+			// Replaces the previous Environment.MachineName enricher, which
+			// returned "localhost" on Android and a sandbox name on iOS.
+			// ResolveDeviceLabel() reads a user-set label from Preferences and
+			// falls back to a platform-aware default, so each device shows up
+			// distinctly in the Better Stack live tail.
+			.Enrich.WithProperty("DeviceLabel", ResolveDeviceLabel())
 			.Enrich.With<ExceptionEnricher>();
 
 #if DEBUG
@@ -403,6 +418,63 @@ public static class MauiProgram
 #endif
 
 		return cfg;
+	}
+
+	// Mirrors ConfigurationService.DeviceLabel but reads Preferences directly
+	// so SetupSerilog can call it before the DI container has been built.
+	// BetterStackLoggerController.Reconfigure rebuilds the whole pipeline via
+	// the captured factory, so any saved label change picks up on the very
+	// next reconfigure — no app restart needed.
+	private const string DEVICE_LABEL_PREFERENCE_KEY = "device_label";
+
+	private static string ResolveDeviceLabel()
+	{
+		try
+		{
+			var stored = Preferences.Get(DEVICE_LABEL_PREFERENCE_KEY, string.Empty);
+			if (!string.IsNullOrWhiteSpace(stored))
+				return stored;
+		}
+		catch
+		{
+			// Preferences unavailable — fall through to the auto-default.
+		}
+
+		try
+		{
+			var platform = DeviceInfo.Platform;
+
+			if (platform == DevicePlatform.WinUI || platform == DevicePlatform.MacCatalyst)
+			{
+				var machine = Environment.MachineName;
+				if (!string.IsNullOrWhiteSpace(machine) &&
+					!string.Equals(machine, "localhost", StringComparison.OrdinalIgnoreCase))
+				{
+					return machine;
+				}
+			}
+
+			var manufacturer = (DeviceInfo.Manufacturer ?? string.Empty).Trim();
+			var model = (DeviceInfo.Model ?? string.Empty).Trim();
+			var osName = platform.ToString();
+			var osVer = (DeviceInfo.VersionString ?? string.Empty).Trim();
+
+			var hardware = !string.IsNullOrEmpty(manufacturer) &&
+						   !model.StartsWith(manufacturer, StringComparison.OrdinalIgnoreCase)
+				? $"{manufacturer} {model}".Trim()
+				: model;
+
+			if (string.IsNullOrWhiteSpace(hardware))
+				hardware = "Device";
+
+			return string.IsNullOrWhiteSpace(osVer)
+				? $"{hardware} ({osName})"
+				: $"{hardware} ({osName} {osVer})";
+		}
+		catch
+		{
+			return "UnknownDevice";
+		}
 	}
 
 	private static void RegisterGlobalExceptionHandlers()

@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.Input;
 using Serilog;
 using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Support;
+using TheBleedingDeacons.Intergroup.Register.Utilities;
 using TheBleedingDeacons.Intergroup.Register.Views;
 using TheBleedingDeacons.Unity.Intergroup.Entities;
 using TheBleedingDeacons.Unity.Intergroup.Repositories.Interfaces;
@@ -34,6 +35,7 @@ public partial class VerifyPositionViewModel : BaseViewModel
 	private readonly IAttendanceRegistration<Position> _attendanceRegistration;
 	private readonly IPositionRepository _positionRepository;
 	private readonly IPopupNotification _popupService;
+	private readonly IComplianceRegistration _complianceRegistration;
 
 	[ObservableProperty]
 	private Position? position;
@@ -64,6 +66,17 @@ public partial class VerifyPositionViewModel : BaseViewModel
 	private bool isLoading;
 
 	/// <summary>
+	/// Identifies which page initiated this Verify flow, so that on
+	/// successful register we know whether to reset to MainPage (the
+	/// standard registration flow) or just pop back to the Registrations
+	/// overview so its list re-evaluates with the new state.
+	/// Empty / unset → MainPage behaviour (default).
+	/// "overview" → pop back to RegistrationOverviewPage.
+	/// </summary>
+	[ObservableProperty]
+	private string entrySource = string.Empty;
+
+	/// <summary>
 	/// Active holders for the position, displayed as a list.
 	/// </summary>
 	public ObservableCollection<Member> ActiveHolders { get; } = new();
@@ -83,11 +96,13 @@ public partial class VerifyPositionViewModel : BaseViewModel
 	public VerifyPositionViewModel(
 		IAttendanceRegistration<Position> attendanceRegistration,
 		IPositionRepository positionRepository,
-		IPopupNotification popupService)
+		IPopupNotification popupService,
+		IComplianceRegistration complianceRegistration)
 	{
 		_attendanceRegistration = attendanceRegistration;
 		_positionRepository = positionRepository;
 		_popupService = popupService;
+		_complianceRegistration = complianceRegistration;
 	}
 
 	#region Query Attributes Handling
@@ -125,6 +140,16 @@ public partial class VerifyPositionViewModel : BaseViewModel
 			if (parsedPositionId > 0)
 			{
 				PositionId = parsedPositionId;
+
+				// Capture optional entrySource so Yes() knows whether to reset
+				// to MainPage or pop back to the page that opened us. Only set
+				// on the initial nav; the edited-return branch above retains it.
+				if (query.TryGetValue("entrySource", out var entrySourceObj) &&
+					entrySourceObj is string entrySourceStr)
+				{
+					EntrySource = entrySourceStr;
+				}
+
 				MainThread.BeginInvokeOnMainThread(async () =>
 				{
 					await LoadPositionAsync(parsedPositionId);
@@ -192,12 +217,40 @@ public partial class VerifyPositionViewModel : BaseViewModel
 
 		try
 		{
+			// GDPR gate. Any active holder who has not previously accepted
+			// the privacy policy must do so now before their data is
+			// committed as a registered attendance. Show the popup once
+			// for the whole batch — declining aborts the registration
+			// silently, accepting records acceptance for every holder
+			// who didn't already have it on file.
+			var unaccepted = ActiveHolders.Where(m => m.GdprAccepted != true).ToList();
+			if (unaccepted.Count > 0)
+			{
+				var consentGiven = await PromptForComplianceAsync(unaccepted);
+				if (!consentGiven)
+				{
+					Logger.Information(
+						"Position {Position} registration aborted: GDPR consent declined for {Count} holder(s)",
+						Position.ShortDescription, unaccepted.Count);
+					return;
+				}
+			}
+
 			await _attendanceRegistration.Register(Position);
 
 			await _popupService.ShowCountdownPopupAsync(
 				"Complete",
 				$"Thanks {Position.ShortDescription}",
-				async () => await Shell.Current.GoToAsync("//MainPage")
+				async () =>
+				{
+					// Symmetric with VerifyGroupViewModel.Yes() — return to
+					// the Registrations overview when that's where we came
+					// from, so its OnAppearing reload re-evaluates the row.
+					if (string.Equals(EntrySource, "overview", StringComparison.OrdinalIgnoreCase))
+						await Shell.Current.GoToAsync("..");
+					else
+						await Shell.Current.GoToAsync("//MainPage");
+				}
 			);
 		}
 		catch (Exception ex)
@@ -215,6 +268,72 @@ public partial class VerifyPositionViewModel : BaseViewModel
 	#endregion
 
 	#region Private Methods
+
+	/// <summary>
+	/// Shows the compliance popup with the policy text from
+	/// <c>Resources/Raw/Compliance.txt</c>, and on Accept records
+	/// acceptance for every supplied member via
+	/// <see cref="IComplianceRegistration.RecordAcceptance"/>. Returns
+	/// <c>true</c> when consent was given (and recorded), <c>false</c>
+	/// when the user declined or the popup was dismissed without an
+	/// explicit choice.
+	/// </summary>
+	private async Task<bool> PromptForComplianceAsync(IEnumerable<Member> members)
+	{
+		ComplianceText policy;
+		try
+		{
+			policy = await ComplianceTextLoader.LoadAsync();
+		}
+		catch (Exception ex)
+		{
+			// If we can't load the policy text we cannot show a meaningful
+			// dialog. Treat as "did not consent" — the safe default — and
+			// log so the operator can investigate.
+			Logger.Error(ex, "Failed to load compliance text; aborting consent prompt");
+			return false;
+		}
+
+		bool accepted = await _popupService.ShowCompliance(policy.Title, policy.Body);
+		if (!accepted)
+			return false;
+
+		// Record acceptance for every member that didn't already have it.
+		// One timestamp per call so the batch reads as a single coordinated
+		// event in the audit log.
+		var ts = DateTime.UtcNow;
+		foreach (var member in members)
+		{
+			try
+			{
+				await _complianceRegistration.RecordAcceptance(
+					member,
+					version: policy.Version,
+					statement: policy.Body,
+					method: "register-app",
+					acceptedAtUtc: ts);
+
+				// Mirror the in-memory entity so the page's bindings reflect
+				// the new state immediately — ComplianceService updates a
+				// freshly-loaded Member instance, not the one the VM holds.
+				member.GdprAccepted = true;
+				member.GdprAcceptedAt = ts;
+			}
+			catch (Exception ex)
+			{
+				// Per-member failure is logged but doesn't abort the batch
+				// — the DB write inside ComplianceService already swallows
+				// its own errors, so a throw here would be unusual. If it
+				// does happen, the registration still proceeds because the
+				// user did consent in the UI.
+				Logger.Warning(ex,
+					"Failed to record GDPR acceptance for member {MemberId} ({Name})",
+					member.Id, member.AnonymousName);
+			}
+		}
+
+		return true;
+	}
 
 	private async Task LoadPositionAsync(int positionId)
 	{

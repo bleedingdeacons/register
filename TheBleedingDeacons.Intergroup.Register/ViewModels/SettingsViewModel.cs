@@ -18,6 +18,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 		private readonly IConfigurationService _configService;
 		private readonly IDbContextFactory<UnityDbContext> _dbContextFactory;
 		private readonly RegistrationEventLog _eventLog;
+		private readonly IBetterStackLoggerController _betterStackController;
 
 		[ObservableProperty]
 		private bool isPurging;
@@ -31,14 +32,87 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 		[ObservableProperty]
 		private bool isPurgeStatusError;
 
+		// =================================================================
+		// Device label (Better Stack live-tail identifier)
+		// =================================================================
+
+		/// <summary>
+		/// User-editable copy of the device label. Two-way bound to the Entry
+		/// on SettingsPage. Save is explicit (a button + command) rather than
+		/// PropertyChanged-on-every-keystroke because rebuilding the Serilog
+		/// pipeline is cheap but not free, and we don't want to thrash it
+		/// while the user is mid-typing.
+		/// </summary>
+		[ObservableProperty]
+		private string deviceLabel = string.Empty;
+
+		/// <summary>The auto-default that would apply if the user clears the field.</summary>
+		[ObservableProperty]
+		private string deviceLabelPlaceholder = string.Empty;
+
+		[ObservableProperty]
+		private string deviceLabelStatusMessage = string.Empty;
+
+		[ObservableProperty]
+		private bool isDeviceLabelStatusVisible;
+
 		public SettingsViewModel(
 			IConfigurationService configService,
 			IDbContextFactory<UnityDbContext> dbContextFactory,
-			RegistrationEventLog eventLog)
+			RegistrationEventLog eventLog,
+			IBetterStackLoggerController betterStackController)
 		{
 			_configService = configService;
 			_dbContextFactory = dbContextFactory;
 			_eventLog = eventLog;
+			_betterStackController = betterStackController;
+
+			// Seed the editable copy with whatever's currently in effect (either
+			// the user-set value or the auto-default), and capture the auto-default
+			// separately so we can show it as an Entry placeholder.
+			DeviceLabel = _configService.DeviceLabel;
+			DeviceLabelPlaceholder = _configService.DeviceLabel;
+		}
+
+		/// <summary>
+		/// Persists the typed-in device label and rebuilds the Serilog
+		/// pipeline so the new value flows through to Better Stack on the
+		/// very next log event. Empty input clears the override and reverts
+		/// to the auto-default.
+		/// </summary>
+		[RelayCommand]
+		private void SaveDeviceLabel()
+		{
+			try
+			{
+				_configService.SetDeviceLabel(DeviceLabel);
+
+				// Rebuild Log.Logger so the enricher picks up the new value.
+				// Reconfigure is a full rebuild from the base-logger factory,
+				// which re-reads Preferences on every invocation.
+				var bsConfig = _configService.GetBetterStackConfiguration();
+				_betterStackController.Reconfigure(bsConfig);
+
+				// Reflect what's actually in effect now (auto-default if the
+				// user cleared the field).
+				var effective = _configService.DeviceLabel;
+				DeviceLabel = effective;
+				DeviceLabelPlaceholder = effective;
+
+				ShowDeviceLabelStatus($"Saved. New logs will tag this device as \"{effective}\".");
+				Logger.Information("Device label updated and logger rebuilt — now {DeviceLabel}", effective);
+			}
+			catch (Exception ex)
+			{
+				Logger.Error(ex, "Failed to save device label");
+				ShowDeviceLabelStatus("Could not save device label — see logs.");
+			}
+		}
+
+		private void ShowDeviceLabelStatus(string message)
+		{
+			DeviceLabelStatusMessage = message;
+			IsDeviceLabelStatusVisible = true;
 		}
 
 		// =================================================================
@@ -60,6 +134,46 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 			{
 				if (_configService.IsRegistrationEventLogEnabled == value) return;
 				_configService.SetRegistrationEventLogEnabled(value);
+				OnPropertyChanged();
+			}
+		}
+
+		/// <summary>
+		/// Two-way bound to a Switch on SettingsPage. When on, registering a
+		/// group via the Verify flow also registers any intergroup position
+		/// held by one of its members. See
+		/// <see cref="IConfigurationService.IsAutoRegisterPositionsOnGroupEnabled"/>.
+		/// Same "no local backing field" approach as the event log toggle:
+		/// Preferences is the source of truth.
+		/// </summary>
+		public bool IsAutoRegisterPositionsOnGroupEnabled
+		{
+			get => _configService.IsAutoRegisterPositionsOnGroupEnabled;
+			set
+			{
+				if (_configService.IsAutoRegisterPositionsOnGroupEnabled == value) return;
+				_configService.SetAutoRegisterPositionsOnGroupEnabled(value);
+				OnPropertyChanged();
+			}
+		}
+
+		/// <summary>
+		/// Two-way bound to a Switch on SettingsPage. When on, the verify-group
+		/// flow takes a shortcut whenever a group has exactly one GSR: tapping
+		/// "No" opens that GSR's edit form directly (skipping the picker), and
+		/// tapping "Finished" on that edit form auto-registers attendance on
+		/// return. See
+		/// <see cref="IConfigurationService.IsSingleGsrShortcutEnabled"/>.
+		/// Same "no local backing field" approach as the other toggles:
+		/// Preferences is the source of truth.
+		/// </summary>
+		public bool IsSingleGsrShortcutEnabled
+		{
+			get => _configService.IsSingleGsrShortcutEnabled;
+			set
+			{
+				if (_configService.IsSingleGsrShortcutEnabled == value) return;
+				_configService.SetSingleGsrShortcutEnabled(value);
 				OnPropertyChanged();
 			}
 		}
@@ -138,6 +252,21 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 
 				using var dbContext = _dbContextFactory.CreateDbContext();
 				await dbContext.PurgeDatabaseAsync();
+
+				// Clear the active intergroup meeting selection. The
+				// meeting ID is stored in Preferences and refers to a
+				// row that we've just deleted — leaving it behind would
+				// leave the app pointing at a meeting that no longer
+				// exists. Same "log but don't fail" policy as the event
+				// log deletion below: the DB purge has already succeeded.
+				try
+				{
+					await _configService.SaveActiveIntergroupMeetingAsync(null);
+				}
+				catch (Exception ex)
+				{
+					Logger.Warning(ex, "Failed to clear active intergroup meeting during device reset");
+				}
 
 				// Delete the registration event log if it exists. We do
 				// this after the DB purge succeeds, not before — if the
