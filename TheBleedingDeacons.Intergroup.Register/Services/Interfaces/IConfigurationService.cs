@@ -84,5 +84,30 @@ namespace TheBleedingDeacons.Intergroup.Register.Services.Interfaces
 		/// verify-group entry; no restart required.
 		/// </summary>
 		void SetSingleGsrShortcutEnabled(bool enabled);
+
+		/// <summary>
+		/// A short human-readable label that identifies this physical device
+		/// in the Better Stack live tail (and any other log sink). Resolution
+		/// order:
+		/// <list type="number">
+		/// <item>The user-set value persisted in Preferences, if any.</item>
+		/// <item>Otherwise, an auto-generated default that combines manufacturer,
+		///       model, and OS version so two physically-similar devices on
+		///       different OS versions are still distinguishable.</item>
+		/// </list>
+		/// On desktop (Windows / macOS Catalyst) the auto-default is
+		/// <c>Environment.MachineName</c>, which is meaningful there. On Android
+		/// it's <c>"Pixel Tablet (Android 16)"</c>-style; on iOS it's the
+		/// model-plus-OS-version. Never returns <c>"localhost"</c>.
+		/// </summary>
+		string DeviceLabel { get; }
+
+		/// <summary>
+		/// Persists a user-chosen device label and rebuilds the Serilog pipeline
+		/// so the new value appears in subsequent log events without an app
+		/// restart. Pass an empty / whitespace string to clear the override and
+		/// fall back to the auto-default.
+		/// </summary>
+		void SetDeviceLabel(string? label);
 	}
 }

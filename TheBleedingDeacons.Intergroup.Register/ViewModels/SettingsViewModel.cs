@@ -18,6 +18,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 		private readonly IConfigurationService _configService;
 		private readonly IDbContextFactory<UnityDbContext> _dbContextFactory;
 		private readonly RegistrationEventLog _eventLog;
+		private readonly IBetterStackLoggerController _betterStackController;
 
 		[ObservableProperty]
 		private bool isPurging;
@@ -31,14 +32,87 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 		[ObservableProperty]
 		private bool isPurgeStatusError;
 
+		// =================================================================
+		// Device label (Better Stack live-tail identifier)
+		// =================================================================
+
+		/// <summary>
+		/// User-editable copy of the device label. Two-way bound to the Entry
+		/// on SettingsPage. Save is explicit (a button + command) rather than
+		/// PropertyChanged-on-every-keystroke because rebuilding the Serilog
+		/// pipeline is cheap but not free, and we don't want to thrash it
+		/// while the user is mid-typing.
+		/// </summary>
+		[ObservableProperty]
+		private string deviceLabel = string.Empty;
+
+		/// <summary>The auto-default that would apply if the user clears the field.</summary>
+		[ObservableProperty]
+		private string deviceLabelPlaceholder = string.Empty;
+
+		[ObservableProperty]
+		private string deviceLabelStatusMessage = string.Empty;
+
+		[ObservableProperty]
+		private bool isDeviceLabelStatusVisible;
+
 		public SettingsViewModel(
 			IConfigurationService configService,
 			IDbContextFactory<UnityDbContext> dbContextFactory,
-			RegistrationEventLog eventLog)
+			RegistrationEventLog eventLog,
+			IBetterStackLoggerController betterStackController)
 		{
 			_configService = configService;
 			_dbContextFactory = dbContextFactory;
 			_eventLog = eventLog;
+			_betterStackController = betterStackController;
+
+			// Seed the editable copy with whatever's currently in effect (either
+			// the user-set value or the auto-default), and capture the auto-default
+			// separately so we can show it as an Entry placeholder.
+			DeviceLabel = _configService.DeviceLabel;
+			DeviceLabelPlaceholder = _configService.DeviceLabel;
+		}
+
+		/// <summary>
+		/// Persists the typed-in device label and rebuilds the Serilog
+		/// pipeline so the new value flows through to Better Stack on the
+		/// very next log event. Empty input clears the override and reverts
+		/// to the auto-default.
+		/// </summary>
+		[RelayCommand]
+		private void SaveDeviceLabel()
+		{
+			try
+			{
+				_configService.SetDeviceLabel(DeviceLabel);
+
+				// Rebuild Log.Logger so the enricher picks up the new value.
+				// Reconfigure is a full rebuild from the base-logger factory,
+				// which re-reads Preferences on every invocation.
+				var bsConfig = _configService.GetBetterStackConfiguration();
+				_betterStackController.Reconfigure(bsConfig);
+
+				// Reflect what's actually in effect now (auto-default if the
+				// user cleared the field).
+				var effective = _configService.DeviceLabel;
+				DeviceLabel = effective;
+				DeviceLabelPlaceholder = effective;
+
+				ShowDeviceLabelStatus($"Saved. New logs will tag this device as \"{effective}\".");
+				Logger.Information("Device label updated and logger rebuilt — now {DeviceLabel}", effective);
+			}
+			catch (Exception ex)
+			{
+				Logger.Error(ex, "Failed to save device label");
+				ShowDeviceLabelStatus("Could not save device label — see logs.");
+			}
+		}
+
+		private void ShowDeviceLabelStatus(string message)
+		{
+			DeviceLabelStatusMessage = message;
+			IsDeviceLabelStatusVisible = true;
 		}
 
 		// =================================================================

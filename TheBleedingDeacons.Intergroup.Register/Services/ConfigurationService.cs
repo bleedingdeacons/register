@@ -22,6 +22,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		private const string AUTO_REGISTER_POSITIONS_KEY = "auto_register_positions_on_group";
 		private const string SINGLE_GSR_SHORTCUT_KEY = "single_gsr_shortcut_enabled";
 		private const string COMPLIANCE_LOG_ENABLED_KEY = "compliance_log_enabled";
+		private const string DEVICE_LABEL_KEY = "device_label";
 
 #if USE_DEV_CREDENTIALS
 		private const string DEV_CREDENTIALS_RESOURCE =
@@ -430,6 +431,117 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			catch (Exception ex)
 			{
 				Logger.Warning(ex, "Failed to save single-GSR shortcut toggle");
+			}
+		}
+
+		// =================================================================
+		// Device Label (Better Stack / Serilog enricher)
+		// =================================================================
+
+		/// <summary>
+		/// Returns the user-set label if any, otherwise an auto-generated
+		/// default that's still distinct enough to tell two devices apart in
+		/// the Better Stack live tail. The auto-default deliberately includes
+		/// <c>DeviceInfo.VersionString</c> so two physically identical Android
+		/// tablets on different OS versions (e.g. Android 15 vs 16) sort apart
+		/// without any configuration. <c>Environment.MachineName</c> is used
+		/// only on desktop, where it is meaningful — on Android it returns
+		/// <c>"localhost"</c> and on iOS it returns a sandbox hostname.
+		/// </summary>
+		public string DeviceLabel
+		{
+			get
+			{
+				try
+				{
+					var stored = Preferences.Get(DEVICE_LABEL_KEY, string.Empty);
+					if (!string.IsNullOrWhiteSpace(stored))
+						return stored;
+				}
+				catch (Exception ex)
+				{
+					// Preferences unavailable — fall through to the platform default.
+					Logger.Warning(ex, "Failed to read device label from Preferences — using auto-default");
+				}
+
+				return BuildDefaultDeviceLabel();
+			}
+		}
+
+		public void SetDeviceLabel(string? label)
+		{
+			try
+			{
+				if (string.IsNullOrWhiteSpace(label))
+				{
+					Preferences.Remove(DEVICE_LABEL_KEY);
+					Logger.Information("Device label cleared — will use auto-default");
+				}
+				else
+				{
+					var trimmed = label.Trim();
+					Preferences.Set(DEVICE_LABEL_KEY, trimmed);
+					Logger.Information("Device label set to {DeviceLabel}", trimmed);
+				}
+			}
+			catch (Exception ex)
+			{
+				Logger.Warning(ex, "Failed to save device label");
+			}
+		}
+
+		/// <summary>
+		/// Computes a sensible cross-platform default device label. Never
+		/// returns <c>"localhost"</c> — on mobile we always synthesise from
+		/// <see cref="DeviceInfo"/>, on desktop we use the OS host name which
+		/// is what the operator already recognises.
+		/// </summary>
+		private static string BuildDefaultDeviceLabel()
+		{
+			try
+			{
+				var platform = DeviceInfo.Platform;
+
+				if (platform == DevicePlatform.WinUI || platform == DevicePlatform.MacCatalyst)
+				{
+					// Desktop: MachineName is meaningful (e.g. "DESK-OFFICE-01").
+					var machine = Environment.MachineName;
+					if (!string.IsNullOrWhiteSpace(machine) &&
+						!string.Equals(machine, "localhost", StringComparison.OrdinalIgnoreCase))
+					{
+						return machine;
+					}
+					// Extremely unusual — fall through to the model-based label.
+				}
+
+				// Mobile (Android, iOS) and the desktop fallback above.
+				// Combine manufacturer, model and OS version. The version is
+				// the bit that lets you tell apart two otherwise-identical
+				// tablets on different Android releases.
+				var manufacturer = (DeviceInfo.Manufacturer ?? string.Empty).Trim();
+				var model = (DeviceInfo.Model ?? string.Empty).Trim();
+				var osName = platform.ToString();         // "Android", "iOS", "WinUI", "MacCatalyst"
+				var osVer = (DeviceInfo.VersionString ?? string.Empty).Trim();
+
+				// Avoid repeating the manufacturer when it's already in the model
+				// string (Samsung tends to do this; "Samsung SM-G991B" vs "SM-G991B").
+				var hardware = !string.IsNullOrEmpty(manufacturer) &&
+							   !model.StartsWith(manufacturer, StringComparison.OrdinalIgnoreCase)
+					? $"{manufacturer} {model}".Trim()
+					: model;
+
+				if (string.IsNullOrWhiteSpace(hardware))
+					hardware = "Device";
+
+				return string.IsNullOrWhiteSpace(osVer)
+					? $"{hardware} ({osName})"
+					: $"{hardware} ({osName} {osVer})";
+			}
+			catch
+			{
+				// Anything genuinely unexpected — return something non-empty
+				// rather than letting the enricher write a blank.
+				return "UnknownDevice";
 			}
 		}
 
