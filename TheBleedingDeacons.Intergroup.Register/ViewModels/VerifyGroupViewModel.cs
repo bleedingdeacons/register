@@ -272,12 +272,15 @@ public partial class VerifyGroupViewModel : BaseViewModel
 
 		try
 		{
-			// GDPR gate. Any active GSR who has not previously accepted
-			// the privacy policy must do so now before their data is
-			// committed as a registered attendance. Show the popup once
-			// for the whole batch — declining aborts the registration
-			// silently, accepting records acceptance for every member
-			// who didn't already have it on file.
+			// GDPR gate. Each active GSR who has not previously accepted
+			// the privacy policy must be asked individually before their
+			// data is committed as a registered attendance. The popup is
+			// shown once per outstanding GSR with that GSR's name in the
+			// title, so it's clear whose consent is being captured. If
+			// any GSR declines, the entire group registration is aborted
+			// — we cannot register a group whose members haven't all
+			// consented. GSRs who accept have their acceptance recorded
+			// individually as the loop progresses.
 			var unaccepted = ActiveGsrs.Where(m => m.GdprAccepted != true).ToList();
 			if (unaccepted.Count > 0)
 			{
@@ -285,7 +288,7 @@ public partial class VerifyGroupViewModel : BaseViewModel
 				if (!consentGiven)
 				{
 					Logger.Information(
-						"Group {GroupName} registration aborted: GDPR consent declined for {Count} member(s)",
+						"Group {GroupName} registration aborted: GDPR consent declined by at least one of {Count} unaccepted GSR(s)",
 						Group.Name, unaccepted.Count);
 					return;
 				}
@@ -331,13 +334,19 @@ public partial class VerifyGroupViewModel : BaseViewModel
 	#region Private Methods
 
 	/// <summary>
-	/// Shows the compliance popup with the policy text from
-	/// <c>Resources/Raw/Compliance.txt</c>, and on Accept records
-	/// acceptance for every supplied member via
-	/// <see cref="IComplianceRegistration.RecordAcceptance"/>. Returns
-	/// <c>true</c> when consent was given (and recorded), <c>false</c>
-	/// when the user declined or the popup was dismissed without an
-	/// explicit choice.
+	/// Shows the compliance popup once per supplied GSR, with that GSR's
+	/// name in the title so it's unambiguous whose consent is being
+	/// captured. Each acceptance is recorded individually via
+	/// <see cref="IComplianceRegistration.RecordAcceptance"/> as soon as
+	/// it's given. Returns <c>true</c> only when every GSR accepted;
+	/// returns <c>false</c> as soon as any GSR declines (or the popup is
+	/// dismissed without an explicit choice), without prompting the
+	/// remaining GSRs — the overall registration cannot proceed.
+	///
+	/// Per-member acceptance timestamps are captured at the moment the
+	/// user clicks Accept for that member, rather than sharing a single
+	/// batch timestamp, so the audit trail reflects the actual sequence
+	/// of consent events.
 	/// </summary>
 	private async Task<bool> PromptForComplianceAsync(IEnumerable<Member> members)
 	{
@@ -355,16 +364,30 @@ public partial class VerifyGroupViewModel : BaseViewModel
 			return false;
 		}
 
-		bool accepted = await _popupService.ShowCompliance(policy.Title, policy.Body);
-		if (!accepted)
-			return false;
-
-		// Record acceptance for every member that didn't already have it.
-		// One timestamp per call so the batch reads as a single coordinated
-		// event in the audit log.
-		var ts = DateTime.UtcNow;
 		foreach (var member in members)
 		{
+			// Compose a per-GSR title so the user can see which member's
+			// consent the popup is asking for. Falls back to the policy's
+			// own title when the member has no display name on file.
+			string memberName = !string.IsNullOrWhiteSpace(member.AnonymousName)
+				? member.AnonymousName!
+				: "this GSR";
+			string perMemberTitle = $"{policy.Title} — {memberName}";
+
+			bool accepted = await _popupService.ShowCompliance(perMemberTitle, policy.Body);
+			if (!accepted)
+			{
+				Logger.Information(
+					"GDPR consent declined for member {MemberId} ({Name}); aborting group registration",
+					member.Id, member.AnonymousName);
+				return false;
+			}
+
+			// Record this member's acceptance immediately. Per-member
+			// timestamps mean each row in the audit log carries the
+			// real moment the user clicked Accept for that GSR, rather
+			// than a single shared batch timestamp.
+			var ts = DateTime.UtcNow;
 			try
 			{
 				await _complianceRegistration.RecordAcceptance(
@@ -382,11 +405,11 @@ public partial class VerifyGroupViewModel : BaseViewModel
 			}
 			catch (Exception ex)
 			{
-				// Per-member failure is logged but doesn't abort the batch
-				// — the DB write inside ComplianceService already swallows
-				// its own errors, so a throw here would be unusual. If it
-				// does happen, the registration still proceeds because the
-				// user did consent in the UI.
+				// Per-member persistence failure is logged but doesn't
+				// abort the loop — the DB write inside ComplianceService
+				// already swallows its own errors, so a throw here would
+				// be unusual. The user did consent in the UI, so we still
+				// honour that and continue prompting the remaining GSRs.
 				Logger.Warning(ex,
 					"Failed to record GDPR acceptance for member {MemberId} ({Name})",
 					member.Id, member.AnonymousName);
