@@ -440,5 +440,5 @@ Properties/launchSettings.json
 /Utils/Integrity-202-Diagnostic.zip
 /Utils/TheBleedingDeacons.Intergroup.Register.zip
 /Utils/TheBleedingDeacons.Unity.Intergroup.zip
-/org.aa_bristol.thebleedingdeacons.intergroup.register-Signed.apk
+**/*.apk
 /org.aa_bristol.thebleedingdeacons.intergroup.register.apk
