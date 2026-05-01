@@ -46,7 +46,7 @@
                         <Grid IsVisible="{Binding HasActiveMembers}">
                             <CollectionView
                                 x:Name="ActiveMembersCollectionView"
-                                HeightRequest="360"
+                                HeightRequest="420"
                                 HorizontalOptions="Center"
                                 ItemsSource="{Binding ActiveMembers}"
                                 ItemsUpdatingScrollMode="KeepScrollOffset"
@@ -65,17 +65,8 @@
                                             MaximumWidthRequest="560"
                                             Style="{StaticResource M3CardStyle}"
                                             WidthRequest="560">
-                                            <VerticalStackLayout Spacing="6">
-                                                <Label Style="{StaticResource FieldLabelStyle}" Text="Name" />
-                                                <Label Style="{StaticResource ValueLabelStyle}" Text="{Binding AnonymousName}" />
-
-                                                <Label Style="{StaticResource FieldLabelStyle}" Text="Personal Email" />
-                                                <Label Style="{StaticResource ValueLabelStyle}" Text="{Binding PersonalEmail}" />
-
-                                                <Label Style="{StaticResource FieldLabelStyle}" Text="Mobile Phone" />
-                                                <Label Style="{StaticResource ValueLabelStyle}" Text="{Binding MobileNumber}" />
-
-                                                <!--  Card-level action row: Edit / Remove  -->
+                                            <controls:MemberCard Member="{Binding .}">
+                                                <!--  Action slot: Edit / Remove  -->
                                                 <Grid
                                                     Margin="0,8,0,0"
                                                     ColumnDefinitions="*,*"
@@ -97,7 +88,7 @@
                                                         TextColor="{AppThemeBinding Light={StaticResource DangerDark},
                                                                                     Dark={StaticResource DangerLight}}" />
                                                 </Grid>
-                                            </VerticalStackLayout>
+                                            </controls:MemberCard>
                                         </Border>
                                     </DataTemplate>
                                 </CollectionView.ItemTemplate>
@@ -217,25 +208,11 @@
                                                 MaximumWidthRequest="560"
                                                 Style="{StaticResource DeletedCardStyle}"
                                                 WidthRequest="560">
-                                                <VerticalStackLayout Spacing="6">
-                                                    <Label Style="{StaticResource FieldLabelStyle}" Text="Name" />
-                                                    <Label
-                                                        Style="{StaticResource ValueLabelStyle}"
-                                                        Text="{Binding AnonymousName}"
-                                                        TextDecorations="Strikethrough" />
-
-                                                    <Label Style="{StaticResource FieldLabelStyle}" Text="Personal Email" />
-                                                    <Label
-                                                        Style="{StaticResource ValueLabelStyle}"
-                                                        Text="{Binding PersonalEmail}"
-                                                        TextDecorations="Strikethrough" />
-
-                                                    <Label Style="{StaticResource FieldLabelStyle}" Text="Mobile Phone" />
-                                                    <Label
-                                                        Style="{StaticResource ValueLabelStyle}"
-                                                        Text="{Binding MobileNumber}"
-                                                        TextDecorations="Strikethrough" />
-
+                                                <controls:MemberCard
+                                                    IsStruckThrough="True"
+                                                    Member="{Binding .}"
+                                                    ShowRevealButton="False">
+                                                    <!--  Action slot: Undo  -->
                                                     <Button
                                                         Margin="0,8,0,0"
                                                         Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:EditGroupViewModel}}, Path=UndoRemoveMemberCommand}"
@@ -245,7 +222,7 @@
                                                         Style="{StaticResource M3SecondaryButtonStyle}"
                                                         Text="Undo"
                                                         WidthRequest="160" />
-                                                </VerticalStackLayout>
+                                                </controls:MemberCard>
                                             </Border>
                                         </DataTemplate>
                                     </CollectionView.ItemTemplate>

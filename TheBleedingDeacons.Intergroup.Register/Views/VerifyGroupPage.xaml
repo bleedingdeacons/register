@@ -63,45 +63,7 @@
                                         MaximumWidthRequest="560"
                                         Style="{StaticResource M3CardStyle}"
                                         WidthRequest="560">
-                                        <VerticalStackLayout Spacing="6">
-                                            <Label Style="{StaticResource FieldLabelStyle}" Text="Name" />
-                                            <Label Style="{StaticResource ValueLabelStyle}" Text="{Binding AnonymousName}" />
-
-                                            <Label Style="{StaticResource FieldLabelStyle}" Text="Personal Email" />
-                                            <controls:MaskedRevealLabel
-                                                x:Name="EmailReveal"
-                                                Margin="0,0,0,4"
-                                                BackgroundColor="Transparent"
-                                                FontSize="16"
-                                                MaskType="Email"
-                                                ShowRevealButton="False"
-                                                TextColor="{AppThemeBinding Light={StaticResource Gray900},
-                                                                            Dark={StaticResource Gray100}}"
-                                                Value="{Binding PersonalEmail}" />
-
-                                            <Label Style="{StaticResource FieldLabelStyle}" Text="Mobile Phone" />
-                                            <controls:MaskedRevealLabel
-                                                x:Name="MobileReveal"
-                                                Margin="0,0,0,4"
-                                                BackgroundColor="Transparent"
-                                                FontSize="16"
-                                                MaskType="Mobile"
-                                                ShowRevealButton="False"
-                                                TextColor="{AppThemeBinding Light={StaticResource Gray900},
-                                                                            Dark={StaticResource Gray100}}"
-                                                Value="{Binding MobileNumber}" />
-
-                                            <!--  Card-level Review toggle: reveals both fields while held  -->
-                                            <Button
-                                                Margin="0,8,0,0"
-                                                HeightRequest="44"
-                                                HorizontalOptions="Center"
-                                                Pressed="OnReviewPressed"
-                                                Released="OnReviewReleased"
-                                                Style="{StaticResource M3SecondaryButtonStyle}"
-                                                Text="Review"
-                                                WidthRequest="160" />
-                                        </VerticalStackLayout>
+                                        <controls:MemberCard Member="{Binding .}" />
                                     </Border>
                                 </DataTemplate>
                             </CollectionView.ItemTemplate>
@@ -157,6 +119,7 @@
 
                     <!--  Standing-in card (only when there ARE active GSRs)  -->
                     <Border
+                        Padding="12,8,12,16"
                         HorizontalOptions="Center"
                         IsVisible="{Binding HasActiveGsrs}"
                         MaximumWidthRequest="560"
@@ -168,7 +131,7 @@
                             2. "Your Name" label + entry, centred,
                             shown only while the checkbox is ticked.
                         -->
-                        <VerticalStackLayout Spacing="12">
+                        <VerticalStackLayout Spacing="6">
 
                             <!--  Row 1: prompt + checkbox, centred  -->
                             <HorizontalStackLayout
@@ -199,7 +162,7 @@
                                     HorizontalOptions="Center"
                                     Style="{StaticResource FieldLabelStyle}"
                                     Text="Your Name" />
-                                <controls:CloseableEntry
+                                <controls:InteractiveEntry
                                     x:Name="StandingInNameEntry"
                                     BackgroundColor="{AppThemeBinding Light={StaticResource Surface},
                                                                       Dark={StaticResource Gray800}}"

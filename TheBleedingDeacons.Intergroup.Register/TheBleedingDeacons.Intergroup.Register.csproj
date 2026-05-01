@@ -161,6 +161,9 @@
 		<MauiXaml Update="Controls\MaskedRevealLabel.xaml">
 			<Generator>MSBuild:Compile</Generator>
 		</MauiXaml>
+		<MauiXaml Update="Controls\MemberCard.xaml">
+			<Generator>MSBuild:Compile</Generator>
+		</MauiXaml>
 		<MauiXaml Update="Views\DatabaseBackupPage.xaml">
 			<Generator>MSBuild:Compile</Generator>
 		</MauiXaml>

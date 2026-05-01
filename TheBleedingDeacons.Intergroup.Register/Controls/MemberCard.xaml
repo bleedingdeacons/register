@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView
+    x:Class="TheBleedingDeacons.Intergroup.Register.Controls.MemberCard"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:controls="clr-namespace:TheBleedingDeacons.Intergroup.Register.Controls"
+    x:Name="MemberCardRoot">
+
+    <!--
+        The internal layout is wrapped in an explicit <ContentView.Content>
+        so that the [ContentProperty(nameof(ActionContent))] attribute on
+        the code-behind doesn't redirect this child into ActionContent.
+        Callers *do* benefit from the ContentProperty: their action row can
+        be written as a direct child of <controls:MemberCard> with no
+        wrapping element.
+
+        Reusable member detail block: Name / Personal Email / Mobile Phone,
+        with a hold-to-reveal Reveal button that unmasks the masked fields
+        while held. The page-specific action row (Edit/Remove, Undo, etc.)
+        is supplied via the ActionContent property.
+
+        We deliberately set BindingContext on the inner stack to Member, so
+        all field bindings here are simple ({Binding AnonymousName}, etc.)
+        and any ActionContent supplied by the caller sees Member as its
+        local context — matching the original DataTemplate behaviour where
+        "{Binding .}" resolves to the Member.
+    -->
+    <ContentView.Content>
+        <VerticalStackLayout BindingContext="{Binding Member, Source={x:Reference MemberCardRoot}}" Spacing="6">
+
+            <Label Style="{StaticResource FieldLabelStyle}" Text="Name" />
+            <Label
+                Style="{StaticResource ValueLabelStyle}"
+                Text="{Binding AnonymousName}"
+                TextDecorations="{Binding ValueTextDecorations, Source={x:Reference MemberCardRoot}}" />
+
+            <Label Style="{StaticResource FieldLabelStyle}" Text="Personal Email" />
+            <controls:MaskedRevealLabel
+                x:Name="EmailReveal"
+                Margin="0,0,0,4"
+                BackgroundColor="Transparent"
+                FontSize="16"
+                MaskType="Email"
+                ShowRevealButton="False"
+                TextColor="{AppThemeBinding Light={StaticResource Gray900},
+                                            Dark={StaticResource Gray100}}"
+                Value="{Binding PersonalEmail}" />
+
+            <Label Style="{StaticResource FieldLabelStyle}" Text="Mobile Phone" />
+            <controls:MaskedRevealLabel
+                x:Name="MobileReveal"
+                Margin="0,0,0,4"
+                BackgroundColor="Transparent"
+                FontSize="16"
+                MaskType="Mobile"
+                ShowRevealButton="False"
+                TextColor="{AppThemeBinding Light={StaticResource Gray900},
+                                            Dark={StaticResource Gray100}}"
+                Value="{Binding MobileNumber}" />
+
+            <!--  Hold-to-reveal Reveal button. Hidden when ShowRevealButton is false.  -->
+            <Button
+                Margin="0,8,0,0"
+                HeightRequest="44"
+                HorizontalOptions="Center"
+                IsVisible="{Binding ShowRevealButton, Source={x:Reference MemberCardRoot}}"
+                Pressed="OnRevealPressed"
+                Released="OnRevealReleased"
+                Style="{StaticResource M3SecondaryButtonStyle}"
+                Text="Reveal"
+                WidthRequest="160" />
+
+            <!--
+                Action slot. The caller-supplied view is parented here in code
+                via the ActionContent property-changed handler — see code-behind.
+                Because we're inside a VerticalStackLayout whose BindingContext
+                is Member, any "{Binding .}" inside ActionContent resolves to
+                the Member — same as the pre-extraction DataTemplate.
+                RelativeSource AncestorType bindings still walk up to the
+                page-level ViewModel as before.
+            -->
+            <ContentView x:Name="ActionSlot" />
+
+        </VerticalStackLayout>
+    </ContentView.Content>
+
+</ContentView>

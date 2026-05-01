@@ -301,8 +301,8 @@ public partial class VerifyGroupViewModel : BaseViewModel
 			await _attendanceRegistration.Register(Group);
 
 			await _popupService.ShowCountdownPopupAsync(
-				"Complete",
-				$"Thanks {Group.Name}",
+				"Registered",
+				$"Welcome {Group.Name}",
 				async () =>
 				{
 					// When the user reached this Verify page from the

@@ -10,8 +10,9 @@
     CanBeDismissedByTappingOutsideOfPopup="False">
 
     <Border
+        Margin="50"
         x:DataType="vm:AcceptTermsPopupViewModel"
-        MaximumHeightRequest="700"
+        HeightRequest="560"
         Style="{StaticResource M3CardStyle}"
         WidthRequest="640">
 
