@@ -61,21 +61,8 @@
                                             HorizontalOptions="Center"
                                             WidthRequest="560"
                                             MaximumWidthRequest="560">
-                                        <VerticalStackLayout Spacing="6">
-                                            <Label Text="Name" Style="{StaticResource FieldLabelStyle}"/>
-                                            <Label Text="{Binding AnonymousName}" Style="{StaticResource ValueLabelStyle}"/>
-
-                                            <Label Text="Personal Email" Style="{StaticResource FieldLabelStyle}"/>
-                                            <Label Text="{Binding PersonalEmail}" Style="{StaticResource ValueLabelStyle}"/>
-
-                                            <Label Text="Mobile Phone" Style="{StaticResource FieldLabelStyle}"/>
-                                            <Label Text="{Binding MobileNumber}" Style="{StaticResource ValueLabelStyle}"/>
-
-                                            <Label Text="Rotation Date" Style="{StaticResource FieldLabelStyle}"/>
-                                            <Label Text="{Binding IntergroupPositionRotation}"
-                                                   Style="{StaticResource ValueLabelStyle}"/>
-
-                                            <!-- Card-level action row: Edit / Remove -->
+                                        <controls:PositionMemberCard Member="{Binding .}">
+                                            <!-- Action slot: Edit / Remove -->
                                             <Grid ColumnDefinitions="*,*"
                                                   ColumnSpacing="12"
                                                   Margin="0,8,0,0">
@@ -93,7 +80,7 @@
                                                         Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:PositionEditViewModel}}, Path=RemoveMemberCommand}"
                                                         CommandParameter="{Binding .}"/>
                                             </Grid>
-                                        </VerticalStackLayout>
+                                        </controls:PositionMemberCard>
                                     </Border>
                                 </DataTemplate>
                             </CollectionView.ItemTemplate>
@@ -136,27 +123,11 @@
                                                 HorizontalOptions="Center"
                                                 WidthRequest="560"
                                                 MaximumWidthRequest="560">
-                                            <VerticalStackLayout Spacing="6">
-                                                <Label Text="Name" Style="{StaticResource FieldLabelStyle}"/>
-                                                <Label Text="{Binding AnonymousName}"
-                                                       Style="{StaticResource ValueLabelStyle}"
-                                                       TextDecorations="Strikethrough"/>
-
-                                                <Label Text="Personal Email" Style="{StaticResource FieldLabelStyle}"/>
-                                                <Label Text="{Binding PersonalEmail}"
-                                                       Style="{StaticResource ValueLabelStyle}"
-                                                       TextDecorations="Strikethrough"/>
-
-                                                <Label Text="Mobile Phone" Style="{StaticResource FieldLabelStyle}"/>
-                                                <Label Text="{Binding MobileNumber}"
-                                                       Style="{StaticResource ValueLabelStyle}"
-                                                       TextDecorations="Strikethrough"/>
-
-                                                <Label Text="Rotation Date" Style="{StaticResource FieldLabelStyle}"/>
-                                                <Label Text="{Binding IntergroupPositionRotation}"
-                                                       Style="{StaticResource ValueLabelStyle}"
-                                                       TextDecorations="Strikethrough"/>
-
+                                            <controls:PositionMemberCard
+                                                IsStruckThrough="True"
+                                                Member="{Binding .}"
+                                                ShowRevealButton="False">
+                                                <!-- Action slot: Undo -->
                                                 <Button Text="Undo"
                                                         Style="{StaticResource M3SecondaryButtonStyle}"
                                                         HorizontalOptions="Center"
@@ -165,7 +136,7 @@
                                                         Margin="0,8,0,0"
                                                         Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:PositionEditViewModel}}, Path=UndoRemoveMemberCommand}"
                                                         CommandParameter="{Binding .}"/>
-                                            </VerticalStackLayout>
+                                            </controls:PositionMemberCard>
                                         </Border>
                                     </DataTemplate>
                                 </CollectionView.ItemTemplate>

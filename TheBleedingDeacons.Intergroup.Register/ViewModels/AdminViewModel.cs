@@ -10,6 +10,7 @@ using TheBleedingDeacons.Intergroup.Register.Views;
 using TheBleedingDeacons.Unity.Intergroup.Data;
 using TheBleedingDeacons.Unity.Intergroup.Entities;
 using TheBleedingDeacons.Unity.Intergroup.Repositories.Interfaces;
+using TheBleedingDeacons.Unity.Intergroup.Services;
 
 namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 {
@@ -79,6 +80,70 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 		[ObservableProperty]
 		private bool isStatusVisible = false;
 
+		// ── Detailed progress (sync / reconciliation) ────────────────
+		//
+		// These mirror the SyncProgress reports coming out of the
+		// service layer. The view binds to them inside the Syncing /
+		// Finishing phase blocks so the user sees what step is running
+		// and how far through it is, rather than a single
+		// indeterminate spinner for the whole pipeline.
+		//
+		// IsProgressDeterminate flips based on whether the current
+		// stage carries a known total, letting the XAML swap between
+		// a ProgressBar and an ActivityIndicator without the
+		// view-model having to know which control is on screen.
+
+		/// <summary>
+		/// Human-readable description of the current sync step
+		/// (e.g. "Fetching members (page 2 of 4)"). Empty when no
+		/// sync is in flight.
+		/// </summary>
+		[ObservableProperty]
+		private string progressMessage = string.Empty;
+
+		/// <summary>
+		/// Items processed so far in the current stage. Combined with
+		/// <see cref="ProgressTotal"/> to drive a determinate progress bar.
+		/// </summary>
+		[ObservableProperty]
+		[NotifyPropertyChangedFor(nameof(ProgressFraction))]
+		[NotifyPropertyChangedFor(nameof(ProgressCountLabel))]
+		private int progressCurrent;
+
+		/// <summary>
+		/// Total items expected in the current stage, or zero when the
+		/// stage is indeterminate / not yet known.
+		/// </summary>
+		[ObservableProperty]
+		[NotifyPropertyChangedFor(nameof(ProgressFraction))]
+		[NotifyPropertyChangedFor(nameof(ProgressCountLabel))]
+		private int progressTotal;
+
+		/// <summary>
+		/// True when the current stage knows its total and the UI
+		/// should show a determinate progress bar; false for the
+		/// indeterminate spinner fallback.
+		/// </summary>
+		[ObservableProperty]
+		private bool isProgressDeterminate;
+
+		/// <summary>
+		/// 0–1 value bound to <c>ProgressBar.Progress</c>. Returns 0
+		/// when no total is known to keep the bar at the start instead
+		/// of jumping when the first determinate report arrives.
+		/// </summary>
+		public double ProgressFraction =>
+			ProgressTotal > 0
+				? Math.Clamp((double)ProgressCurrent / ProgressTotal, 0, 1)
+				: 0;
+
+		/// <summary>
+		/// Compact "n / N" label shown next to the progress bar, or
+		/// empty when there's no total to count against.
+		/// </summary>
+		public string ProgressCountLabel =>
+			ProgressTotal > 0 ? $"{ProgressCurrent} / {ProgressTotal}" : string.Empty;
+
 		// ── Sync error state ─────────────────────────────────────────
 
 		[ObservableProperty]
@@ -102,7 +167,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 		/// to fire.
 		/// </summary>
 		[ObservableProperty]
-		[NotifyCanExecuteChangedFor(nameof(StartMeetingCommand))]
+		[NotifyCanExecuteChangedFor(nameof(LoadUnityCommand))]
 		[NotifyCanExecuteChangedFor(nameof(RetrySyncCommand))]
 		[NotifyCanExecuteChangedFor(nameof(SyncAgainCommand))]
 		private bool isOnline = Connectivity.Current.NetworkAccess == NetworkAccess.Internet;
@@ -124,8 +189,25 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 		private string finishSummary = string.Empty;
 
 		// ── Meeting list (shown during SelectMeeting phase) ──────────
+		//
+		// Wrap each IntergroupMeeting in a tiny row-view-model so the
+		// "is this the selected row?" state lives on a property the
+		// XAML can bind directly (no converter, no equality dance).
+		// Tapping a row or its checkbox flips IsSelected on that row
+		// and clears it on every other row — single-select, modelled
+		// as one ObservableObject per visible row.
 
-		public ObservableCollection<IntergroupMeeting> Meetings { get; } = new();
+		public ObservableCollection<IntergroupMeetingRow> Meetings { get; } = new();
+
+		/// <summary>
+		/// The row currently ticked, or <c>null</c> when nothing is
+		/// selected. Drives <see cref="StartMeetingCommand"/>'s
+		/// CanExecute so the Start Meeting button stays disabled
+		/// until the user picks one.
+		/// </summary>
+		[ObservableProperty]
+		[NotifyCanExecuteChangedFor(nameof(StartMeetingCommand))]
+		private IntergroupMeetingRow? selectedMeetingRow;
 
 		public AdminViewModel(
 			DataService dataService,
@@ -163,21 +245,36 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 			if (disposing)
 			{
 				Connectivity.Current.ConnectivityChanged -= OnConnectivityChanged;
+
+				// Detach row PropertyChanged subscriptions so the rows
+				// can be GC'd alongside the VM. Without this the rows
+				// would outlive the VM via the delegate's implicit
+				// strong reference back to its target.
+				foreach (var row in Meetings)
+					row.PropertyChanged -= OnRowSelectionChanged;
 			}
 			base.Dispose(disposing);
 		}
 
 		// =============================================================
-		// Start Meeting
+		// Load Unity (sync)
 		// =============================================================
 
 		/// <summary>
 		/// Step 1: Sync from Unity and capture a snapshot, then show
 		/// the meeting selection list. Disabled while offline — the sync
 		/// has to reach the Unity API to do anything useful.
+		///
+		/// <para>
+		/// Previously named <c>StartMeeting</c> when this command both
+		/// triggered the sync and started the meeting in one step. The
+		/// flow has since been split: this command only loads data,
+		/// and a separate <see cref="StartMeetingCommand"/> commits
+		/// the user's selection.
+		/// </para>
 		/// </summary>
-		[RelayCommand(CanExecute = nameof(CanStartMeeting))]
-		private async Task StartMeeting()
+		[RelayCommand(CanExecute = nameof(CanLoadUnity))]
+		private async Task LoadUnity()
 		{
 			var config = await _configService.LoadUnityConfigurationAsync();
 			if (!config.IsValid())
@@ -188,7 +285,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 			}
 
 			Logger.Information(
-				"StartMeeting config — BaseUrl: {BaseUrl}, ApiKey: {ApiKeyStatus}, ActiveMeetingId: {ActiveMeetingId}",
+				"LoadUnity config — BaseUrl: {BaseUrl}, ApiKey: {ApiKeyStatus}, ActiveMeetingId: {ActiveMeetingId}",
 				config.BaseUrl,
 				string.IsNullOrEmpty(config.ApiKey) ? "(not set)" : "***",
 				config.ActiveIntergroupMeetingId);
@@ -198,9 +295,17 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 				Phase = MeetingPhase.Syncing;
 				HasSyncError = false;
 				ShowStatus("Syncing data from Unity...", false);
+				ResetProgress();
+
+				// Progress<T> captures the current SynchronizationContext
+				// at construction, so reports made on the service's
+				// ConfigureAwait(false) continuations still arrive on
+				// the UI thread. The handler updates the observable
+				// progress fields, which the page's bindings pick up.
+				var progress = new Progress<SyncProgress>(OnSyncProgress);
 
 				var (meetings, positions, members, groups, contacts, intergroupMeetings) =
-					await _dataService.ImportWithSnapshotAsync(Token);
+					await _dataService.ImportWithSnapshotAsync(Token, progress);
 
 				ShowStatus(
 					$"Sync complete: {groups} groups, {meetings} meetings, " +
@@ -208,10 +313,11 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 					false);
 
 				Logger.Information(
-					"Start Meeting sync complete: {Groups} groups, {Meetings} meetings, {Members} members",
+					"Load Unity sync complete: {Groups} groups, {Meetings} meetings, {Members} members",
 					groups, meetings, members);
 
 				HasSyncedSuccessfully = true;
+				ResetProgress();
 
 				// Load the intergroup meetings list for selection
 				await LoadMeetingsAsync();
@@ -220,22 +326,23 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 			}
 			catch (Exception ex)
 			{
-				Logger.Error(ex, "Start Meeting sync failed");
+				Logger.Error(ex, "Load Unity sync failed");
 				ShowStatus($"Sync failed: {ex.Message}", true);
 				HasSyncError = true;
+				ResetProgress();
 				Phase = MeetingPhase.NotStarted;
 			}
 		}
 
 		/// <summary>
-		/// Retry sync after a previous failure. Same connectivity guard
-		/// as StartMeeting — retrying without Internet would just hit the
-		/// same network failure again.
+		/// Retry the Unity load after a previous failure. Same connectivity
+		/// guard as <see cref="LoadUnity"/> — retrying without Internet
+		/// would just hit the same network failure again.
 		/// </summary>
-		[RelayCommand(CanExecute = nameof(CanStartMeeting))]
+		[RelayCommand(CanExecute = nameof(CanLoadUnity))]
 		private async Task RetrySync()
 		{
-			await StartMeeting();
+			await LoadUnity();
 		}
 
 		/// <summary>
@@ -248,14 +355,15 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 		[RelayCommand(CanExecute = nameof(CanSyncAgain))]
 		private async Task SyncAgain()
 		{
-			await StartMeeting();
+			await LoadUnity();
 		}
 
 		/// <summary>
-		/// Shared CanExecute for StartMeeting and RetrySync. Re-evaluated
-		/// whenever IsOnline changes via [NotifyCanExecuteChangedFor].
+		/// Shared CanExecute for <see cref="LoadUnity"/> and
+		/// <see cref="RetrySync"/>. Re-evaluated whenever IsOnline
+		/// changes via [NotifyCanExecuteChangedFor].
 		/// </summary>
-		private bool CanStartMeeting() => IsOnline;
+		private bool CanLoadUnity() => IsOnline;
 
 		/// <summary>
 		/// Sync Again is allowed only while online AND no meeting has yet
@@ -265,13 +373,87 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 		/// </summary>
 		private bool CanSyncAgain() => IsOnline && !IsInProgress;
 
+		// =============================================================
+		// Select / Start Meeting
+		// =============================================================
+
 		/// <summary>
-		/// Step 2: User selects an intergroup meeting from the list.
+		/// Toggle the checkbox / selected state for one row. Bound to
+		/// the surrounding card's TapGestureRecognizer so a tap
+		/// anywhere on the row flips its IsSelected — which then
+		/// propagates through <see cref="OnRowSelectionChanged"/> to
+		/// enforce single-select. Tapping the already-selected row
+		/// clears the selection.
+		///
+		/// <para>
+		/// The CheckBox itself is two-way bound to IsSelected, so
+		/// tapping the box directly bypasses this command and goes
+		/// straight to the property change. Both paths land in the
+		/// same OnRowSelectionChanged handler — that's the single
+		/// chokepoint where single-select invariants are applied.
+        /// </para>
 		/// </summary>
 		[RelayCommand]
-		private async Task SelectMeeting(IntergroupMeeting meeting)
+		private void ToggleSelectMeeting(IntergroupMeetingRow? row)
 		{
-			if (meeting == null) return;
+			if (row == null) return;
+			row.IsSelected = !row.IsSelected;
+		}
+
+		/// <summary>
+		/// Property-changed handler subscribed to every row when the
+		/// list is loaded. Fires whenever <c>IsSelected</c> changes on
+		/// any row, regardless of whether the change came from the
+		/// checkbox's two-way binding, the card-tap toggle command,
+		/// or programmatic state restoration.
+		///
+		/// <para>
+		/// Centralising single-select enforcement here keeps the rest
+		/// of the code dumb: rows just own a bool, the toggle command
+		/// just flips it, the checkbox just two-way binds to it. Any
+		/// path that produces "this row is now selected" funnels
+		/// through this handler to clear the others.
+		/// </para>
+		/// </summary>
+		private void OnRowSelectionChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+		{
+			if (e.PropertyName != nameof(IntergroupMeetingRow.IsSelected)) return;
+			if (sender is not IntergroupMeetingRow changed) return;
+
+			if (changed.IsSelected)
+			{
+				// Clear every other row that's still ticked. Iterates
+				// the whole list rather than only the remembered
+				// SelectedMeetingRow so a transient "two rows ticked"
+				// state self-heals.
+				foreach (var other in Meetings)
+				{
+					if (other != changed && other.IsSelected)
+						other.IsSelected = false;
+				}
+				SelectedMeetingRow = changed;
+			}
+			else if (SelectedMeetingRow == changed)
+			{
+				// The row that was selected has been unticked → no
+				// pick. Don't touch others; single-select invariant
+				// guarantees they're already unticked.
+				SelectedMeetingRow = null;
+			}
+		}
+
+		/// <summary>
+		/// Step 2: Commit the user's pick. Writes the active meeting
+		/// to config, resets per-session flags, navigates to the main
+		/// page. Disabled until the user has ticked a row.
+		/// </summary>
+		[RelayCommand(CanExecute = nameof(CanStartMeeting))]
+		private async Task StartMeeting()
+		{
+			var row = SelectedMeetingRow;
+			if (row == null) return;
+
+			var meeting = row.Meeting;
 
 			await _configService.SaveActiveIntergroupMeetingAsync(meeting.Id);
 
@@ -291,6 +473,13 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 			// Navigate to the main page now that a meeting is active
 			await Shell.Current.GoToAsync("//MainPage");
 		}
+
+		/// <summary>
+		/// Start Meeting can only fire once the user has ticked a row.
+		/// Re-evaluated whenever <see cref="SelectedMeetingRow"/>
+		/// changes via [NotifyCanExecuteChangedFor].
+		/// </summary>
+		private bool CanStartMeeting() => SelectedMeetingRow != null;
 
 		// =============================================================
 		// Finish Meeting
@@ -332,10 +521,13 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 			{
 				HasFinishSyncError = false;
 				ShowStatus("Pushing changes to Unity...", false);
+				ResetProgress();
+
+				var progress = new Progress<SyncProgress>(OnSyncProgress);
 
 				var (meetings, positions, members, groups, contacts, intergroupMeetings,
 					 created, modified, registered, errors, warnings) =
-					await _dataService.ImportWithReconciliationAsync(Token);
+					await _dataService.ImportWithReconciliationAsync(Token, progress);
 
 				// If any non-recoverable errors occurred, stay in Finishing phase
 				// so the user sees Retry Sync. Purge is only available after a
@@ -348,6 +540,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 					ShowStatus(
 						$"Reconciliation completed with {errors} error(s). Tap Retry Sync to try again.",
 						true);
+					ResetProgress();
 					Logger.Warning(
 						"Finish Meeting reconciliation reported {Errors} errors — staying in Finishing phase",
 						errors);
@@ -373,6 +566,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 
 				Phase = MeetingPhase.Completed;
 				HideStatus();
+				ResetProgress();
 
 				Logger.Information(
 					"Meeting finished: {Created} created, {Modified} modified, {Registered} registered, {Errors} errors, {Warnings} warnings",
@@ -383,6 +577,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 				Logger.Error(ex, "Finish Meeting reconciliation failed");
 				ShowStatus($"Reconciliation failed: {ex.Message}", true);
 				HasFinishSyncError = true;
+				ResetProgress();
 				// Remain at Finishing phase so the retry button is visible
 			}
 		}
@@ -470,9 +665,23 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 		{
 			var meetings = await _intergroupMeetingRepository.GetAllAsync(Token);
 
+			// Detach any previous handlers — re-loads are common
+			// (Sync Again, Retry Sync) and leaving stale subscriptions
+			// in place would leak rows that the GC can't collect
+			// because the AdminViewModel is still holding their
+			// PropertyChanged delegates.
+			foreach (var oldRow in Meetings)
+				oldRow.PropertyChanged -= OnRowSelectionChanged;
+
 			Meetings.Clear();
+			SelectedMeetingRow = null;
+
 			foreach (var meeting in meetings)
-				Meetings.Add(meeting);
+			{
+				var row = new IntergroupMeetingRow(meeting);
+				row.PropertyChanged += OnRowSelectionChanged;
+				Meetings.Add(row);
+			}
 
 			Logger.Information("Loaded {Count} intergroup meetings", meetings.Count);
 		}
@@ -518,5 +727,75 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 			StatusMessage = string.Empty;
 			IsStatusError = false;
 		}
+
+		/// <summary>
+		/// Handler for <see cref="Progress{T}"/> reports coming out of
+		/// the sync / reconciliation pipeline. Already marshalled onto
+		/// the UI thread by Progress&lt;T&gt; (which captures the
+		/// sync-context at construction), so we only have to translate
+		/// the report into the bound observable fields.
+		/// </summary>
+		private void OnSyncProgress(SyncProgress report)
+		{
+			ProgressMessage = report.Message;
+
+			if (report.Total is int total && total > 0)
+			{
+				ProgressTotal = total;
+				ProgressCurrent = Math.Clamp(report.Current, 0, total);
+				IsProgressDeterminate = true;
+			}
+			else
+			{
+				// Indeterminate stage — drop the bar back to zero so
+				// the next determinate stage starts clean rather than
+				// inheriting the previous fraction. The XAML hides
+				// the bar entirely when IsProgressDeterminate is false.
+				ProgressTotal = 0;
+				ProgressCurrent = 0;
+				IsProgressDeterminate = false;
+			}
+		}
+
+		/// <summary>
+		/// Clears progress fields so the next sync starts from a known
+		/// blank state. Called at the start of a sync, on completion,
+		/// and on error — the page should never show stale progress
+		/// from a previous run.
+		/// </summary>
+		private void ResetProgress()
+		{
+			ProgressMessage = string.Empty;
+			ProgressCurrent = 0;
+			ProgressTotal = 0;
+			IsProgressDeterminate = false;
+		}
+	}
+
+	/// <summary>
+	/// UI-side wrapper around an <see cref="IntergroupMeeting"/> entity
+	/// so each visible row can carry its own checkbox state without
+	/// polluting the entity model. The view-model owns the row list
+	/// and is responsible for keeping at most one row's
+	/// <see cref="IsSelected"/> set to <c>true</c> at a time.
+	/// </summary>
+	public partial class IntergroupMeetingRow : ObservableObject
+	{
+		public IntergroupMeetingRow(IntergroupMeeting meeting)
+		{
+			Meeting = meeting;
+		}
+
+		/// <summary>The underlying meeting entity. Bound to via <c>Meeting.Title</c> etc.</summary>
+		public IntergroupMeeting Meeting { get; }
+
+		/// <summary>
+		/// True while this row is the user's current pick. Two-way
+		/// bound from a CheckBox in the row template; tapping the
+		/// checkbox or the surrounding card both end up setting this
+		/// via <see cref="AdminViewModel.ToggleSelectMeeting"/>.
+		/// </summary>
+		[ObservableProperty]
+		private bool isSelected;
 	}
 }

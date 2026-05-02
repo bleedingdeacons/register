@@ -1,4 +1,3 @@
-using TheBleedingDeacons.Intergroup.Register.Controls;
 using TheBleedingDeacons.Intergroup.Register.ViewModels;
 
 namespace TheBleedingDeacons.Intergroup.Register.Views;
@@ -102,51 +101,5 @@ public partial class VerifyPositionPage : ContentPage, IQueryAttributable
 		var count = _viewModel.ActiveHolders.Count;
 		var target = Math.Min(count - 1, _activeHoldersFirstVisibleIndex + 1);
 		ActiveHoldersCollectionView.ScrollTo(target, position: ScrollToPosition.Center, animate: true);
-	}
-
-	// ─── Review (hold-to-reveal) ───────────────────────────────────────
-	// See VerifyGroupPage for the same pattern — the Review button lives inside
-	// a DataTemplate so we walk up from the sender to find the card's reveal labels.
-
-	private void OnReviewPressed(object sender, EventArgs e) => SetRevealState(sender, reveal: true);
-
-	private void OnReviewReleased(object sender, EventArgs e) => SetRevealState(sender, reveal: false);
-
-	private static void SetRevealState(object sender, bool reveal)
-	{
-		if (sender is not Element element) return;
-
-		foreach (var label in FindMaskedRevealLabels(element))
-		{
-			if (reveal) label.Reveal(); else label.Hide();
-		}
-	}
-
-	private static IEnumerable<MaskedRevealLabel> FindMaskedRevealLabels(Element startFrom)
-	{
-		Element? node = startFrom.Parent;
-		while (node is not null)
-		{
-			if (node is Layout layout)
-			{
-				var found = Walk(layout).OfType<MaskedRevealLabel>().ToList();
-				if (found.Count > 0) return found;
-			}
-			node = node.Parent;
-		}
-		return Enumerable.Empty<MaskedRevealLabel>();
-	}
-
-	private static IEnumerable<Element> Walk(Element root)
-	{
-		yield return root;
-		if (root is IElementController controller)
-		{
-			foreach (var child in controller.LogicalChildren)
-			{
-				foreach (var d in Walk(child))
-					yield return d;
-			}
-		}
 	}
 }

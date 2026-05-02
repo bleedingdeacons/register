@@ -109,8 +109,17 @@ public class ReconciliationService
 	/// Detects all local changes since the last snapshot, pushes them to
 	/// the Unity API in dependency order, then performs a fresh sync and
 	/// captures a new snapshot.
+	///
+	/// <para>
+	/// When <paramref name="progress"/> is supplied, emits
+	/// <see cref="SyncProgress"/> updates at every phase boundary and on a
+	/// per-item basis during the API push loops. Pass <c>null</c> to run
+	/// without reporting (e.g. during a headless retry).
+	/// </para>
 	/// </summary>
-	public async Task<ReconcileResult> ReconcileAsync(CancellationToken ct = default)
+	public async Task<ReconcileResult> ReconcileAsync(
+		CancellationToken ct = default,
+		IProgress<SyncProgress>? progress = null)
 	{
 		// One context for the whole reconcile — detect / push / stamp
 		// all share a consistent view of local state.
@@ -123,6 +132,10 @@ public class ReconciliationService
 		// changes in the current session. No-op when the log is empty.
 		if (_eventLog.HasPendingEntries())
 		{
+			progress?.Report(new SyncProgress(
+				SyncStage.ReplayingLog,
+				"Replaying registration log…"));
+
 			Logger.Information("ReconcileAsync: registration log has pending entries — replaying before diff");
 			var replay = await _eventLog.ReplayIntoDatabaseAsync(db, ct);
 			Logger.Information(
@@ -138,6 +151,10 @@ public class ReconciliationService
 		// written if both logs received entries in the same session.
 		if (_complianceLog.HasPendingEntries())
 		{
+			progress?.Report(new SyncProgress(
+				SyncStage.ReplayingLog,
+				"Replaying compliance log…"));
+
 			Logger.Information("ReconcileAsync: compliance log has pending entries — replaying before diff");
 			var replay = await _complianceLog.ReplayIntoDatabaseAsync(db, ct);
 			Logger.Information(
@@ -149,8 +166,8 @@ public class ReconciliationService
 		if (!hasSnapshot)
 		{
 			Logger.Warning("ReconcileAsync: no snapshot exists — performing plain sync + snapshot");
-			var sync = await _syncService.SyncAsync(ct);
-			var snap = await _snapshotService.CaptureAsync(ct);
+			var sync = await _syncService.SyncAsync(ct, progress);
+			var snap = await _snapshotService.CaptureAsync(ct, progress);
 			return new ReconcileResult(0, 0, 0, 0, 0, 0, 0, 0, 0, sync, snap);
 		}
 
@@ -175,8 +192,30 @@ public class ReconciliationService
 			.AsNoTracking()
 			.ToListAsync(ct);
 
+		// Only report this phase when there's something to do — an empty
+		// loop would flash through the UI for no reason and break the
+		// determinate progress bar's "x of N" continuity.
+		if (newMembers.Count > 0)
+		{
+			progress?.Report(new SyncProgress(
+				SyncStage.PushCreates,
+				newMembers.Count == 1
+					? "Creating 1 new member…"
+					: $"Creating {newMembers.Count} new members…",
+				Current: 0,
+				Total: newMembers.Count));
+		}
+
+		int createIndex = 0;
 		foreach (var member in newMembers)
 		{
+			createIndex++;
+			progress?.Report(new SyncProgress(
+				SyncStage.PushCreates,
+				$"Creating member: {member.AnonymousName}",
+				Current: createIndex,
+				Total: newMembers.Count));
+
 			try
 			{
 				var request = new CreateMemberRequest
@@ -215,11 +254,49 @@ public class ReconciliationService
 		}
 
 		// ── Phase 2: Push modified members to Unity ──────────────────
+		progress?.Report(new SyncProgress(
+			SyncStage.DetectingChanges,
+			"Detecting local changes…"));
+
 		var modifiedMemberChanges = await DetectModifiedMembersAsync(db, ct);
+
+		// Updates and compliance pushes both walk this list, so count up
+		// front how many fall into each bucket. Without these counts the
+		// determinate progress bar would jerk between the two phases.
+		// Skipping temp members keeps the count honest — they're handled
+		// in Phase 1 and the loop body below also skips them.
+		int updateTotal = modifiedMemberChanges.Count(c =>
+			c.Member.Id >= 0 &&
+			c.ChangedProperties.Any(p => p != GdprComplianceKey));
+
+		if (updateTotal > 0)
+		{
+			progress?.Report(new SyncProgress(
+				SyncStage.PushUpdates,
+				updateTotal == 1
+					? "Updating 1 member…"
+					: $"Updating {updateTotal} members…",
+				Current: 0,
+				Total: updateTotal));
+		}
+
+		int updateIndex = 0;
 		foreach (var (member, changedProps) in modifiedMemberChanges)
 		{
 			// Skip temp members — they were just created above
 			if (member.Id < 0) continue;
+
+			// Skip rows where the only thing that changed is GDPR
+			// compliance — that's pushed separately in Phase 2.5 and
+			// shouldn't be counted against the "updating member" total.
+			if (!changedProps.Any(p => p != GdprComplianceKey)) continue;
+
+			updateIndex++;
+			progress?.Report(new SyncProgress(
+				SyncStage.PushUpdates,
+				$"Updating member: {member.AnonymousName}",
+				Current: updateIndex,
+				Total: updateTotal));
 
 			try
 			{
@@ -273,6 +350,28 @@ public class ReconciliationService
 		// Members may legitimately have both kinds of change in the
 		// same session (e.g. an officer corrects a phone number AND
 		// records an acceptance); each pushes to its own endpoint.
+
+		// Pre-count compliance pushes for the same reason as Phase 2:
+		// the determinate progress bar needs a stable total, and a
+		// member with only-GDPR changes on a temp ID (Id < 0) is a
+		// no-op down in the loop body, so it shouldn't be counted.
+		int complianceTotal = modifiedMemberChanges.Count(c =>
+			c.Member.Id >= 0 &&
+			c.ChangedProperties.Contains(GdprComplianceKey) &&
+			c.Member.GdprAccepted is not null);
+
+		if (complianceTotal > 0)
+		{
+			progress?.Report(new SyncProgress(
+				SyncStage.PushCompliance,
+				complianceTotal == 1
+					? "Recording 1 compliance update…"
+					: $"Recording {complianceTotal} compliance updates…",
+				Current: 0,
+				Total: complianceTotal));
+		}
+
+		int complianceIndex = 0;
 		foreach (var (member, changedProps) in modifiedMemberChanges)
 		{
 			if (member.Id < 0) continue; // temp members handled above
@@ -290,6 +389,13 @@ public class ReconciliationService
 					member.Id);
 				continue;
 			}
+
+			complianceIndex++;
+			progress?.Report(new SyncProgress(
+				SyncStage.PushCompliance,
+				$"Recording compliance: {member.AnonymousName}",
+				Current: complianceIndex,
+				Total: complianceTotal));
 
 			try
 			{
@@ -348,10 +454,40 @@ public class ReconciliationService
 		{
 			var meetingId = config.ActiveIntergroupMeetingId.Value;
 
-			// Group registrations
+			// Detect both kinds of registration change up-front so we
+			// can quote a single combined total to the UI. From the
+			// user's point of view "registering attendance" is one
+			// step regardless of whether each item is a group or an
+			// officer, and a single bar that fills smoothly across the
+			// whole phase reads more naturally than two short bars.
 			var groupChanges = await DetectGroupRegistrationChangesAsync(db, ct);
+			var positionChanges = await DetectPositionRegistrationChangesAsync(db, ct);
+			int registrationTotal = groupChanges.Count + positionChanges.Count;
+			int registrationIndex = 0;
+
+			if (registrationTotal > 0)
+			{
+				progress?.Report(new SyncProgress(
+					SyncStage.PushRegistrations,
+					registrationTotal == 1
+						? "Pushing 1 registration…"
+						: $"Pushing {registrationTotal} registrations…",
+					Current: 0,
+					Total: registrationTotal));
+			}
+
+			// Group registrations
 			foreach (var (group, registered) in groupChanges)
 			{
+				registrationIndex++;
+				progress?.Report(new SyncProgress(
+					SyncStage.PushRegistrations,
+					registered
+						? $"Registering group: {group.Name}"
+						: $"Unregistering group: {group.Name}",
+					Current: registrationIndex,
+					Total: registrationTotal));
+
 				try
 				{
 					if (registered)
@@ -410,9 +546,18 @@ public class ReconciliationService
 			}
 
 			// Position / officer registrations
-			var positionChanges = await DetectPositionRegistrationChangesAsync(db, ct);
 			foreach (var (position, registered) in positionChanges)
 			{
+				registrationIndex++;
+				var positionLabel = position.ShortDescription ?? position.LongName ?? $"#{position.Id}";
+				progress?.Report(new SyncProgress(
+					SyncStage.PushRegistrations,
+					registered
+						? $"Registering officer: {positionLabel}"
+						: $"Unregistering officer: {positionLabel}",
+					Current: registrationIndex,
+					Total: registrationTotal));
+
 				try
 				{
 					// Find the holder for this position — resolve temp IDs
@@ -488,11 +633,18 @@ public class ReconciliationService
 		}
 
 		// ── Phase 4: Re-sync from Unity to get authoritative state ───
+		// Forward `progress` so the user gets the per-page fetch updates
+		// from the re-sync as well as the initial sync. Without this the
+		// progress bar would freeze during what is often the longest
+		// step of the whole reconcile.
 		Logger.Information("Reconciliation API calls complete — re-syncing from Unity");
-		var syncResult = await _syncService.SyncAsync(ct);
+		progress?.Report(new SyncProgress(
+			SyncStage.Resyncing,
+			"Re-syncing from Unity…"));
+		var syncResult = await _syncService.SyncAsync(ct, progress);
 
 		// ── Phase 5: Capture fresh snapshot ──────────────────────────
-		var snapshotResult = await _snapshotService.CaptureAsync(ct);
+		var snapshotResult = await _snapshotService.CaptureAsync(ct, progress);
 
 		// ── Phase 6: Purge the durability log ────────────────────────
 		if (apiErrors == 0)
@@ -536,6 +688,8 @@ public class ReconciliationService
 			registeredPositions, unregisteredPositions,
 			recordedCompliance,
 			apiErrors, apiWarnings);
+
+		progress?.Report(new SyncProgress(SyncStage.Complete, "Done"));
 
 		return new ReconcileResult(
 			createdMembers, modifiedMembers,

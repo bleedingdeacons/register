@@ -51,9 +51,22 @@ public class SnapshotService
 	/// Deletes any existing snapshot and captures a fresh one from the current
 	/// database state.  Should be called immediately after
 	/// <see cref="UnitySyncService.SyncAsync"/> completes.
+	///
+	/// <para>
+	/// When <paramref name="progress"/> is supplied, emits a single
+	/// <see cref="SyncStage.CapturingSnapshot"/> report at the start. The
+	/// snapshot itself is fast enough that per-entity reporting would just
+	/// be noise, so we treat the whole capture as one indeterminate step.
+	/// </para>
 	/// </summary>
-	public async Task<SnapshotResult> CaptureAsync(CancellationToken ct = default)
+	public async Task<SnapshotResult> CaptureAsync(
+		CancellationToken ct = default,
+		IProgress<SyncProgress>? progress = null)
 	{
+		progress?.Report(new SyncProgress(
+			SyncStage.CapturingSnapshot,
+			"Capturing snapshot…"));
+
 		await using var db = await _dbContextFactory.CreateDbContextAsync(ct);
 
 		// Wipe any previous snapshot

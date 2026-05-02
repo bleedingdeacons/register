@@ -38,29 +38,42 @@ public class UnitySyncService
 
 	/// <summary>
 	/// Pulls all data from Unity and replaces the local database.
+	///
+	/// <para>
+	/// <paramref name="progress"/>, when supplied, receives <see cref="SyncProgress"/>
+	/// updates at each pipeline step (paginated fetch progress, database write,
+	/// completion). Pass <c>null</c> for fire-and-forget syncs where the caller
+	/// doesn't want UI feedback.
+	/// </para>
 	/// </summary>
-	public async Task<SyncResult> SyncAsync(CancellationToken ct = default)
+	public async Task<SyncResult> SyncAsync(
+		CancellationToken ct = default,
+		IProgress<SyncProgress>? progress = null)
 	{
 		// Create a fresh client each sync so we always use the latest credentials.
 		using var client = await _clientFactory();
 
 		// ── Fetch from Unity API (paginated) ─────────────────────────
+		// Each FetchAllPagesAsync call reports its own per-page progress;
+		// the human-readable label is passed through so the UI can show
+		// "Fetching groups (page 2 of 4)" without the service having to
+		// know anything about the entity name.
 
 		var allGroups = await FetchAllPagesAsync(
 			(page, token) => client.GetGroupsAsync(page: page, perPage: PageSize, expandMeetings: true, cancellationToken: token),
-			"groups", ct);
+			"groups", ct, progress);
 
 		var allPositions = await FetchAllPagesAsync(
 			(page, token) => client.GetPositionsAsync(page: page, perPage: PageSize, cancellationToken: token),
-			"positions", ct);
+			"positions", ct, progress);
 
 		var allMembers = await FetchAllPagesAsync(
 			(page, token) => client.GetMembersAsync(page: page, perPage: PageSize, cancellationToken: token),
-			"members", ct);
+			"members", ct, progress);
 
 		var allIntergroupMeetings = await FetchAllPagesAsync(
 			(page, token) => client.GetIntergroupMeetingsAsync(page: page, perPage: PageSize, cancellationToken: token),
-			"intergroup meetings", ct);
+			"intergroup meetings", ct, progress);
 
 		// ── Map to EF entities ────────────────────────────────────────
 
@@ -100,6 +113,10 @@ public class UnitySyncService
 		// with other services or ViewModels. If the app crashes between
 		// delete and insert, the transaction rolls back and the previous
 		// data is preserved.
+
+		progress?.Report(new SyncProgress(
+			SyncStage.WritingDatabase,
+			"Saving data locally…"));
 
 		await using var db = await _dbContextFactory.CreateDbContextAsync(ct);
 		await using var transaction = await db.Database.BeginTransactionAsync(ct);
@@ -183,14 +200,30 @@ public class UnitySyncService
 	/// <summary>
 	/// Fetches every page of a paginated Unity endpoint and returns the
 	/// combined results as a single list.
+	///
+	/// <para>
+	/// When <paramref name="progress"/> is non-null, reports two things per
+	/// page request: an indeterminate "fetching X…" before the first page
+	/// (the total page count isn't known yet), and a determinate
+	/// "fetching X (page n of N)" once the first response gives us the
+	/// total. <see cref="SyncProgress.Current"/> is incremented after each
+	/// successful page so the UI's progress bar advances smoothly.
+	/// </para>
 	/// </summary>
 	private static async Task<List<T>> FetchAllPagesAsync<T>(
 		Func<int, CancellationToken, Task<ApiResponse<List<T>>>> fetchPage,
 		string entityName,
-		CancellationToken ct) where T : class
+		CancellationToken ct,
+		IProgress<SyncProgress>? progress = null) where T : class
 	{
 		var all = new List<T>();
 		int page = 1;
+
+		// Initial indeterminate report — the first response carries the
+		// page count, but until then we can only say what we're doing.
+		progress?.Report(new SyncProgress(
+			SyncStage.Fetching,
+			$"Fetching {entityName}…"));
 
 		while (true)
 		{
@@ -201,6 +234,21 @@ public class UnitySyncService
 					$"Failed to fetch {entityName} (page {page}): {response.Error?.Message}");
 
 			all.AddRange(response.Data);
+
+			int? totalPages = response.Meta?.TotalPages;
+
+			// Once we know the total, switch to determinate reporting.
+			// The "page" we just received counts as completed.
+			if (totalPages is int total && total > 0)
+			{
+				progress?.Report(new SyncProgress(
+					SyncStage.Fetching,
+					total == 1
+						? $"Fetched {entityName}"
+						: $"Fetching {entityName} (page {page} of {total})",
+					Current: page,
+					Total: total));
+			}
 
 			if (response.Meta is null || page >= response.Meta.TotalPages)
 				break;

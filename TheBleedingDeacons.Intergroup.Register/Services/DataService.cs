@@ -45,16 +45,26 @@ public class DataService
     /// intergroup meeting) to establish the "clean" state.
     ///
     /// Flow: Sync all data from Unity → Snapshot the result.
+    ///
+    /// <para>
+    /// Pass <paramref name="progress"/> to receive granular UI updates
+    /// (per-page fetch status, snapshot capture). The final
+    /// <see cref="SyncStage.Complete"/> report is fired here so the
+    /// calling view-model can clear its busy state on a single signal.
+    /// </para>
     /// </summary>
     public async Task<(int Meetings, int Positions, int Members, int Groups, int Contacts, int IntergroupMeetings)> ImportWithSnapshotAsync(
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IProgress<SyncProgress>? progress = null)
     {
         try
         {
             Logger.Information("Starting Unity sync with snapshot capture");
 
-            var sync = await _syncService.SyncAsync(cancellationToken);
-            var snap = await _snapshotService.CaptureAsync(cancellationToken);
+            var sync = await _syncService.SyncAsync(cancellationToken, progress);
+            var snap = await _snapshotService.CaptureAsync(cancellationToken, progress);
+
+            progress?.Report(new SyncProgress(SyncStage.Complete, "Done"));
 
             Logger.Information(
                 "Unity sync + snapshot complete: {Groups} groups, {Meetings} meetings, {Members} members, {Positions} positions, {Contacts} contacts, {IntergroupMeetings} IG meetings. " +
@@ -76,16 +86,23 @@ public class DataService
     /// dependency order, then re-syncs and re-snapshots.
     ///
     /// Flow: Detect → Push creates → Push updates → Push registrations → Re-sync → Re-snapshot.
+    ///
+    /// <para>
+    /// Pass <paramref name="progress"/> to receive per-phase reconciliation
+    /// updates. Forwarded as-is to
+    /// <see cref="ReconciliationService.ReconcileAsync"/>.
+    /// </para>
     /// </summary>
     public async Task<(int Meetings, int Positions, int Members, int Groups, int Contacts, int IntergroupMeetings,
                         int Created, int Modified, int Registered, int ApiErrors, int ApiWarnings)> ImportWithReconciliationAsync(
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IProgress<SyncProgress>? progress = null)
     {
         try
         {
             Logger.Information("Starting Unity reconciliation");
 
-            var result = await _reconciliationService.ReconcileAsync(cancellationToken);
+            var result = await _reconciliationService.ReconcileAsync(cancellationToken, progress);
             var sync = result.Resync;
 
             Logger.Information(

@@ -14,7 +14,7 @@
         <toolkit:StatusBarBehavior StatusBarColor="{AppThemeBinding Light=White, Dark=Black}" StatusBarStyle="{AppThemeBinding Light=DarkContent, Dark=LightContent}" />
     </ContentPage.Behaviors>
 
-    <controls:PageScaffold>
+    <controls:PageScaffold HasActionBar="{Binding IsSelectingMeeting}">
         <controls:PageScaffold.ContentBody>
             <ScrollView>
                 <VerticalStackLayout Spacing="20">
@@ -113,13 +113,13 @@
                         <Label
                             Margin="20,0,20,8"
                             Style="{StaticResource M3EmptyStateSubtitleStyle}"
-                            Text="Tap Start Meeting to sync data from Unity and select today's intergroup meeting." />
+                            Text="Tap Load Unity to sync data from Unity, then pick today's intergroup meeting and tap Start Meeting." />
 
                         <Button
-                            Command="{Binding StartMeetingCommand}"
+                            Command="{Binding LoadUnityCommand}"
                             IsVisible="{Binding HasSyncError, Converter={StaticResource InvertedBoolConverter}}"
                             Style="{StaticResource M3PrimaryButtonStyle}"
-                            Text="Start Meeting" />
+                            Text="Load Unity" />
 
                         <Button
                             Command="{Binding RetrySyncCommand}"
@@ -131,7 +131,20 @@
 
                     <!--
                         ═══════════════════════════════════════════════════════
-                        PHASE: Syncing — busy state (status banner shows detail)
+                        PHASE: Syncing — busy state with detailed progress
+                        
+                        The progress block has three rows:
+                        1. Static "Syncing…" headline so the screen has a
+                        stable anchor when ProgressMessage churns rapidly
+                        during pagination loops.
+                        2. ProgressMessage — the live per-step description
+                        coming out of the SyncProgress reports.
+                        3. A determinate ProgressBar + "n / N" label OR an
+                        indeterminate ActivityIndicator, swapped via
+                        IsProgressDeterminate. Determinate stages
+                        (paginated fetch, push loops) get the bar;
+                        indeterminate stages (DB write, snapshot capture)
+                        fall back to the spinner the page used to show.
                         ═══════════════════════════════════════════════════════
                     -->
                     <VerticalStackLayout
@@ -142,10 +155,39 @@
                             Margin="0,40,0,0"
                             HorizontalOptions="Center"
                             Style="{StaticResource M3EmptyStateTitleStyle}"
-                            Text="Preparing…" />
+                            Text="Syncing…" />
+
+                        <Label
+                            Margin="20,0"
+                            HorizontalOptions="Center"
+                            HorizontalTextAlignment="Center"
+                            IsVisible="{Binding ProgressMessage, Converter={toolkit:IsStringNotNullOrEmptyConverter}}"
+                            LineBreakMode="WordWrap"
+                            Style="{StaticResource SecondaryTextStyle}"
+                            Text="{Binding ProgressMessage}" />
+
+                        <!--  Determinate: thin bar + count.  -->
+                        <VerticalStackLayout
+                            Margin="40,0"
+                            IsVisible="{Binding IsProgressDeterminate}"
+                            Spacing="6">
+                            <ProgressBar
+                                HeightRequest="6"
+                                Progress="{Binding ProgressFraction}"
+                                ProgressColor="{AppThemeBinding Light={StaticResource Primary},
+                                                                Dark={StaticResource PrimaryDark}}" />
+                            <Label
+                                FontSize="12"
+                                HorizontalOptions="Center"
+                                Style="{StaticResource SecondaryTextStyle}"
+                                Text="{Binding ProgressCountLabel}" />
+                        </VerticalStackLayout>
+
+                        <!--  Indeterminate fallback — same spinner the page used to show.  -->
                         <ActivityIndicator
                             HorizontalOptions="Center"
-                            IsRunning="True"
+                            IsRunning="{Binding IsProgressDeterminate, Converter={StaticResource InvertedBoolConverter}}"
+                            IsVisible="{Binding IsProgressDeterminate, Converter={StaticResource InvertedBoolConverter}}"
                             Scale="2"
                             Color="{AppThemeBinding Light={StaticResource Primary},
                                                     Dark={StaticResource PrimaryDark}}" />
@@ -155,6 +197,14 @@
                     <!--
                         ═══════════════════════════════════════════════════════
                         PHASE: SelectMeeting — list of today's meetings
+                        
+                        Each row is single-select via a CheckBox bound to the
+                        row-VM's IsSelected. Both the checkbox and the
+                        surrounding card are wired to ToggleSelectMeetingCommand
+                        so a tap anywhere on the row toggles the selection.
+                        The Start Meeting button below the list commits the
+                        choice; CanExecute keeps it disabled until something
+                        is ticked.
                         ═══════════════════════════════════════════════════════
                     -->
                     <VerticalStackLayout IsVisible="{Binding IsSelectingMeeting}" Spacing="12">
@@ -169,43 +219,62 @@
                                     <Label Style="{StaticResource M3EmptyStateSubtitleStyle}" Text="No meetings were found in the synced data. Check that intergroup meetings exist in Unity, then try again." />
                                     <Button
                                         Margin="0,20,0,0"
-                                        Command="{Binding Source={RelativeSource AncestorType={x:Type vm:AdminViewModel}}, Path=StartMeetingCommand}"
+                                        Command="{Binding Source={RelativeSource AncestorType={x:Type vm:AdminViewModel}}, Path=LoadUnityCommand}"
                                         Style="{StaticResource M3PrimaryButtonStyle}"
-                                        Text="Start Meeting" />
+                                        Text="Load Unity" />
                                 </VerticalStackLayout>
                             </CollectionView.EmptyView>
                             <CollectionView.ItemsLayout>
                                 <LinearItemsLayout ItemSpacing="0" Orientation="Vertical" />
                             </CollectionView.ItemsLayout>
                             <CollectionView.ItemTemplate>
-                                <DataTemplate x:DataType="entities:IntergroupMeeting">
+                                <DataTemplate x:DataType="vm:IntergroupMeetingRow">
                                     <Border Padding="0" Style="{StaticResource M3ListItemCardStyle}">
                                         <Border.GestureRecognizers>
-                                            <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type vm:AdminViewModel}}, Path=SelectMeetingCommand}" CommandParameter="{Binding .}" />
+                                            <!--  Tapping the card body toggles selection — same code path as tapping the checkbox.  -->
+                                            <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type vm:AdminViewModel}}, Path=ToggleSelectMeetingCommand}" CommandParameter="{Binding .}" />
                                         </Border.GestureRecognizers>
 
                                         <Grid
                                             Padding="16,14"
-                                            ColumnDefinitions="*,Auto"
+                                            ColumnDefinitions="Auto,*,Auto"
+                                            ColumnSpacing="12"
                                             RowDefinitions="Auto,Auto">
+
+                                            <!--
+                                                Single-select checkbox. Two-way bound to
+                                                IsSelected; the AdminViewModel listens on
+                                                each row's PropertyChanged to enforce the
+                                                single-select invariant whenever any
+                                                checkbox flips, so we don't need a
+                                                CheckedChanged behavior here.
+                                            -->
+                                            <CheckBox
+                                                Grid.Row="0"
+                                                Grid.RowSpan="2"
+                                                Grid.Column="0"
+                                                IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                                VerticalOptions="Center"
+                                                Color="{AppThemeBinding Light={StaticResource Primary},
+                                                                        Dark={StaticResource PrimaryDark}}" />
 
                                             <Label
                                                 Grid.Row="0"
-                                                Grid.Column="0"
+                                                Grid.Column="1"
                                                 Grid.ColumnSpan="2"
-                                                IsVisible="{Binding Title, Converter={toolkit:IsNotNullConverter}}"
+                                                IsVisible="{Binding Meeting.Title, Converter={toolkit:IsNotNullConverter}}"
                                                 Style="{StaticResource FieldLabelStyle}"
-                                                Text="{Binding Title}" />
-
-                                            <Label
-                                                Grid.Row="1"
-                                                Grid.Column="0"
-                                                Style="{StaticResource ValueLabelStyle}"
-                                                Text="{Binding Date}" />
+                                                Text="{Binding Meeting.Title}" />
 
                                             <Label
                                                 Grid.Row="1"
                                                 Grid.Column="1"
+                                                Style="{StaticResource ValueLabelStyle}"
+                                                Text="{Binding Meeting.Date}" />
+
+                                            <Label
+                                                Grid.Row="1"
+                                                Grid.Column="2"
                                                 FontSize="20"
                                                 Text="›"
                                                 TextColor="{AppThemeBinding Light={StaticResource Gray400},
@@ -279,6 +348,13 @@
                     <!--
                         ═══════════════════════════════════════════════════════
                         PHASE: Finishing — busy state with retry on error
+                        
+                        Mirrors the Syncing block's progress UI: a headline,
+                        the live ProgressMessage, then either a determinate
+                        bar with count or the indeterminate spinner. The
+                        whole progress group is hidden when an error has
+                        been raised so the retry button isn't competing
+                        with a half-filled bar.
                         ═══════════════════════════════════════════════════════
                     -->
                     <VerticalStackLayout IsVisible="{Binding IsFinishing}" Spacing="16">
@@ -287,13 +363,41 @@
                             HorizontalOptions="Center"
                             Style="{StaticResource M3EmptyStateTitleStyle}"
                             Text="Finishing…" />
-                        <ActivityIndicator
-                            HorizontalOptions="Center"
-                            IsRunning="True"
-                            IsVisible="{Binding HasFinishSyncError, Converter={StaticResource InvertedBoolConverter}}"
-                            Scale="2"
-                            Color="{AppThemeBinding Light={StaticResource Primary},
-                                                    Dark={StaticResource PrimaryDark}}" />
+
+                        <VerticalStackLayout IsVisible="{Binding HasFinishSyncError, Converter={StaticResource InvertedBoolConverter}}" Spacing="16">
+                            <Label
+                                Margin="20,0"
+                                HorizontalOptions="Center"
+                                HorizontalTextAlignment="Center"
+                                IsVisible="{Binding ProgressMessage, Converter={toolkit:IsStringNotNullOrEmptyConverter}}"
+                                LineBreakMode="WordWrap"
+                                Style="{StaticResource SecondaryTextStyle}"
+                                Text="{Binding ProgressMessage}" />
+
+                            <VerticalStackLayout
+                                Margin="40,0"
+                                IsVisible="{Binding IsProgressDeterminate}"
+                                Spacing="6">
+                                <ProgressBar
+                                    HeightRequest="6"
+                                    Progress="{Binding ProgressFraction}"
+                                    ProgressColor="{AppThemeBinding Light={StaticResource Primary},
+                                                                    Dark={StaticResource PrimaryDark}}" />
+                                <Label
+                                    FontSize="12"
+                                    HorizontalOptions="Center"
+                                    Style="{StaticResource SecondaryTextStyle}"
+                                    Text="{Binding ProgressCountLabel}" />
+                            </VerticalStackLayout>
+
+                            <ActivityIndicator
+                                HorizontalOptions="Center"
+                                IsRunning="{Binding IsProgressDeterminate, Converter={StaticResource InvertedBoolConverter}}"
+                                IsVisible="{Binding IsProgressDeterminate, Converter={StaticResource InvertedBoolConverter}}"
+                                Scale="2"
+                                Color="{AppThemeBinding Light={StaticResource Primary},
+                                                        Dark={StaticResource PrimaryDark}}" />
+                        </VerticalStackLayout>
 
                         <Button
                             Command="{Binding RetryFinishCommand}"
@@ -333,6 +437,39 @@
                 </VerticalStackLayout>
             </ScrollView>
         </controls:PageScaffold.ContentBody>
+
+        <!--
+            ═══════════════════════════════════════════════════════════
+            Fixed-position action bar — Start Meeting button.
+            
+            Lives outside the body's ScrollView/CollectionView entirely.
+            Earlier attempts placed this button after the meetings
+            CollectionView in the scrollable body, but a CollectionView
+            inside a ScrollView has unreliable height behaviour in MAUI:
+            the Button below it could be pushed off-screen, given zero
+            measured height, or fail to lay out at all on some
+            platforms. PageScaffold's ActionBar slot is rendered in a
+            separate Grid row at the bottom of the page, sized
+            independently, and is the project's established pattern for
+            page-level actions (see EditGroupPage, VerifyGroupPage).
+            
+            HasActionBar is bound to IsSelectingMeeting on the scaffold
+            element so this bar is only present during meeting
+            selection — the other phases continue to use their own
+            in-body buttons (Finish Meeting, Purge Database, etc.).
+            
+            StartMeetingCommand.CanExecute keeps the button disabled
+            until SelectedMeetingRow is non-null, so it's safe to
+            render unconditionally during the SelectMeeting phase.
+            ═══════════════════════════════════════════════════════════
+        -->
+        <controls:PageScaffold.ActionBarBody>
+            <Button
+                Command="{Binding StartMeetingCommand}"
+                Style="{StaticResource M3PrimaryButtonStyle}"
+                Text="Start Meeting" />
+        </controls:PageScaffold.ActionBarBody>
+
     </controls:PageScaffold>
 
 </ContentPage>
