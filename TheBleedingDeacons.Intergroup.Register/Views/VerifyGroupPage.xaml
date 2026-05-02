@@ -63,7 +63,7 @@
                                         MaximumWidthRequest="560"
                                         Style="{StaticResource M3CardStyle}"
                                         WidthRequest="560">
-                                        <controls:MemberCard Member="{Binding .}" />
+                                        <controls:GroupMemberCard Member="{Binding .}" />
                                     </Border>
                                 </DataTemplate>
                             </CollectionView.ItemTemplate>

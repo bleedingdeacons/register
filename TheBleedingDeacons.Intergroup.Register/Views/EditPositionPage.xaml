@@ -1,256 +1,359 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<ContentPage x:Class="TheBleedingDeacons.Intergroup.Register.Views.EditPositionPage"
-             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-             xmlns:controls="clr-namespace:TheBleedingDeacons.Intergroup.Register.Controls"
-             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             xmlns:viewmodels="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
-             xmlns:entities="clr-namespace:TheBleedingDeacons.Unity.Intergroup.Entities;assembly=TheBleedingDeacons.Unity.Intergroup"
-             xmlns:converters="clr-namespace:TheBleedingDeacons.Intergroup.Register.Converters"
-             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
-             x:DataType="viewmodels:PositionEditViewModel"
-             Title="{Binding Title}">
+<ContentPage
+    x:Class="TheBleedingDeacons.Intergroup.Register.Views.EditPositionPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:controls="clr-namespace:TheBleedingDeacons.Intergroup.Register.Controls"
+    xmlns:converters="clr-namespace:TheBleedingDeacons.Intergroup.Register.Converters"
+    xmlns:entities="clr-namespace:TheBleedingDeacons.Unity.Intergroup.Entities;assembly=TheBleedingDeacons.Unity.Intergroup"
+    xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+    xmlns:viewmodels="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
+    Title="{Binding Title}"
+    x:DataType="viewmodels:PositionEditViewModel">
 
     <ContentPage.Behaviors>
-        <toolkit:StatusBarBehavior StatusBarColor="{AppThemeBinding Light=White, Dark=Black}"
-                                   StatusBarStyle="{AppThemeBinding Light=DarkContent, Dark=LightContent}"/>
+        <toolkit:StatusBarBehavior StatusBarColor="{AppThemeBinding Light=White, Dark=Black}" StatusBarStyle="{AppThemeBinding Light=DarkContent, Dark=LightContent}" />
     </ContentPage.Behaviors>
 
-    <controls:PageScaffold IsBusy="{Binding IsLoading}"
-                           BusyMessage="Loading..."
-                           HasActionBar="True">
+    <controls:PageScaffold
+        BusyMessage="Loading..."
+        HasActionBar="True"
+        IsBusy="{Binding IsLoading}">
 
-        <!-- ═══ Body ═══ -->
+        <!--  ═══ Body ═══  -->
         <controls:PageScaffold.ContentBody>
             <ScrollView>
                 <VerticalStackLayout Spacing="16">
 
-                    <!-- ═══════════════════════════════════════════════════════ -->
-                    <!-- HOLDER LIST (visible when NOT editing a specific holder) -->
-                    <!-- ═══════════════════════════════════════════════════════ -->
-                    <VerticalStackLayout Spacing="16"
-                                         IsVisible="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}">
+                    <!--  ═══════════════════════════════════════════════════════  -->
+                    <!--  HOLDER LIST (visible when NOT editing a specific holder)  -->
+                    <!--  ═══════════════════════════════════════════════════════  -->
+                    <VerticalStackLayout IsVisible="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}" Spacing="16">
 
-                        <!-- Holder-count + Add row (centred, same width as cards) -->
-                        <Grid ColumnDefinitions="*,Auto"
-                              HorizontalOptions="Center"
-                              WidthRequest="560"
-                              MaximumWidthRequest="560">
-                            <Label Grid.Column="0"
-                                   Text="{Binding HolderCountText}"
-                                   Style="{StaticResource SecondaryTextStyle}"
-                                   VerticalOptions="Center"/>
-                            <Button Grid.Column="1"
-                                    Text="+ Add"
-                                    Command="{Binding AddNewMemberCommand}"
-                                    Style="{StaticResource M3SecondaryButtonStyle}"
-                                    HeightRequest="44"
-                                    WidthRequest="120"
-                                    Padding="12,0"/>
-                        </Grid>
-
-                        <!-- Active Holders -->
-                        <CollectionView ItemsSource="{Binding ActiveHolders}"
-                                        SelectionMode="None"
-                                        IsVisible="{Binding HasActiveHolders}">
-                            <CollectionView.ItemsLayout>
-                                <LinearItemsLayout Orientation="Vertical" ItemSpacing="0"/>
-                            </CollectionView.ItemsLayout>
-                            <CollectionView.ItemTemplate>
-                                <DataTemplate x:DataType="entities:Member">
-                                    <Border Style="{StaticResource M3CardStyle}"
-                                            HorizontalOptions="Center"
-                                            WidthRequest="560"
-                                            MaximumWidthRequest="560">
-                                        <controls:PositionMemberCard Member="{Binding .}">
-                                            <!-- Action slot: Edit / Remove -->
-                                            <Grid ColumnDefinitions="*,*"
-                                                  ColumnSpacing="12"
-                                                  Margin="0,8,0,0">
-                                                <Button Grid.Column="0"
-                                                        Text="Edit"
-                                                        Style="{StaticResource M3SecondaryButtonStyle}"
-                                                        HeightRequest="44"
-                                                        Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:PositionEditViewModel}}, Path=SelectMemberCommand}"
-                                                        CommandParameter="{Binding .}"/>
-                                                <Button Grid.Column="1"
-                                                        Text="Remove"
-                                                        Style="{StaticResource M3SecondaryButtonStyle}"
-                                                        TextColor="{AppThemeBinding Light={StaticResource DangerDark}, Dark={StaticResource DangerLight}}"
-                                                        HeightRequest="44"
-                                                        Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:PositionEditViewModel}}, Path=RemoveMemberCommand}"
-                                                        CommandParameter="{Binding .}"/>
-                                            </Grid>
-                                        </controls:PositionMemberCard>
-                                    </Border>
-                                </DataTemplate>
-                            </CollectionView.ItemTemplate>
-                        </CollectionView>
-
-                        <!-- Empty state card -->
-                        <Border Style="{StaticResource M3CardStyle}"
+                        <!--  Displayed Holders  -->
+                        <!--
+                            Single horizontal CollectionView holding both active
+                            holders and holders staged for removal. Pending
+                            removals are appended at the end of the list — the
+                            DataTemplate's IsPending DataTriggers swap the card
+                            into the strikethrough / Undo variant in place, so
+                            the user swipes through one continuous strip rather
+                            than two stacked sections.
+                            
+                            HorizontalOptions="Center" centres the whole card block.
+                            When the combined card width exceeds the viewport the
+                            CollectionView scrolls normally, with the scroll window
+                            starting centred on the content.
+                            
+                            The Grid lets us overlay left/right chevron buttons on
+                            the CollectionView's edges. The chevrons' IsVisible is
+                            driven from code-behind in response to the Scrolled
+                            event, so they only appear when scrolling is possible
+                            in that direction.
+                        -->
+                        <Grid IsVisible="{Binding HasActiveHolders}">
+                            <CollectionView
+                                x:Name="DisplayedHoldersCollectionView"
+                                HeightRequest="500"
                                 HorizontalOptions="Center"
-                                WidthRequest="560"
-                                MaximumWidthRequest="560"
-                                IsVisible="{Binding HasActiveHolders, Converter={StaticResource InvertedBoolConverter}}">
-                            <VerticalStackLayout HorizontalOptions="Center" Spacing="6" Padding="12">
-                                <Label Text="No Position Holders"
-                                       Style="{StaticResource M3EmptyStateTitleStyle}"/>
-                                <Label Text="Tap '+ Add' above to create a new position holder."
-                                       Style="{StaticResource M3EmptyStateSubtitleStyle}"/>
-                            </VerticalStackLayout>
-                        </Border>
-
-                        <!-- Pending Removals -->
-                        <VerticalStackLayout IsVisible="{Binding HasPendingRemovals}"
-                                             Spacing="8"
-                                             HorizontalOptions="Center"
-                                             WidthRequest="560"
-                                             MaximumWidthRequest="560">
-                            <Label Text="Pending Removals"
-                                   FontSize="16"
-                                   FontAttributes="Bold"
-                                   TextColor="{AppThemeBinding Light={StaticResource DangerDark}, Dark={StaticResource DangerLight}}"
-                                   Margin="0,4,0,0"/>
-
-                            <CollectionView ItemsSource="{Binding PendingRemovals}"
-                                            SelectionMode="None">
+                                ItemsSource="{Binding DisplayedHolders}"
+                                ItemsUpdatingScrollMode="KeepScrollOffset"
+                                Scrolled="DisplayedHoldersCollectionView_Scrolled"
+                                SelectionMode="None">
                                 <CollectionView.ItemsLayout>
-                                    <LinearItemsLayout Orientation="Vertical" ItemSpacing="0"/>
+                                    <LinearItemsLayout
+                                        ItemSpacing="12"
+                                        Orientation="Horizontal"
+                                        SnapPointsType="None" />
                                 </CollectionView.ItemsLayout>
                                 <CollectionView.ItemTemplate>
-                                    <DataTemplate x:DataType="entities:Member">
-                                        <Border Style="{StaticResource DeletedCardStyle}"
-                                                HorizontalOptions="Center"
-                                                WidthRequest="560"
-                                                MaximumWidthRequest="560">
-                                            <controls:PositionMemberCard
-                                                IsStruckThrough="True"
-                                                Member="{Binding .}"
-                                                ShowRevealButton="False">
-                                                <!-- Action slot: Undo -->
-                                                <Button Text="Undo"
-                                                        Style="{StaticResource M3SecondaryButtonStyle}"
-                                                        HorizontalOptions="Center"
-                                                        WidthRequest="160"
-                                                        HeightRequest="44"
-                                                        Margin="0,8,0,0"
+                                    <DataTemplate x:DataType="viewmodels:MemberCardItem">
+                                        <!--
+                                            Border style switches between active (M3CardStyle) and
+                                            pending-removal (DeletedCardStyle) via a DataTrigger on
+                                            IsPending.
+                                        -->
+                                        <Border
+                                            MaximumWidthRequest="560"
+                                            Style="{StaticResource M3CardStyle}"
+                                            WidthRequest="560">
+                                            <Border.Triggers>
+                                                <DataTrigger
+                                                    Binding="{Binding IsPending}"
+                                                    TargetType="Border"
+                                                    Value="True">
+                                                    <Setter Property="Style" Value="{StaticResource DeletedCardStyle}" />
+                                                </DataTrigger>
+                                            </Border.Triggers>
+                                            <!--
+                                                Action buttons sit OUTSIDE PositionMemberCard, as a
+                                                sibling within the Border. Putting them in the
+                                                control's ActionSlot would reparent them under the
+                                                card's inner stack, where BindingContext is reset
+                                                to the underlying Member — breaking
+                                                CommandParameter="{Binding Member}" and IsVisible
+                                                triggers on IsPending. Out here, BindingContext
+                                                is unambiguously the MemberCardItem wrapper.
+                                            -->
+                                            <VerticalStackLayout Spacing="0">
+                                                <controls:PositionMemberCard
+                                                    IsStruckThrough="{Binding IsPending}"
+                                                    Member="{Binding Member}"
+                                                    ShowRevealButton="{Binding IsPending, Converter={StaticResource InvertedBoolConverter}}" />
+
+                                                <!--
+                                                    Two button groups, mutually exclusive on
+                                                    IsPending: Edit/Remove for active cards,
+                                                    Undo for cards staged for removal.
+                                                -->
+                                                <Grid Margin="0,8,0,0">
+                                                    <!--  Active card actions: Edit / Remove  -->
+                                                    <Grid
+                                                        ColumnDefinitions="*,*"
+                                                        ColumnSpacing="12"
+                                                        IsVisible="{Binding IsPending, Converter={StaticResource InvertedBoolConverter}}">
+                                                        <Button
+                                                            Grid.Column="0"
+                                                            Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:PositionEditViewModel}}, Path=SelectMemberCommand}"
+                                                            CommandParameter="{Binding Member}"
+                                                            HeightRequest="44"
+                                                            Style="{StaticResource M3SecondaryButtonStyle}"
+                                                            Text="Edit" />
+                                                        <Button
+                                                            Grid.Column="1"
+                                                            Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:PositionEditViewModel}}, Path=RemoveMemberCommand}"
+                                                            CommandParameter="{Binding Member}"
+                                                            HeightRequest="44"
+                                                            Style="{StaticResource M3SecondaryButtonStyle}"
+                                                            Text="Remove"
+                                                            TextColor="{AppThemeBinding Light={StaticResource DangerDark},
+                                                                                        Dark={StaticResource DangerLight}}" />
+                                                    </Grid>
+
+                                                    <!--  Pending-removal card actions: Undo  -->
+                                                    <Button
                                                         Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:PositionEditViewModel}}, Path=UndoRemoveMemberCommand}"
-                                                        CommandParameter="{Binding .}"/>
-                                            </controls:PositionMemberCard>
+                                                        CommandParameter="{Binding Member}"
+                                                        HeightRequest="44"
+                                                        HorizontalOptions="Center"
+                                                        IsVisible="{Binding IsPending}"
+                                                        Style="{StaticResource M3SecondaryButtonStyle}"
+                                                        Text="Undo"
+                                                        WidthRequest="160" />
+                                                </Grid>
+                                            </VerticalStackLayout>
                                         </Border>
                                     </DataTemplate>
                                 </CollectionView.ItemTemplate>
                             </CollectionView>
-                        </VerticalStackLayout>
+
+                            <!--
+                                Left / right scroll chevrons — overlaid on the
+                                CollectionView's edges, visibility driven from
+                                code-behind via the Scrolled handler.
+                            -->
+                            <Button
+                                x:Name="DisplayedHoldersScrollLeftButton"
+                                Margin="8,0,0,0"
+                                Padding="0"
+                                BackgroundColor="{AppThemeBinding Light={StaticResource Surface},
+                                                                  Dark={StaticResource Gray900}}"
+                                Clicked="DisplayedHoldersScrollLeftButton_Clicked"
+                                CornerRadius="22"
+                                FontSize="32"
+                                HeightRequest="44"
+                                HorizontalOptions="Start"
+                                IsVisible="False"
+                                Text="‹"
+                                TextColor="{AppThemeBinding Light={StaticResource TextBody},
+                                                            Dark={StaticResource TextBodyDim}}"
+                                VerticalOptions="Center"
+                                WidthRequest="44" />
+                            <Button
+                                x:Name="DisplayedHoldersScrollRightButton"
+                                Margin="0,0,8,0"
+                                Padding="0"
+                                BackgroundColor="{AppThemeBinding Light={StaticResource Surface},
+                                                                  Dark={StaticResource Gray900}}"
+                                Clicked="DisplayedHoldersScrollRightButton_Clicked"
+                                CornerRadius="22"
+                                FontSize="32"
+                                HeightRequest="44"
+                                HorizontalOptions="End"
+                                IsVisible="False"
+                                Text="›"
+                                TextColor="{AppThemeBinding Light={StaticResource TextBody},
+                                                            Dark={StaticResource TextBodyDim}}"
+                                VerticalOptions="Center"
+                                WidthRequest="44" />
+                        </Grid>
+
+                        <!--
+                            Add button — sits below the card list, 2/3 card width,
+                            always visible whether the list has holders or not.
+                        -->
+                        <Button
+                            Command="{Binding AddNewMemberCommand}"
+                            HeightRequest="44"
+                            HorizontalOptions="Center"
+                            Style="{StaticResource M3SecondaryButtonStyle}"
+                            Text="+ Add"
+                            WidthRequest="373" />
+
+                        <!--  Empty state card  -->
+                        <Border
+                            HorizontalOptions="Center"
+                            IsVisible="{Binding HasActiveHolders, Converter={StaticResource InvertedBoolConverter}}"
+                            MaximumWidthRequest="560"
+                            Style="{StaticResource M3CardStyle}"
+                            WidthRequest="560">
+                            <VerticalStackLayout
+                                Padding="12"
+                                HorizontalOptions="Center"
+                                Spacing="6">
+                                <Label Style="{StaticResource M3EmptyStateTitleStyle}" Text="No Position Holders" />
+                                <Label Style="{StaticResource M3EmptyStateSubtitleStyle}" Text="Tap '+ Add' above to create a new position holder." />
+                            </VerticalStackLayout>
+                        </Border>
 
                     </VerticalStackLayout>
 
-                    <!-- ═══════════════════════════════════════════════════════ -->
-                    <!-- EDIT/CREATE FORM (visible when editing a specific holder) -->
-                    <!-- ═══════════════════════════════════════════════════════ -->
+                    <!--  ═══════════════════════════════════════════════════════  -->
+                    <!--  EDIT/CREATE FORM (visible when editing a specific holder)  -->
+                    <!--  ═══════════════════════════════════════════════════════  -->
                     <VerticalStackLayout IsVisible="{Binding IsEditing}" Spacing="16">
 
-                        <!-- Form card -->
-                        <Border Style="{StaticResource M3CardStyle}"
-                                HorizontalOptions="Center"
-                                WidthRequest="560"
-                                MaximumWidthRequest="560">
+                        <!--  Form card  -->
+                        <Border
+                            HorizontalOptions="Center"
+                            MaximumWidthRequest="560"
+                            Style="{StaticResource M3CardStyle}"
+                            WidthRequest="560">
                             <VerticalStackLayout Spacing="6">
 
-                                <!-- Section header -->
-                                <Label FontSize="20"
-                                       FontAttributes="Bold"
-                                       HorizontalOptions="Center"
-                                       Margin="0,0,0,8"
-                                       TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}">
+                                <!--  Section header  -->
+                                <Label
+                                    Margin="0,0,0,8"
+                                    FontAttributes="Bold"
+                                    FontSize="20"
+                                    HorizontalOptions="Center"
+                                    TextColor="{AppThemeBinding Light={StaticResource Gray900},
+                                                                Dark={StaticResource Gray100}}">
                                     <Label.Triggers>
-                                        <DataTrigger TargetType="Label"
-                                                     Binding="{Binding IsCreatingNew}"
-                                                     Value="True">
-                                            <Setter Property="Text" Value="New Holder"/>
+                                        <DataTrigger
+                                            Binding="{Binding IsCreatingNew}"
+                                            TargetType="Label"
+                                            Value="True">
+                                            <Setter Property="Text" Value="New Holder" />
                                         </DataTrigger>
-                                        <DataTrigger TargetType="Label"
-                                                     Binding="{Binding IsCreatingNew}"
-                                                     Value="False">
-                                            <Setter Property="Text" Value="Edit Holder"/>
+                                        <DataTrigger
+                                            Binding="{Binding IsCreatingNew}"
+                                            TargetType="Label"
+                                            Value="False">
+                                            <Setter Property="Text" Value="Edit Holder" />
                                         </DataTrigger>
                                     </Label.Triggers>
                                 </Label>
 
-                                <!-- Name Field -->
-                                <Label Text="Name" Style="{StaticResource FieldLabelStyle}"/>
-                                <controls:ClearableEntry x:Name="EditNameEntry"
-                                                         Text="{Binding EditName, Mode=TwoWay}"
-                                                         Placeholder="Tap to enter name..."
-                                                         FontSize="18"
-                                                         HeightRequest="50"
-                                                         Margin="0,0,0,4"
-                                                         BackgroundColor="{AppThemeBinding Light={StaticResource Surface}, Dark={StaticResource Gray800}}"
-                                                         TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"
-                                                         PlaceholderColor="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource Gray400}}"/>
-                                <Label Text="{Binding NameError}"
-                                       TextColor="{AppThemeBinding Light={StaticResource DangerDark}, Dark={StaticResource DangerLight}}"
-                                       FontSize="14"
-                                       IsVisible="{Binding HasNameError}"
-                                       Margin="0,0,0,4"/>
+                                <!--  Name Field  -->
+                                <Label Style="{StaticResource FieldLabelStyle}" Text="Name" />
+                                <controls:ClearableEntry
+                                    x:Name="EditNameEntry"
+                                    Margin="0,0,0,4"
+                                    BackgroundColor="{AppThemeBinding Light={StaticResource Surface},
+                                                                      Dark={StaticResource Gray800}}"
+                                    FontSize="18"
+                                    HeightRequest="50"
+                                    Placeholder="Tap to enter name..."
+                                    PlaceholderColor="{AppThemeBinding Light={StaticResource Gray500},
+                                                                       Dark={StaticResource Gray400}}"
+                                    Text="{Binding EditName, Mode=TwoWay}"
+                                    TextColor="{AppThemeBinding Light={StaticResource Gray900},
+                                                                Dark={StaticResource Gray100}}" />
+                                <Label
+                                    Margin="0,0,0,4"
+                                    FontSize="14"
+                                    IsVisible="{Binding HasNameError}"
+                                    Text="{Binding NameError}"
+                                    TextColor="{AppThemeBinding Light={StaticResource DangerDark},
+                                                                Dark={StaticResource DangerLight}}" />
 
-                                <!-- Phone Field -->
-                                <Label Text="Mobile Phone" Style="{StaticResource FieldLabelStyle}"/>
-                                <controls:ClearableEntry x:Name="EditPhoneEntry"
-                                                         Text="{Binding EditPhone, Mode=TwoWay}"
-                                                         Placeholder="Tap to enter phone number..."
-                                                         Keyboard="Telephone"
-                                                         FontSize="18"
-                                                         HeightRequest="50"
-                                                         Margin="0,0,0,4"
-                                                         BackgroundColor="{AppThemeBinding Light={StaticResource Surface}, Dark={StaticResource Gray800}}"
-                                                         TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"
-                                                         PlaceholderColor="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource Gray400}}"/>
-                                <Label Text="{Binding PhoneError}"
-                                       TextColor="{AppThemeBinding Light={StaticResource DangerDark}, Dark={StaticResource DangerLight}}"
-                                       FontSize="14"
-                                       IsVisible="{Binding HasPhoneError}"
-                                       Margin="0,0,0,4"/>
+                                <!--  Phone Field  -->
+                                <Label Style="{StaticResource FieldLabelStyle}" Text="Mobile Phone" />
+                                <controls:ClearableEntry
+                                    x:Name="EditPhoneEntry"
+                                    Margin="0,0,0,4"
+                                    BackgroundColor="{AppThemeBinding Light={StaticResource Surface},
+                                                                      Dark={StaticResource Gray800}}"
+                                    FontSize="18"
+                                    HeightRequest="50"
+                                    Keyboard="Telephone"
+                                    Placeholder="Tap to enter phone number..."
+                                    PlaceholderColor="{AppThemeBinding Light={StaticResource Gray500},
+                                                                       Dark={StaticResource Gray400}}"
+                                    Text="{Binding EditPhone, Mode=TwoWay}"
+                                    TextColor="{AppThemeBinding Light={StaticResource Gray900},
+                                                                Dark={StaticResource Gray100}}" />
+                                <Label
+                                    Margin="0,0,0,4"
+                                    FontSize="14"
+                                    IsVisible="{Binding HasPhoneError}"
+                                    Text="{Binding PhoneError}"
+                                    TextColor="{AppThemeBinding Light={StaticResource DangerDark},
+                                                                Dark={StaticResource DangerLight}}" />
 
-                                <!-- Email Field -->
-                                <Label Text="Personal Email" Style="{StaticResource FieldLabelStyle}"/>
-                                <controls:ClearableEntry x:Name="EditEmailEntry"
-                                                         Text="{Binding EditEmail, Mode=TwoWay}"
-                                                         Placeholder="Tap to enter email address..."
-                                                         Keyboard="Email"
-                                                         FontSize="18"
-                                                         HeightRequest="50"
-                                                         Margin="0,0,0,4"
-                                                         BackgroundColor="{AppThemeBinding Light={StaticResource Surface}, Dark={StaticResource Gray800}}"
-                                                         TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"
-                                                         PlaceholderColor="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource Gray400}}"/>
-                                <Label Text="{Binding EmailError}"
-                                       TextColor="{AppThemeBinding Light={StaticResource DangerDark}, Dark={StaticResource DangerLight}}"
-                                       FontSize="14"
-                                       IsVisible="{Binding HasEmailError}"
-                                       Margin="0,0,0,4"/>
+                                <!--  Email Field  -->
+                                <Label Style="{StaticResource FieldLabelStyle}" Text="Personal Email" />
+                                <controls:ClearableEntry
+                                    x:Name="EditEmailEntry"
+                                    Margin="0,0,0,4"
+                                    BackgroundColor="{AppThemeBinding Light={StaticResource Surface},
+                                                                      Dark={StaticResource Gray800}}"
+                                    FontSize="18"
+                                    HeightRequest="50"
+                                    Keyboard="Email"
+                                    Placeholder="Tap to enter email address..."
+                                    PlaceholderColor="{AppThemeBinding Light={StaticResource Gray500},
+                                                                       Dark={StaticResource Gray400}}"
+                                    Text="{Binding EditEmail, Mode=TwoWay}"
+                                    TextColor="{AppThemeBinding Light={StaticResource Gray900},
+                                                                Dark={StaticResource Gray100}}" />
+                                <Label
+                                    Margin="0,0,0,4"
+                                    FontSize="14"
+                                    IsVisible="{Binding HasEmailError}"
+                                    Text="{Binding EmailError}"
+                                    TextColor="{AppThemeBinding Light={StaticResource DangerDark},
+                                                                Dark={StaticResource DangerLight}}" />
 
-                                <!-- Rotation Date Field -->
-                                <Label Text="Rotation Date" Style="{StaticResource FieldLabelStyle}"/>
-                                <Label Text="Please select a rotation date"
-                                       FontSize="14"
-                                       TextColor="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource Gray400}}"
-                                       IsVisible="{Binding RotationDateSelected, Converter={StaticResource InvertedBoolConverter}}"
-                                       Margin="0,0,0,4"/>
-                                <DatePicker x:Name="EditRotationDatePicker"
-                                            Date="{Binding EditRotationDate, Mode=TwoWay}"
-                                            Format="yyyy-MM-dd"
-                                            FontSize="18"
-                                            MinimumDate="2020-01-01"
-                                            MaximumDate="2040-12-31"
-                                            Margin="0,0,0,4"
-                                            BackgroundColor="{AppThemeBinding Light={StaticResource Surface}, Dark={StaticResource Gray800}}"
-                                            TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"/>
-                                <Label Text="{Binding RotationDateError}"
-                                       TextColor="{AppThemeBinding Light={StaticResource DangerDark}, Dark={StaticResource DangerLight}}"
-                                       FontSize="14"
-                                       IsVisible="{Binding HasRotationDateError}"
-                                       Margin="0,0,0,4"/>
+                                <!--  Rotation Date Field  -->
+                                <Label Style="{StaticResource FieldLabelStyle}" Text="Rotation Date" />
+                                <Label
+                                    Margin="0,0,0,4"
+                                    FontSize="14"
+                                    IsVisible="{Binding RotationDateSelected, Converter={StaticResource InvertedBoolConverter}}"
+                                    Text="Please select a rotation date"
+                                    TextColor="{AppThemeBinding Light={StaticResource Gray500},
+                                                                Dark={StaticResource Gray400}}" />
+                                <DatePicker
+                                    x:Name="EditRotationDatePicker"
+                                    Margin="0,0,0,4"
+                                    BackgroundColor="{AppThemeBinding Light={StaticResource Surface},
+                                                                      Dark={StaticResource Gray800}}"
+                                    Date="{Binding EditRotationDate, Mode=TwoWay}"
+                                    FontSize="18"
+                                    Format="yyyy-MM-dd"
+                                    MaximumDate="2040-12-31"
+                                    MinimumDate="2020-01-01"
+                                    TextColor="{AppThemeBinding Light={StaticResource Gray900},
+                                                                Dark={StaticResource Gray100}}" />
+                                <Label
+                                    Margin="0,0,0,4"
+                                    FontSize="14"
+                                    IsVisible="{Binding HasRotationDateError}"
+                                    Text="{Binding RotationDateError}"
+                                    TextColor="{AppThemeBinding Light={StaticResource DangerDark},
+                                                                Dark={StaticResource DangerLight}}" />
 
                             </VerticalStackLayout>
                         </Border>
@@ -261,48 +364,54 @@
             </ScrollView>
         </controls:PageScaffold.ContentBody>
 
-        <!-- ═══ Action bar: swaps between list-mode (OK/Cancel) and edit-mode (Save/Cancel) ═══ -->
+        <!--  ═══ Action bar: swaps between list-mode (Cancel/OK) and edit-mode (Save/Cancel) ═══  -->
         <!--
-             Buttons are arranged horizontally, side by side. The pair
-             together occupies half the screen width and is centred via the
-             outer three-column Grid (*,2*,*). The action-bar Border itself
-             (in PageScaffold) sizes to its content height, so the bar is
-             just tall enough to hold one row of buttons.
+            Buttons are arranged horizontally, side by side. The pair
+            together occupies half the screen width and is centred via the
+            outer three-column Grid (*,2*,*). The action-bar Border itself
+            (in PageScaffold) sizes to its content height, so the bar is
+            just tall enough to hold one row of buttons.
         -->
         <controls:PageScaffold.ActionBarBody>
             <Grid ColumnDefinitions="*,2*,*">
-                <!-- Inner row hosts both buttons side-by-side in the middle 50% column -->
-                <Grid Grid.Column="1"
-                      ColumnDefinitions="*,*"
-                      ColumnSpacing="12">
+                <!--  List mode (IsEditing = false): Cancel (left) / OK (right) side-by-side in the middle 50%  -->
+                <Grid
+                    Grid.Column="1"
+                    ColumnDefinitions="*,*"
+                    ColumnSpacing="12"
+                    IsVisible="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}">
+                    <Button
+                        Grid.Column="0"
+                        Command="{Binding CancelPageCommand}"
+                        HorizontalOptions="Fill"
+                        Style="{StaticResource M3SecondaryButtonStyle}"
+                        Text="Cancel" />
+                    <Button
+                        Grid.Column="1"
+                        Command="{Binding DoneCommand}"
+                        HorizontalOptions="Fill"
+                        Style="{StaticResource M3PrimaryButtonStyle}"
+                        Text="OK" />
+                </Grid>
 
-                    <!-- List mode (IsEditing = false): Cancel (left) / OK (right) -->
-                    <Button Grid.Column="0"
-                            Text="Cancel"
-                            Command="{Binding CancelPageCommand}"
-                            Style="{StaticResource M3SecondaryButtonStyle}"
-                            HorizontalOptions="Fill"
-                            IsVisible="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}"/>
-                    <Button Grid.Column="1"
-                            Text="OK"
-                            Command="{Binding DoneCommand}"
-                            Style="{StaticResource M3PrimaryButtonStyle}"
-                            HorizontalOptions="Fill"
-                            IsVisible="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}"/>
-
-                    <!-- Edit mode (IsEditing = true): Cancel (left) / Save (right) -->
-                    <Button Grid.Column="0"
-                            Text="Cancel"
-                            Command="{Binding CancelEditCommand}"
-                            Style="{StaticResource M3SecondaryButtonStyle}"
-                            HorizontalOptions="Fill"
-                            IsVisible="{Binding IsEditing}"/>
-                    <Button Grid.Column="1"
-                            Text="{Binding SaveButtonText}"
-                            Command="{Binding SaveMemberCommand}"
-                            Style="{StaticResource M3PrimaryButtonStyle}"
-                            HorizontalOptions="Fill"
-                            IsVisible="{Binding IsEditing}"/>
+                <!--  Edit mode (IsEditing = true): Cancel (left) / Save (right) side-by-side in the middle 50%  -->
+                <Grid
+                    Grid.Column="1"
+                    ColumnDefinitions="*,*"
+                    ColumnSpacing="12"
+                    IsVisible="{Binding IsEditing}">
+                    <Button
+                        Grid.Column="0"
+                        Command="{Binding CancelEditCommand}"
+                        HorizontalOptions="Fill"
+                        Style="{StaticResource M3SecondaryButtonStyle}"
+                        Text="Cancel" />
+                    <Button
+                        Grid.Column="1"
+                        Command="{Binding SaveMemberCommand}"
+                        HorizontalOptions="Fill"
+                        Style="{StaticResource M3PrimaryButtonStyle}"
+                        Text="{Binding SaveButtonText}" />
                 </Grid>
             </Grid>
         </controls:PageScaffold.ActionBarBody>

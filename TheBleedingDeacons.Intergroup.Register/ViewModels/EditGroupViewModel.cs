@@ -56,16 +56,32 @@ public partial class EditGroupViewModel : BaseViewModel
 	private Member? selectedMember;
 
 	/// <summary>
-	/// Observable list of active members for the group.
+	/// Single display-ordered list shown in the page's CollectionView. Active
+	/// members appear first in the order returned by the database, with any
+	/// staged-for-removal cards appended at the end. The card variant
+	/// (strikethrough + Undo vs. Edit/Remove) is driven from
+	/// <see cref="MemberCardItem.IsPending"/> via a XAML DataTrigger.
+	///
+	/// All list-mutating commands (Add / Remove / Undo) operate on this
+	/// collection. The previous <c>ActiveMembers</c> / <c>PendingRemovals</c>
+	/// split lives on as enumerable views over this same source —
+	/// <see cref="ActiveMembers"/> and <see cref="PendingRemovals"/> below —
+	/// for the Done/Cancel commit-and-revert paths that need to iterate one
+	/// half or the other.
 	/// </summary>
-	public ObservableCollection<Member> ActiveMembers { get; } = new();
+	public ObservableCollection<MemberCardItem> DisplayedMembers { get; } = new();
 
 	/// <summary>
-	/// Members that have been removed in this session but not yet committed.
-	/// Displayed with a strikethrough / deleted card style so the user can
-	/// see what will be removed when they tap OK.
+	/// Active (not-staged-for-removal) members, derived from <see cref="DisplayedMembers"/>.
 	/// </summary>
-	public ObservableCollection<Member> PendingRemovals { get; } = new();
+	public IEnumerable<Member> ActiveMembers => DisplayedMembers.Where(i => !i.IsPending).Select(i => i.Member);
+
+	/// <summary>
+	/// Members staged for removal, derived from <see cref="DisplayedMembers"/>.
+	/// Iterated by <see cref="Done"/> to commit removals and by
+	/// <see cref="CancelPage"/> to revert them.
+	/// </summary>
+	public IEnumerable<Member> PendingRemovals => DisplayedMembers.Where(i => i.IsPending).Select(i => i.Member);
 
 	// ── Editing fields (bound to the form when a member is selected) ──
 
@@ -167,7 +183,7 @@ public partial class EditGroupViewModel : BaseViewModel
 			// re-set below if the navigation included an editMember param.
 			_enteredViaSingleGsrShortcut = false;
 
-			PendingRemovals.Clear();
+			RemoveAllPendingFromDisplayed();
 			HasPendingChanges = false;
 			UpdateHasPendingRemovals();
 			PopulateMemberLists();
@@ -379,9 +395,11 @@ public partial class EditGroupViewModel : BaseViewModel
 				context.Members.Add(newMember);
 				await context.SaveChangesAsync(Token);
 
-				// Add to the group's in-memory collection and our observable list
+				// Add to the group's in-memory collection and our observable list.
+				// New members are inserted before any pending-removal cards so the
+				// "actives first, removals appended" ordering is preserved.
 				_group.Members.Add(newMember);
-				ActiveMembers.Add(newMember);
+				InsertActiveDisplayed(newMember);
 
 				Logger.Information("Created new member {MemberName} for group {GroupName}",
 					newMember.AnonymousName, _group.Name);
@@ -405,12 +423,12 @@ public partial class EditGroupViewModel : BaseViewModel
 
 					// Member doesn't implement INotifyPropertyChanged, so the
 					// CollectionView won't pick up the property changes above.
-					// Replace the item in the ObservableCollection to trigger a
+					// Replace the wrapper in DisplayedMembers to trigger a
 					// CollectionChanged notification that refreshes the UI.
-					var index = ActiveMembers.IndexOf(SelectedMember);
+					var index = IndexOfDisplayed(SelectedMember);
 					if (index >= 0)
 					{
-						ActiveMembers[index] = SelectedMember;
+						DisplayedMembers[index] = MemberCardItem.Active(SelectedMember);
 					}
 
 					Logger.Information("Updated member {MemberName} (ID={MemberId})",
@@ -450,8 +468,15 @@ public partial class EditGroupViewModel : BaseViewModel
 
 		await ShowFeedback();
 
-		ActiveMembers.Remove(member);
-		PendingRemovals.Add(member);
+		// Remove the active wrapper and append a pending wrapper at the end of
+		// the displayed list. The "actives first, removals at the end" ordering
+		// is what makes the single combined CollectionView readable.
+		var idx = IndexOfDisplayed(member);
+		if (idx >= 0)
+		{
+			DisplayedMembers.RemoveAt(idx);
+		}
+		DisplayedMembers.Add(MemberCardItem.Pending(member));
 
 		// If we were editing this member, close the form
 		if (SelectedMember?.Id == member.Id)
@@ -481,8 +506,15 @@ public partial class EditGroupViewModel : BaseViewModel
 
 		await ShowFeedback();
 
-		PendingRemovals.Remove(member);
-		ActiveMembers.Add(member);
+		// Drop the pending wrapper and re-insert as an active card at the end
+		// of the active block (i.e. just before the first remaining pending
+		// card, or at the end if there are no others).
+		var idx = IndexOfDisplayed(member);
+		if (idx >= 0)
+		{
+			DisplayedMembers.RemoveAt(idx);
+		}
+		InsertActiveDisplayed(member);
 
 		UpdateHasPendingRemovals();
 		// Undoing a removal is itself a pending change (we're putting the
@@ -547,8 +579,14 @@ public partial class EditGroupViewModel : BaseViewModel
 
 			using var context = _contextFactory.CreateDbContext();
 
+			// Snapshot the pending list before any DB work — committing iterates
+			// it once, and we'll remove the wrappers from DisplayedMembers after
+			// SaveChanges succeeds. Materialising avoids re-evaluating the
+			// derived enumerable while we mutate the source.
+			var pendingSnapshot = PendingRemovals.ToList();
+
 			// Commit all pending removals to the database
-			foreach (var member in PendingRemovals)
+			foreach (var member in pendingSnapshot)
 			{
 				var tracked = await context.Members.FindAsync(new object[] { member.Id }, Token);
 				if (tracked != null)
@@ -569,12 +607,12 @@ public partial class EditGroupViewModel : BaseViewModel
 				}
 			}
 
-			if (PendingRemovals.Count > 0)
+			if (pendingSnapshot.Count > 0)
 			{
 				await context.SaveChangesAsync(Token);
 			}
 
-			PendingRemovals.Clear();
+			RemoveAllPendingFromDisplayed();
 			UpdateHasPendingRemovals();
 		}
 		catch (Exception ex)
@@ -622,12 +660,16 @@ public partial class EditGroupViewModel : BaseViewModel
 
 		await ShowFeedback();
 
-		// Revert pending removals — move them back to ActiveMembers
-		foreach (var member in PendingRemovals)
+		// Revert pending removals — flip each pending card back to an active
+		// card, in place. Iterate over a snapshot so we can mutate the
+		// underlying collection without invalidating the loop.
+		for (var i = 0; i < DisplayedMembers.Count; i++)
 		{
-			ActiveMembers.Add(member);
+			if (DisplayedMembers[i].IsPending)
+			{
+				DisplayedMembers[i] = MemberCardItem.Active(DisplayedMembers[i].Member);
+			}
 		}
-		PendingRemovals.Clear();
 		UpdateHasPendingRemovals();
 		HasPendingChanges = false;
 
@@ -640,15 +682,65 @@ public partial class EditGroupViewModel : BaseViewModel
 
 	#region Private Methods
 
+	/// <summary>
+	/// Find the index of a member's wrapper in <see cref="DisplayedMembers"/>,
+	/// regardless of whether the wrapper is currently Active or Pending.
+	/// Returns -1 if the member isn't displayed.
+	/// </summary>
+	private int IndexOfDisplayed(Member member)
+	{
+		for (var i = 0; i < DisplayedMembers.Count; i++)
+		{
+			if (DisplayedMembers[i].Member.Id == member.Id) return i;
+		}
+		return -1;
+	}
+
+	/// <summary>
+	/// Insert <paramref name="member"/> as an Active card immediately after the
+	/// last existing Active card — i.e. at the end of the active block, just
+	/// before any pending-removal cards. Preserves the "actives first, removals
+	/// at the end" ordering used by the page's combined CollectionView.
+	/// </summary>
+	private void InsertActiveDisplayed(Member member)
+	{
+		var insertAt = DisplayedMembers.Count;
+		for (var i = 0; i < DisplayedMembers.Count; i++)
+		{
+			if (DisplayedMembers[i].IsPending)
+			{
+				insertAt = i;
+				break;
+			}
+		}
+		DisplayedMembers.Insert(insertAt, MemberCardItem.Active(member));
+	}
+
+	/// <summary>
+	/// Remove every wrapper currently marked Pending from <see cref="DisplayedMembers"/>.
+	/// Used by Done (after a successful commit) and on entry, where we want a
+	/// clean slate.
+	/// </summary>
+	private void RemoveAllPendingFromDisplayed()
+	{
+		for (var i = DisplayedMembers.Count - 1; i >= 0; i--)
+		{
+			if (DisplayedMembers[i].IsPending)
+			{
+				DisplayedMembers.RemoveAt(i);
+			}
+		}
+	}
+
 	private void PopulateMemberLists()
 	{
-		ActiveMembers.Clear();
+		DisplayedMembers.Clear();
 
 		if (_group?.Members != null)
 		{
 			foreach (var member in _group.Members.Where(m => m.IsGsr))
 			{
-				ActiveMembers.Add(member);
+				DisplayedMembers.Add(MemberCardItem.Active(member));
 			}
 		}
 
@@ -658,17 +750,17 @@ public partial class EditGroupViewModel : BaseViewModel
 
 	private void UpdateHasActiveMembers()
 	{
-		HasActiveMembers = ActiveMembers.Count > 0;
+		HasActiveMembers = DisplayedMembers.Any(i => !i.IsPending);
 	}
 
 	private void UpdateHasPendingRemovals()
 	{
-		HasPendingRemovals = PendingRemovals.Count > 0;
+		HasPendingRemovals = DisplayedMembers.Any(i => i.IsPending);
 	}
 
 	private void RefreshMemberCountText()
 	{
-		var count = ActiveMembers.Count;
+		var count = DisplayedMembers.Count(i => !i.IsPending);
 		MemberCountText = count switch
 		{
 			0 => "No members — tap + to add one",

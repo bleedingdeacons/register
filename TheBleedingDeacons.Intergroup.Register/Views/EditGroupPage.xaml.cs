@@ -27,55 +27,22 @@ public partial class EditGroupPage : ContentPage, IQueryAttributable
 		// The Scrolled event only fires during scroll, so it won't prime the
 		// chevron visibility on first layout when the content already overflows.
 		// Listen for collection changes and refresh manually.
-		_viewModel.ActiveMembers.CollectionChanged += OnActiveMembersChanged;
-		_viewModel.PendingRemovals.CollectionChanged += OnPendingRemovalsChanged;
-		RefreshActiveMembersChevronsDeferred();
-		RefreshPendingRemovalsChevronsDeferred();
+		_viewModel.DisplayedMembers.CollectionChanged += OnDisplayedMembersChanged;
+		RefreshDisplayedMembersChevronsDeferred();
 	}
 
 	protected override void OnDisappearing()
 	{
-		_viewModel.ActiveMembers.CollectionChanged -= OnActiveMembersChanged;
-		_viewModel.PendingRemovals.CollectionChanged -= OnPendingRemovalsChanged;
+		_viewModel.DisplayedMembers.CollectionChanged -= OnDisplayedMembersChanged;
 		base.OnDisappearing();
 	}
 
-	private void OnActiveMembersChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+	private void OnDisplayedMembersChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
 	{
-		RefreshActiveMembersChevronsDeferred();
+		RefreshDisplayedMembersChevronsDeferred();
 	}
 
-	private void OnPendingRemovalsChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
-	{
-		RefreshPendingRemovalsChevronsDeferred();
-	}
-
-	private void RefreshActiveMembersChevronsDeferred()
-	{
-		RefreshChevronsDeferred(
-			count: () => _viewModel.ActiveMembers.Count,
-			collectionView: ActiveMembersCollectionView,
-			firstVisibleIndex: _activeMembersFirstVisibleIndex,
-			leftButton: ActiveMembersScrollLeftButton,
-			rightButton: ActiveMembersScrollRightButton);
-	}
-
-	private void RefreshPendingRemovalsChevronsDeferred()
-	{
-		RefreshChevronsDeferred(
-			count: () => _viewModel.PendingRemovals.Count,
-			collectionView: PendingRemovalsCollectionView,
-			firstVisibleIndex: _pendingRemovalsFirstVisibleIndex,
-			leftButton: PendingRemovalsScrollLeftButton,
-			rightButton: PendingRemovalsScrollRightButton);
-	}
-
-	private void RefreshChevronsDeferred(
-		Func<int> count,
-		CollectionView collectionView,
-		int firstVisibleIndex,
-		Button leftButton,
-		Button rightButton)
+	private void RefreshDisplayedMembersChevronsDeferred()
 	{
 		// Layout isn't guaranteed to be complete when the collection changes,
 		// so push the visibility update to the next UI tick. At that point
@@ -83,11 +50,11 @@ public partial class EditGroupPage : ContentPage, IQueryAttributable
 		// state we want to react to.
 		Dispatcher.Dispatch(() =>
 		{
-			var c = count();
+			var c = _viewModel.DisplayedMembers.Count;
 			if (c <= 1)
 			{
-				leftButton.IsVisible = false;
-				rightButton.IsVisible = false;
+				DisplayedMembersScrollLeftButton.IsVisible = false;
+				DisplayedMembersScrollRightButton.IsVisible = false;
 				return;
 			}
 
@@ -98,7 +65,7 @@ public partial class EditGroupPage : ContentPage, IQueryAttributable
 			const double cardWidth = 560;
 			const double spacing = 12;
 			var contentWidth = (c * cardWidth) + ((c - 1) * spacing);
-			var viewportWidth = collectionView.Width;
+			var viewportWidth = DisplayedMembersCollectionView.Width;
 
 			if (viewportWidth <= 0)
 			{
@@ -109,8 +76,8 @@ public partial class EditGroupPage : ContentPage, IQueryAttributable
 
 			var overflowsRight = contentWidth > viewportWidth;
 
-			leftButton.IsVisible = firstVisibleIndex > 0;
-			rightButton.IsVisible = overflowsRight;
+			DisplayedMembersScrollLeftButton.IsVisible = _displayedMembersFirstVisibleIndex > 0;
+			DisplayedMembersScrollRightButton.IsVisible = overflowsRight;
 		});
 	}
 
@@ -134,74 +101,49 @@ public partial class EditGroupPage : ContentPage, IQueryAttributable
 	//
 	// CollectionView doesn't expose the current first-visible index as a
 	// property — only via the Scrolled event args — so we cache the latest
-	// value here. Click handlers read from the cache to compute the next
+	// values here. Click handlers read from the cache to compute the next
 	// scroll target.
 	//
 	// IMPORTANT: XAML-wired event handlers must use non-nullable `object` for
 	// the sender parameter. MAUI's XAML compiler does an exact signature match
 	// and rejects `object?` with error XC0002.
-	private int _activeMembersFirstVisibleIndex;
+	private int _displayedMembersFirstVisibleIndex;
+	private int _displayedMembersLastVisibleIndex;
 
-	private void ActiveMembersCollectionView_Scrolled(object sender, ItemsViewScrolledEventArgs e)
+	private void DisplayedMembersCollectionView_Scrolled(object sender, ItemsViewScrolledEventArgs e)
 	{
-		_activeMembersFirstVisibleIndex = e.FirstVisibleItemIndex;
+		_displayedMembersFirstVisibleIndex = e.FirstVisibleItemIndex;
+		_displayedMembersLastVisibleIndex = e.LastVisibleItemIndex;
 
-		var count = _viewModel.ActiveMembers.Count;
+		var count = _viewModel.DisplayedMembers.Count;
 		if (count <= 1 || e.FirstVisibleItemIndex < 0 || e.LastVisibleItemIndex < 0)
 		{
-			ActiveMembersScrollLeftButton.IsVisible = false;
-			ActiveMembersScrollRightButton.IsVisible = false;
+			DisplayedMembersScrollLeftButton.IsVisible = false;
+			DisplayedMembersScrollRightButton.IsVisible = false;
 			return;
 		}
 
-		ActiveMembersScrollLeftButton.IsVisible = e.FirstVisibleItemIndex > 0;
-		ActiveMembersScrollRightButton.IsVisible = e.LastVisibleItemIndex < count - 1;
+		DisplayedMembersScrollLeftButton.IsVisible = e.FirstVisibleItemIndex > 0;
+		DisplayedMembersScrollRightButton.IsVisible = e.LastVisibleItemIndex < count - 1;
 	}
 
-	private void ActiveMembersScrollLeftButton_Clicked(object sender, EventArgs e)
+	private void DisplayedMembersScrollLeftButton_Clicked(object sender, EventArgs e)
 	{
-		// Scroll one position back, keeping the target card centred to match
-		// the list's MandatorySingle + Center snap alignment.
-		var target = Math.Max(0, _activeMembersFirstVisibleIndex - 1);
-		ActiveMembersCollectionView.ScrollTo(target, position: ScrollToPosition.Center, animate: true);
+		// Step back from the FIRST visible card. Using LastVisibleItemIndex
+		// here would skip cards when the viewport shows multiple at once.
+		var target = Math.Max(0, _displayedMembersFirstVisibleIndex - 1);
+		DisplayedMembersCollectionView.ScrollTo(target, position: ScrollToPosition.Center, animate: true);
 	}
 
-	private void ActiveMembersScrollRightButton_Clicked(object sender, EventArgs e)
+	private void DisplayedMembersScrollRightButton_Clicked(object sender, EventArgs e)
 	{
-		var count = _viewModel.ActiveMembers.Count;
-		var target = Math.Min(count - 1, _activeMembersFirstVisibleIndex + 1);
-		ActiveMembersCollectionView.ScrollTo(target, position: ScrollToPosition.Center, animate: true);
-	}
-
-	// ── PendingRemovals chevrons — same pattern as ActiveMembers ──────────
-	private int _pendingRemovalsFirstVisibleIndex;
-
-	private void PendingRemovalsCollectionView_Scrolled(object sender, ItemsViewScrolledEventArgs e)
-	{
-		_pendingRemovalsFirstVisibleIndex = e.FirstVisibleItemIndex;
-
-		var count = _viewModel.PendingRemovals.Count;
-		if (count <= 1 || e.FirstVisibleItemIndex < 0 || e.LastVisibleItemIndex < 0)
-		{
-			PendingRemovalsScrollLeftButton.IsVisible = false;
-			PendingRemovalsScrollRightButton.IsVisible = false;
-			return;
-		}
-
-		PendingRemovalsScrollLeftButton.IsVisible = e.FirstVisibleItemIndex > 0;
-		PendingRemovalsScrollRightButton.IsVisible = e.LastVisibleItemIndex < count - 1;
-	}
-
-	private void PendingRemovalsScrollLeftButton_Clicked(object sender, EventArgs e)
-	{
-		var target = Math.Max(0, _pendingRemovalsFirstVisibleIndex - 1);
-		PendingRemovalsCollectionView.ScrollTo(target, position: ScrollToPosition.Center, animate: true);
-	}
-
-	private void PendingRemovalsScrollRightButton_Clicked(object sender, EventArgs e)
-	{
-		var count = _viewModel.PendingRemovals.Count;
-		var target = Math.Min(count - 1, _pendingRemovalsFirstVisibleIndex + 1);
-		PendingRemovalsCollectionView.ScrollTo(target, position: ScrollToPosition.Center, animate: true);
+		// Step forward from the LAST visible card. With SnapPointsAlignment=Center
+		// on a viewport wide enough to show partial neighbours, FirstVisibleItemIndex
+		// can stay at 0 even when card 1 is centred — using FirstVisibleItemIndex+1
+		// would pin the user at card 1 forever. LastVisibleItemIndex+1 advances
+		// past whatever's currently in view.
+		var count = _viewModel.DisplayedMembers.Count;
+		var target = Math.Min(count - 1, _displayedMembersLastVisibleIndex + 1);
+		DisplayedMembersCollectionView.ScrollTo(target, position: ScrollToPosition.Center, animate: true);
 	}
 }

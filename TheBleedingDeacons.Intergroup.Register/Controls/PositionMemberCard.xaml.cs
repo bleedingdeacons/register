@@ -6,7 +6,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Controls;
 /// Reusable card-body view for displaying a position-holder Member's Name /
 /// Personal Email / Mobile Phone / Rotation Date, with hold-to-reveal masking
 /// on the email and phone fields driven by an internal Reveal button.
-/// Mirrors <see cref="MemberCard"/> but adds the Rotation Date row used on
+/// Mirrors <see cref="GroupMemberCard"/> but adds the Rotation Date row used on
 /// position pages.
 /// </summary>
 [ContentProperty(nameof(ActionContent))]

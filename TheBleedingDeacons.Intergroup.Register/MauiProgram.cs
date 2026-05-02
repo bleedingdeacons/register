@@ -383,12 +383,14 @@ public static class MauiProgram
 			.Enrich.WithProperty("PlatformVersion", DeviceInfo.VersionString)
 			.Enrich.WithProperty("AppVersion", AppVersion())
 			.Enrich.WithProperty("DeviceModel", DeviceInfo.Model)
+			.Enrich.WithProperty("DeviceName", DeviceInfo.Name)
+			.Enrich.WithProperty("ProcessId", Environment.ProcessId)
 			// Replaces the previous Environment.MachineName enricher, which
 			// returned "localhost" on Android and a sandbox name on iOS.
 			// ResolveDeviceLabel() reads a user-set label from Preferences and
 			// falls back to a platform-aware default, so each device shows up
 			// distinctly in the Better Stack live tail.
-			.Enrich.WithProperty("MachineName", ResolveDeviceName())
+			.Enrich.WithProperty("DeviceLabel", ResolveDeviceLabel())
 			.Enrich.With<ExceptionEnricher>();
 
 #if DEBUG
@@ -425,7 +427,7 @@ public static class MauiProgram
 	// next reconfigure — no app restart needed.
 	private const string DEVICE_LABEL_PREFERENCE_KEY = "device_label";
 
-	private static string ResolveDeviceName()
+	private static string ResolveDeviceLabel()
 	{
 		try
 		{

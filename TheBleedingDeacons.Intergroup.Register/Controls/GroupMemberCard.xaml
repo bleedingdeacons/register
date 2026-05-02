@@ -1,42 +1,47 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentView
-    x:Class="TheBleedingDeacons.Intergroup.Register.Controls.PositionMemberCard"
+    x:Class="TheBleedingDeacons.Intergroup.Register.Controls.GroupMemberCard"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:controls="clr-namespace:TheBleedingDeacons.Intergroup.Register.Controls"
-    x:Name="PositionMemberCardRoot">
+    x:Name="GroupMemberCardRoot">
 
     <!--
-        Reusable card-body view for displaying a position-holder Member's
-        Name / Personal Email / Mobile Phone / Rotation Date, with a
-        hold-to-reveal Reveal button that unmasks the masked fields while
-        held. Mirrors GroupMemberCard but adds the Rotation Date row used on
-        position pages (Verify Position, Edit Position).
+        The internal layout is wrapped in an explicit <ContentView.Content>
+        so that the [ContentProperty(nameof(ActionContent))] attribute on
+        the code-behind doesn't redirect this child into ActionContent.
+        Callers *do* benefit from the ContentProperty: their action row can
+        be written as a direct child of <controls:GroupMemberCard> with no
+        wrapping element.
 
-        Kept as a separate control rather than composing GroupMemberCard so each
-        card has a flat, obvious structure and an independent layout — the
-        position pages can evolve their card without dragging GroupMemberCard
-        with them. The trade-off is some duplication of the field bindings
-        and Reveal handler.
+        Reusable member detail block: Name / Personal Email / Mobile Phone,
+        with a hold-to-reveal Reveal button that unmasks the masked fields
+        while held. The page-specific action row (Edit/Remove, Undo, etc.)
+        is supplied via the ActionContent property.
 
-        See GroupMemberCard.xaml for the same notes on the explicit
-        <ContentView.Content> wrapper, BindingContext-on-stack pattern,
-        and ActionContent slot.
+        We deliberately set BindingContext on the inner stack to Member, so
+        all field bindings here are simple ({Binding AnonymousName}, etc.)
+        and any ActionContent supplied by the caller sees Member as its
+        local context — matching the original DataTemplate behaviour where
+        "{Binding .}" resolves to the Member.
     -->
     <ContentView.Content>
         <!--
             Outer Grid: the inner stack fills the cell, while the Reveal button
-            is overlaid in the top-right corner. See GroupMemberCard.xaml for
-            the rationale on this pattern.
+            is overlaid in the top-right corner via HorizontalOptions/VerticalOptions
+            on the same single-cell. Keeping the BindingContext-on-stack pattern
+            means the field bindings inside the stack still see Member, while the
+            Reveal button (outside the stack) reads ShowRevealButton from the
+            control root via x:Reference.
         -->
         <Grid>
-            <VerticalStackLayout BindingContext="{Binding Member, Source={x:Reference PositionMemberCardRoot}}" Spacing="6">
+            <VerticalStackLayout BindingContext="{Binding Member, Source={x:Reference GroupMemberCardRoot}}" Spacing="6">
 
                 <Label Style="{StaticResource FieldLabelStyle}" Text="Name" />
                 <Label
                     Style="{StaticResource ValueLabelStyle}"
                     Text="{Binding AnonymousName}"
-                    TextDecorations="{Binding ValueTextDecorations, Source={x:Reference PositionMemberCardRoot}}" />
+                    TextDecorations="{Binding ValueTextDecorations, Source={x:Reference GroupMemberCardRoot}}" />
 
                 <Label Style="{StaticResource FieldLabelStyle}" Text="Personal Email" />
                 <controls:MaskedRevealLabel
@@ -62,15 +67,14 @@
                                                 Dark={StaticResource Gray100}}"
                     Value="{Binding MobileNumber}" />
 
-                <Label Style="{StaticResource FieldLabelStyle}" Text="Rotation Date" />
-                <Label
-                    Style="{StaticResource ValueLabelStyle}"
-                    Text="{Binding IntergroupPositionRotation}"
-                    TextDecorations="{Binding ValueTextDecorations, Source={x:Reference PositionMemberCardRoot}}" />
-
                 <!--
                     Action slot. The caller-supplied view is parented here in code
                     via the ActionContent property-changed handler — see code-behind.
+                    Because we're inside a VerticalStackLayout whose BindingContext
+                    is Member, any "{Binding .}" inside ActionContent resolves to
+                    the Member — same as the pre-extraction DataTemplate.
+                    RelativeSource AncestorType bindings still walk up to the
+                    page-level ViewModel as before.
                 -->
                 <ContentView x:Name="ActionSlot" />
 
@@ -84,7 +88,7 @@
             <Button
                 HeightRequest="36"
                 HorizontalOptions="End"
-                IsVisible="{Binding ShowRevealButton, Source={x:Reference PositionMemberCardRoot}}"
+                IsVisible="{Binding ShowRevealButton, Source={x:Reference GroupMemberCardRoot}}"
                 Pressed="OnRevealPressed"
                 Released="OnRevealReleased"
                 Style="{StaticResource M3SecondaryButtonStyle}"

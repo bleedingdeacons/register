@@ -50,16 +50,32 @@ public partial class PositionEditViewModel : BaseViewModel
 	private Member? selectedMember;
 
 	/// <summary>
-	/// Observable list of active holders for the position.
+	/// Single display-ordered list shown in the page's CollectionView. Active
+	/// holders appear first in the order returned by the database, with any
+	/// staged-for-removal cards appended at the end. The card variant
+	/// (strikethrough + Undo vs. Edit/Remove) is driven from
+	/// <see cref="MemberCardItem.IsPending"/> via a XAML DataTrigger.
+	///
+	/// All list-mutating commands (Add / Remove / Undo) operate on this
+	/// collection. The previous <c>ActiveHolders</c> / <c>PendingRemovals</c>
+	/// split lives on as enumerable views over this same source —
+	/// <see cref="ActiveHolders"/> and <see cref="PendingRemovals"/> below —
+	/// for the Done/Cancel commit-and-revert paths that need to iterate one
+	/// half or the other.
 	/// </summary>
-	public ObservableCollection<Member> ActiveHolders { get; } = new();
+	public ObservableCollection<MemberCardItem> DisplayedHolders { get; } = new();
 
 	/// <summary>
-	/// Holders that have been removed in this session but not yet committed.
-	/// Displayed with a strikethrough / deleted card style so the user can
-	/// see what will be removed when they tap OK.
+	/// Active (not-staged-for-removal) holders, derived from <see cref="DisplayedHolders"/>.
 	/// </summary>
-	public ObservableCollection<Member> PendingRemovals { get; } = new();
+	public IEnumerable<Member> ActiveHolders => DisplayedHolders.Where(i => !i.IsPending).Select(i => i.Member);
+
+	/// <summary>
+	/// Holders staged for removal, derived from <see cref="DisplayedHolders"/>.
+	/// Iterated by <see cref="Done"/> to commit removals and by
+	/// <see cref="CancelPage"/> to revert them.
+	/// </summary>
+	public IEnumerable<Member> PendingRemovals => DisplayedHolders.Where(i => i.IsPending).Select(i => i.Member);
 
 	// ── Editing fields (bound to the form when a member is selected) ──
 
@@ -176,7 +192,7 @@ public partial class PositionEditViewModel : BaseViewModel
 			Logger.Information("Edit mode: position {PositionName} with {HolderCount} holders",
 				position.ShortDescription, position.Holders.Count);
 
-			PendingRemovals.Clear();
+			RemoveAllPendingFromDisplayed();
 			HasPendingChanges = false;
 			UpdateHasPendingRemovals();
 			PopulateHolderList();
@@ -202,7 +218,7 @@ public partial class PositionEditViewModel : BaseViewModel
 			if (position != null)
 			{
 				_position = position;
-				PendingRemovals.Clear();
+				RemoveAllPendingFromDisplayed();
 				HasPendingChanges = false;
 				UpdateHasPendingRemovals();
 				PopulateHolderList();
@@ -387,9 +403,11 @@ public partial class PositionEditViewModel : BaseViewModel
 				context.Members.Add(newMember);
 				await context.SaveChangesAsync();
 
-				// Add to the position's in-memory collection and our observable list
+				// Add to the position's in-memory collection and our observable list.
+				// New holders are inserted before any pending-removal cards so the
+				// "actives first, removals appended" ordering is preserved.
 				_position.Holders.Add(newMember);
-				ActiveHolders.Add(newMember);
+				InsertActiveDisplayed(newMember);
 
 				Logger.Information("Created new holder {MemberName} for position {PositionName}",
 					newMember.AnonymousName, _position.ShortDescription);
@@ -415,12 +433,12 @@ public partial class PositionEditViewModel : BaseViewModel
 
 					// Member doesn't implement INotifyPropertyChanged, so the
 					// CollectionView won't pick up the property changes above.
-					// Replace the item in the ObservableCollection to trigger a
+					// Replace the wrapper in DisplayedHolders to trigger a
 					// CollectionChanged notification that refreshes the UI.
-					var index = ActiveHolders.IndexOf(SelectedMember);
+					var index = IndexOfDisplayed(SelectedMember);
 					if (index >= 0)
 					{
-						ActiveHolders[index] = SelectedMember;
+						DisplayedHolders[index] = MemberCardItem.Active(SelectedMember);
 					}
 
 					Logger.Information("Updated holder {MemberName} (ID={MemberId})",
@@ -458,8 +476,15 @@ public partial class PositionEditViewModel : BaseViewModel
 	{
 		if (member == null) return;
 
-		ActiveHolders.Remove(member);
-		PendingRemovals.Add(member);
+		// Remove the active wrapper and append a pending wrapper at the end of
+		// the displayed list. The "actives first, removals at the end" ordering
+		// is what makes the single combined CollectionView readable.
+		var idx = IndexOfDisplayed(member);
+		if (idx >= 0)
+		{
+			DisplayedHolders.RemoveAt(idx);
+		}
+		DisplayedHolders.Add(MemberCardItem.Pending(member));
 
 		// If we were editing this member, close the form
 		if (SelectedMember?.Id == member.Id)
@@ -487,11 +512,22 @@ public partial class PositionEditViewModel : BaseViewModel
 	{
 		if (member == null) return;
 
-		PendingRemovals.Remove(member);
-		ActiveHolders.Add(member);
+		// Drop the pending wrapper and re-insert as an active card at the end
+		// of the active block (i.e. just before the first remaining pending
+		// card, or at the end if there are no others).
+		var idx = IndexOfDisplayed(member);
+		if (idx >= 0)
+		{
+			DisplayedHolders.RemoveAt(idx);
+		}
+		InsertActiveDisplayed(member);
 
 		UpdateHasPendingRemovals();
-		HasPendingChanges = PendingRemovals.Count > 0;
+		// PositionEditViewModel intentionally re-evaluates HasPendingChanges
+		// here (vs EditGroupViewModel which keeps it set), because Undo on the
+		// last pending removal restores the page to a clean state if no other
+		// edits or adds occurred.
+		HasPendingChanges = HasPendingRemovals;
 		RefreshHolderCountText();
 		UpdateHasActiveHolders();
 
@@ -543,8 +579,14 @@ public partial class PositionEditViewModel : BaseViewModel
 		{
 			using var context = _contextFactory.CreateDbContext();
 
+			// Snapshot the pending list before any DB work — committing iterates
+			// it once, and we'll remove the wrappers from DisplayedHolders after
+			// SaveChanges succeeds. Materialising avoids re-evaluating the
+			// derived enumerable while we mutate the source.
+			var pendingSnapshot = PendingRemovals.ToList();
+
 			// Commit all pending removals to the database
-			foreach (var member in PendingRemovals)
+			foreach (var member in pendingSnapshot)
 			{
 				var tracked = await context.Members.FindAsync(member.Id);
 				if (tracked != null)
@@ -566,12 +608,12 @@ public partial class PositionEditViewModel : BaseViewModel
 				}
 			}
 
-			if (PendingRemovals.Count > 0)
+			if (pendingSnapshot.Count > 0)
 			{
 				await context.SaveChangesAsync();
 			}
 
-			PendingRemovals.Clear();
+			RemoveAllPendingFromDisplayed();
 			UpdateHasPendingRemovals();
 		}
 		catch (Exception ex)
@@ -600,12 +642,16 @@ public partial class PositionEditViewModel : BaseViewModel
 			if (!shouldLeave) return;
 		}
 
-		// Revert pending removals — move them back to ActiveHolders
-		foreach (var member in PendingRemovals)
+		// Revert pending removals — flip each pending card back to an active
+		// card, in place. Iterate the underlying collection by index so we
+		// can mutate it safely.
+		for (var i = 0; i < DisplayedHolders.Count; i++)
 		{
-			ActiveHolders.Add(member);
+			if (DisplayedHolders[i].IsPending)
+			{
+				DisplayedHolders[i] = MemberCardItem.Active(DisplayedHolders[i].Member);
+			}
 		}
-		PendingRemovals.Clear();
 		UpdateHasPendingRemovals();
 		HasPendingChanges = false;
 
@@ -618,15 +664,65 @@ public partial class PositionEditViewModel : BaseViewModel
 
 	#region Private Methods
 
+	/// <summary>
+	/// Find the index of a member's wrapper in <see cref="DisplayedHolders"/>,
+	/// regardless of whether the wrapper is currently Active or Pending.
+	/// Returns -1 if the member isn't displayed.
+	/// </summary>
+	private int IndexOfDisplayed(Member member)
+	{
+		for (var i = 0; i < DisplayedHolders.Count; i++)
+		{
+			if (DisplayedHolders[i].Member.Id == member.Id) return i;
+		}
+		return -1;
+	}
+
+	/// <summary>
+	/// Insert <paramref name="member"/> as an Active card immediately after the
+	/// last existing Active card — i.e. at the end of the active block, just
+	/// before any pending-removal cards. Preserves the "actives first, removals
+	/// at the end" ordering used by the page's combined CollectionView.
+	/// </summary>
+	private void InsertActiveDisplayed(Member member)
+	{
+		var insertAt = DisplayedHolders.Count;
+		for (var i = 0; i < DisplayedHolders.Count; i++)
+		{
+			if (DisplayedHolders[i].IsPending)
+			{
+				insertAt = i;
+				break;
+			}
+		}
+		DisplayedHolders.Insert(insertAt, MemberCardItem.Active(member));
+	}
+
+	/// <summary>
+	/// Remove every wrapper currently marked Pending from <see cref="DisplayedHolders"/>.
+	/// Used by Done (after a successful commit) and on entry, where we want a
+	/// clean slate.
+	/// </summary>
+	private void RemoveAllPendingFromDisplayed()
+	{
+		for (var i = DisplayedHolders.Count - 1; i >= 0; i--)
+		{
+			if (DisplayedHolders[i].IsPending)
+			{
+				DisplayedHolders.RemoveAt(i);
+			}
+		}
+	}
+
 	private void PopulateHolderList()
 	{
-		ActiveHolders.Clear();
+		DisplayedHolders.Clear();
 
 		if (_position?.Holders != null)
 		{
 			foreach (var holder in _position.Holders)
 			{
-				ActiveHolders.Add(holder);
+				DisplayedHolders.Add(MemberCardItem.Active(holder));
 			}
 		}
 
@@ -636,17 +732,17 @@ public partial class PositionEditViewModel : BaseViewModel
 
 	private void UpdateHasActiveHolders()
 	{
-		HasActiveHolders = ActiveHolders.Count > 0;
+		HasActiveHolders = DisplayedHolders.Any(i => !i.IsPending);
 	}
 
 	private void UpdateHasPendingRemovals()
 	{
-		HasPendingRemovals = PendingRemovals.Count > 0;
+		HasPendingRemovals = DisplayedHolders.Any(i => i.IsPending);
 	}
 
 	private void RefreshHolderCountText()
 	{
-		var count = ActiveHolders.Count;
+		var count = DisplayedHolders.Count(i => !i.IsPending);
 		HolderCountText = count switch
 		{
 			0 => "No holders — tap + to add one",

@@ -161,7 +161,7 @@
 		<MauiXaml Update="Controls\MaskedRevealLabel.xaml">
 			<Generator>MSBuild:Compile</Generator>
 		</MauiXaml>
-		<MauiXaml Update="Controls\MemberCard.xaml">
+		<MauiXaml Update="Controls\GroupMemberCard.xaml">
 			<Generator>MSBuild:Compile</Generator>
 		</MauiXaml>
 		<MauiXaml Update="Controls\PositionMemberCard.xaml">

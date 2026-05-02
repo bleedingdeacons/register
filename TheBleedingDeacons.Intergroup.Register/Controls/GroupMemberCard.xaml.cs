@@ -8,12 +8,12 @@ namespace TheBleedingDeacons.Intergroup.Register.Controls;
 /// driven by an internal Reveal button. The bottom action row (e.g. Edit /
 /// Remove, Undo) is supplied by the host page via <see cref="ActionContent"/>,
 /// which is the control's ContentProperty so it can be written as the
-/// MemberCard's direct child.
+/// GroupMemberCard's direct child.
 /// </summary>
 [ContentProperty(nameof(ActionContent))]
-public partial class MemberCard : ContentView
+public partial class GroupMemberCard : ContentView
 {
-	public MemberCard()
+	public GroupMemberCard()
 	{
 		InitializeComponent();
 	}
@@ -24,7 +24,7 @@ public partial class MemberCard : ContentView
 		BindableProperty.Create(
 			nameof(Member),
 			typeof(Member),
-			typeof(MemberCard),
+			typeof(GroupMemberCard),
 			defaultValue: null);
 
 	/// <summary>
@@ -41,7 +41,7 @@ public partial class MemberCard : ContentView
 		BindableProperty.Create(
 			nameof(IsStruckThrough),
 			typeof(bool),
-			typeof(MemberCard),
+			typeof(GroupMemberCard),
 			defaultValue: false,
 			propertyChanged: OnIsStruckThroughChanged);
 
@@ -59,7 +59,7 @@ public partial class MemberCard : ContentView
 		BindableProperty.Create(
 			nameof(ValueTextDecorations),
 			typeof(TextDecorations),
-			typeof(MemberCard),
+			typeof(GroupMemberCard),
 			defaultValue: TextDecorations.None);
 
 	/// <summary>
@@ -77,7 +77,7 @@ public partial class MemberCard : ContentView
 		BindableProperty.Create(
 			nameof(ShowRevealButton),
 			typeof(bool),
-			typeof(MemberCard),
+			typeof(GroupMemberCard),
 			defaultValue: true);
 
 	/// <summary>
@@ -95,7 +95,7 @@ public partial class MemberCard : ContentView
 		BindableProperty.Create(
 			nameof(ActionContent),
 			typeof(View),
-			typeof(MemberCard),
+			typeof(GroupMemberCard),
 			defaultValue: null,
 			propertyChanged: OnActionContentChanged);
 
@@ -114,7 +114,7 @@ public partial class MemberCard : ContentView
 
 	private static void OnActionContentChanged(BindableObject bindable, object oldValue, object newValue)
 	{
-		if (bindable is MemberCard card)
+		if (bindable is GroupMemberCard card)
 		{
 			card.ActionSlot.Content = newValue as View;
 		}
@@ -122,7 +122,7 @@ public partial class MemberCard : ContentView
 
 	private static void OnIsStruckThroughChanged(BindableObject bindable, object oldValue, object newValue)
 	{
-		if (bindable is MemberCard card)
+		if (bindable is GroupMemberCard card)
 		{
 			card.ValueTextDecorations = (bool)newValue
 				? TextDecorations.Strikethrough

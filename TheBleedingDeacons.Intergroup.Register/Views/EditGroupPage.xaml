@@ -30,8 +30,16 @@
                     <!--  ═══════════════════════════════════════════════════════  -->
                     <VerticalStackLayout IsVisible="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}" Spacing="16">
 
-                        <!--  Active Members  -->
+                        <!--  Displayed Members  -->
                         <!--
+                            Single horizontal CollectionView holding both active
+                            members and members staged for removal. Pending
+                            removals are appended at the end of the list — the
+                            DataTemplate's IsPending DataTriggers swap the card
+                            into the strikethrough / Undo variant in place, so
+                            the user swipes through one continuous strip rather
+                            than two stacked sections.
+                            
                             HorizontalOptions="Center" centres the whole card block.
                             When the combined card width exceeds the viewport the
                             CollectionView scrolls normally, with the scroll window
@@ -45,50 +53,96 @@
                         -->
                         <Grid IsVisible="{Binding HasActiveMembers}">
                             <CollectionView
-                                x:Name="ActiveMembersCollectionView"
+                                x:Name="DisplayedMembersCollectionView"
                                 HeightRequest="420"
                                 HorizontalOptions="Center"
-                                ItemsSource="{Binding ActiveMembers}"
+                                ItemsSource="{Binding DisplayedMembers}"
                                 ItemsUpdatingScrollMode="KeepScrollOffset"
-                                Scrolled="ActiveMembersCollectionView_Scrolled"
+                                Scrolled="DisplayedMembersCollectionView_Scrolled"
                                 SelectionMode="None">
                                 <CollectionView.ItemsLayout>
                                     <LinearItemsLayout
                                         ItemSpacing="12"
                                         Orientation="Horizontal"
-                                        SnapPointsAlignment="Center"
-                                        SnapPointsType="MandatorySingle" />
+                                        SnapPointsType="None" />
                                 </CollectionView.ItemsLayout>
                                 <CollectionView.ItemTemplate>
-                                    <DataTemplate x:DataType="entities:Member">
+                                    <DataTemplate x:DataType="viewmodels:MemberCardItem">
+                                        <!--
+                                            Border style switches between active (M3CardStyle) and
+                                            pending-removal (DeletedCardStyle) via a DataTrigger on
+                                            IsPending. Style is a regular bindable property on
+                                            VisualElement so DataTrigger can set it directly.
+                                        -->
                                         <Border
                                             MaximumWidthRequest="560"
                                             Style="{StaticResource M3CardStyle}"
                                             WidthRequest="560">
-                                            <controls:MemberCard Member="{Binding .}">
-                                                <!--  Action slot: Edit / Remove  -->
-                                                <Grid
-                                                    Margin="0,8,0,0"
-                                                    ColumnDefinitions="*,*"
-                                                    ColumnSpacing="12">
+                                            <Border.Triggers>
+                                                <DataTrigger
+                                                    Binding="{Binding IsPending}"
+                                                    TargetType="Border"
+                                                    Value="True">
+                                                    <Setter Property="Style" Value="{StaticResource DeletedCardStyle}" />
+                                                </DataTrigger>
+                                            </Border.Triggers>
+                                            <!--
+                                                Action buttons sit OUTSIDE GroupMemberCard, as a
+                                                sibling within the Border. Putting them in the
+                                                control's ActionSlot would reparent them under the
+                                                card's inner stack, where BindingContext is reset
+                                                to the underlying Member — breaking
+                                                CommandParameter="{Binding Member}" and IsVisible
+                                                triggers on IsPending. Out here, BindingContext
+                                                is unambiguously the MemberCardItem wrapper.
+                                            -->
+                                            <VerticalStackLayout Spacing="0">
+                                                <controls:GroupMemberCard
+                                                    IsStruckThrough="{Binding IsPending}"
+                                                    Member="{Binding Member}"
+                                                    ShowRevealButton="{Binding IsPending, Converter={StaticResource InvertedBoolConverter}}" />
+
+                                                <!--
+                                                    Two button groups, mutually exclusive on
+                                                    IsPending: Edit/Remove for active cards,
+                                                    Undo for cards staged for removal.
+                                                -->
+                                                <Grid Margin="0,8,0,0">
+                                                    <!--  Active card actions: Edit / Remove  -->
+                                                    <Grid
+                                                        ColumnDefinitions="*,*"
+                                                        ColumnSpacing="12"
+                                                        IsVisible="{Binding IsPending, Converter={StaticResource InvertedBoolConverter}}">
+                                                        <Button
+                                                            Grid.Column="0"
+                                                            Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:EditGroupViewModel}}, Path=SelectMemberCommand}"
+                                                            CommandParameter="{Binding Member}"
+                                                            HeightRequest="44"
+                                                            Style="{StaticResource M3SecondaryButtonStyle}"
+                                                            Text="Edit" />
+                                                        <Button
+                                                            Grid.Column="1"
+                                                            Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:EditGroupViewModel}}, Path=RemoveMemberCommand}"
+                                                            CommandParameter="{Binding Member}"
+                                                            HeightRequest="44"
+                                                            Style="{StaticResource M3SecondaryButtonStyle}"
+                                                            Text="Remove"
+                                                            TextColor="{AppThemeBinding Light={StaticResource DangerDark},
+                                                                                        Dark={StaticResource DangerLight}}" />
+                                                    </Grid>
+
+                                                    <!--  Pending-removal card actions: Undo  -->
                                                     <Button
-                                                        Grid.Column="0"
-                                                        Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:EditGroupViewModel}}, Path=SelectMemberCommand}"
-                                                        CommandParameter="{Binding .}"
+                                                        Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:EditGroupViewModel}}, Path=UndoRemoveMemberCommand}"
+                                                        CommandParameter="{Binding Member}"
                                                         HeightRequest="44"
+                                                        HorizontalOptions="Center"
+                                                        IsVisible="{Binding IsPending}"
                                                         Style="{StaticResource M3SecondaryButtonStyle}"
-                                                        Text="Edit" />
-                                                    <Button
-                                                        Grid.Column="1"
-                                                        Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:EditGroupViewModel}}, Path=RemoveMemberCommand}"
-                                                        CommandParameter="{Binding .}"
-                                                        HeightRequest="44"
-                                                        Style="{StaticResource M3SecondaryButtonStyle}"
-                                                        Text="Remove"
-                                                        TextColor="{AppThemeBinding Light={StaticResource DangerDark},
-                                                                                    Dark={StaticResource DangerLight}}" />
+                                                        Text="Undo"
+                                                        WidthRequest="160" />
                                                 </Grid>
-                                            </controls:MemberCard>
+                                            </VerticalStackLayout>
                                         </Border>
                                     </DataTemplate>
                                 </CollectionView.ItemTemplate>
@@ -100,12 +154,12 @@
                                 code-behind via the Scrolled handler.
                             -->
                             <Button
-                                x:Name="ActiveMembersScrollLeftButton"
+                                x:Name="DisplayedMembersScrollLeftButton"
                                 Margin="8,0,0,0"
                                 Padding="0"
                                 BackgroundColor="{AppThemeBinding Light={StaticResource Surface},
                                                                   Dark={StaticResource Gray900}}"
-                                Clicked="ActiveMembersScrollLeftButton_Clicked"
+                                Clicked="DisplayedMembersScrollLeftButton_Clicked"
                                 CornerRadius="22"
                                 FontSize="32"
                                 HeightRequest="44"
@@ -117,12 +171,12 @@
                                 VerticalOptions="Center"
                                 WidthRequest="44" />
                             <Button
-                                x:Name="ActiveMembersScrollRightButton"
+                                x:Name="DisplayedMembersScrollRightButton"
                                 Margin="0,0,8,0"
                                 Padding="0"
                                 BackgroundColor="{AppThemeBinding Light={StaticResource Surface},
                                                                   Dark={StaticResource Gray900}}"
-                                Clicked="ActiveMembersScrollRightButton_Clicked"
+                                Clicked="DisplayedMembersScrollRightButton_Clicked"
                                 CornerRadius="22"
                                 FontSize="32"
                                 HeightRequest="44"
@@ -162,109 +216,6 @@
                                 <Label Style="{StaticResource M3EmptyStateSubtitleStyle}" Text="Tap '+ Add' above to create a new group service representative." />
                             </VerticalStackLayout>
                         </Border>
-
-                        <!--  Pending Removals  -->
-                        <!--
-                            Outer stack no longer constrained to 560px — with a
-                            horizontal card list and chevron buttons we want the
-                            chevrons to sit at the viewport edges, not at the
-                            edges of a single-card-wide column. The heading is
-                            centred explicitly below to preserve its alignment.
-                        -->
-                        <VerticalStackLayout IsVisible="{Binding HasPendingRemovals}" Spacing="8">
-                            <Label
-                                Margin="0,4,0,0"
-                                FontAttributes="Bold"
-                                FontSize="16"
-                                HorizontalOptions="Center"
-                                Text="Pending Removals"
-                                TextColor="{AppThemeBinding Light={StaticResource DangerDark},
-                                                            Dark={StaticResource DangerLight}}" />
-
-                            <!--
-                                CollectionView wrapped in Grid so chevron buttons
-                                can overlay the left/right edges. Same pattern as
-                                the Active Members list above.
-                            -->
-                            <Grid>
-                                <CollectionView
-                                    x:Name="PendingRemovalsCollectionView"
-                                    HeightRequest="320"
-                                    HorizontalOptions="Center"
-                                    ItemsSource="{Binding PendingRemovals}"
-                                    ItemsUpdatingScrollMode="KeepScrollOffset"
-                                    Scrolled="PendingRemovalsCollectionView_Scrolled"
-                                    SelectionMode="None">
-                                    <CollectionView.ItemsLayout>
-                                        <LinearItemsLayout
-                                            ItemSpacing="12"
-                                            Orientation="Horizontal"
-                                            SnapPointsAlignment="Center"
-                                            SnapPointsType="MandatorySingle" />
-                                    </CollectionView.ItemsLayout>
-                                    <CollectionView.ItemTemplate>
-                                        <DataTemplate x:DataType="entities:Member">
-                                            <Border
-                                                MaximumWidthRequest="560"
-                                                Style="{StaticResource DeletedCardStyle}"
-                                                WidthRequest="560">
-                                                <controls:MemberCard
-                                                    IsStruckThrough="True"
-                                                    Member="{Binding .}"
-                                                    ShowRevealButton="False">
-                                                    <!--  Action slot: Undo  -->
-                                                    <Button
-                                                        Margin="0,8,0,0"
-                                                        Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:EditGroupViewModel}}, Path=UndoRemoveMemberCommand}"
-                                                        CommandParameter="{Binding .}"
-                                                        HeightRequest="44"
-                                                        HorizontalOptions="Center"
-                                                        Style="{StaticResource M3SecondaryButtonStyle}"
-                                                        Text="Undo"
-                                                        WidthRequest="160" />
-                                                </controls:MemberCard>
-                                            </Border>
-                                        </DataTemplate>
-                                    </CollectionView.ItemTemplate>
-                                </CollectionView>
-
-                                <!--  Scroll chevrons  -->
-                                <Button
-                                    x:Name="PendingRemovalsScrollLeftButton"
-                                    Margin="8,0,0,0"
-                                    Padding="0"
-                                    BackgroundColor="{AppThemeBinding Light={StaticResource Surface},
-                                                                      Dark={StaticResource Gray900}}"
-                                    Clicked="PendingRemovalsScrollLeftButton_Clicked"
-                                    CornerRadius="22"
-                                    FontSize="32"
-                                    HeightRequest="44"
-                                    HorizontalOptions="Start"
-                                    IsVisible="False"
-                                    Text="‹"
-                                    TextColor="{AppThemeBinding Light={StaticResource TextBody},
-                                                                Dark={StaticResource TextBodyDim}}"
-                                    VerticalOptions="Center"
-                                    WidthRequest="44" />
-                                <Button
-                                    x:Name="PendingRemovalsScrollRightButton"
-                                    Margin="0,0,8,0"
-                                    Padding="0"
-                                    BackgroundColor="{AppThemeBinding Light={StaticResource Surface},
-                                                                      Dark={StaticResource Gray900}}"
-                                    Clicked="PendingRemovalsScrollRightButton_Clicked"
-                                    CornerRadius="22"
-                                    FontSize="32"
-                                    HeightRequest="44"
-                                    HorizontalOptions="End"
-                                    IsVisible="False"
-                                    Text="›"
-                                    TextColor="{AppThemeBinding Light={StaticResource TextBody},
-                                                                Dark={StaticResource TextBodyDim}}"
-                                    VerticalOptions="Center"
-                                    WidthRequest="44" />
-                            </Grid>
-                        </VerticalStackLayout>
 
                     </VerticalStackLayout>
 
