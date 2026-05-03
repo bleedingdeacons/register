@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage
-    x:Class="TheBleedingDeacons.Intergroup.Register.Views.IntegrationsSettingsPage"
+    x:Class="TheBleedingDeacons.Intergroup.Register.Views.ApiSettingsPage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:controls="clr-namespace:TheBleedingDeacons.Intergroup.Register.Controls"
     xmlns:tc="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
     xmlns:vm="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
-    Title="Integrations"
-    x:DataType="vm:IntegrationsSettingsViewModel">
+    Title="API Settings"
+    x:DataType="vm:ApiSettingsViewModel">
 
     <ContentPage.Resources>
         <tc:BoolToObjectConverter
@@ -30,7 +30,7 @@
             <Label
                 FontAttributes="Bold"
                 FontSize="24"
-                Text="Integrations" />
+                Text="API Settings" />
 
             <Label
                 FontAttributes="Italic"

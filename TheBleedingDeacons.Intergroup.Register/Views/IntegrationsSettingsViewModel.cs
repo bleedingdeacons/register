@@ -20,9 +20,9 @@ namespace TheBleedingDeacons.Intergroup.Register.Views;
 /// Both paths converge on <see cref="PromptDiscardAsync"/> so the user sees the same dialog
 /// regardless of how they tried to leave.
 /// </summary>
-public partial class IntegrationsSettingsPage : ContentPage
+public partial class ApiSettingsPage : ContentPage
 {
-    private readonly IntegrationsSettingsViewModel _viewModel;
+    private readonly ApiSettingsViewModel _viewModel;
 
     // Re-entrancy guard. When the user confirms "Discard", we cancel the
     // original navigation event and then re-issue it ourselves — that
@@ -31,7 +31,7 @@ public partial class IntegrationsSettingsPage : ContentPage
     // the re-issued navigation pass through untouched.
     private bool _bypassGuard;
 
-    public IntegrationsSettingsPage(IntegrationsSettingsViewModel viewModel)
+    public ApiSettingsPage(ApiSettingsViewModel viewModel)
     {
         InitializeComponent();
         _viewModel = viewModel;

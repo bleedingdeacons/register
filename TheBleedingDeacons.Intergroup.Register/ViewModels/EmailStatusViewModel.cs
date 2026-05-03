@@ -103,26 +103,46 @@ public partial class EmailStatusViewModel : BaseViewModel
 			_emailService.LastQueueError,
 			_emailService.CircuitOpenedAt);
 
-		// Setup auto-refresh timer (every 30 seconds)
+		// Setup auto-refresh timer (every 30 seconds). The callback runs on
+		// a thread-pool thread, so RefreshEmailsAsync / LoadEmailsAsync are
+		// responsible for marshalling any UI-touching property writes back
+		// to the UI thread — see the MainThread.InvokeOnMainThreadAsync
+		// blocks in those methods.
 		_refreshTimer = new Timer(async _ => await RefreshEmailsAsync(), null,
 			TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30));
 
-		// Initial load
-		Task.Run(async () => await LoadEmailsAsync()).SafeFireAndForget("InitialEmailLoad");
+		// No constructor-time initial load: EmailStatusPage.OnAppearing
+		// invokes LoadEmailsCommand on the UI thread as soon as the page
+		// is shown, which is the safe entry point. A Task.Run-based load
+		// here would write IsLoading / StatusMessage from a pool thread
+		// before the page has a chance to appear, tripping Android's
+		// "Only the original thread that created a view hierarchy can
+		// touch its views" check via the bound ActivityIndicator / status
+		// label.
 	}
 
 	[RelayCommand]
 	private async Task LoadEmailsAsync()
 	{
-		try
+		// LoadEmailsAsync is reachable from two kinds of callers:
+		//   • UI gestures (the bound command) — already on the UI thread.
+		//   • The 30-second refresh timer — on a thread-pool thread.
+		// Every property assignment below raises PropertyChanged on the
+		// calling thread, and the page binds IsLoading / StatusMessage to
+		// real Android views, so a pool-thread write blows up with the
+		// "Only the original thread that created a view hierarchy can
+		// touch its views" exception. Marshal the whole body to the UI
+		// thread up-front; the awaited I/O inside still releases the UI
+		// thread while the DB read is in flight, so this isn't blocking.
+		await MainThread.InvokeOnMainThreadAsync(async () =>
 		{
-			IsLoading = true;
-			StatusMessage = "Loading emails...";
-
-			var emails = await _emailService.GetQueuedEmailsAsync();
-
-			await MainThread.InvokeOnMainThreadAsync(() =>
+			try
 			{
+				IsLoading = true;
+				StatusMessage = "Loading emails...";
+
+				var emails = await _emailService.GetQueuedEmailsAsync();
+
 				Emails.Clear();
 				foreach (var email in emails)
 				{
@@ -130,35 +150,42 @@ public partial class EmailStatusViewModel : BaseViewModel
 				}
 
 				UpdateStatistics();
-			});
 
-			StatusMessage = $"Loaded {emails.Count} emails";
-		}
-		catch (Exception ex)
-		{
-			Logger.Error(ex, "Error loading emails");
-			StatusMessage = $"Error loading emails: {ex.Message}";
-		}
-		finally
-		{
-			IsLoading = false;
-		}
+				StatusMessage = $"Loaded {emails.Count} emails";
+			}
+			catch (Exception ex)
+			{
+				Logger.Error(ex, "Error loading emails");
+				StatusMessage = $"Error loading emails: {ex.Message}";
+			}
+			finally
+			{
+				IsLoading = false;
+			}
+		});
 	}
 
 	[RelayCommand]
 	private async Task RefreshEmailsAsync()
 	{
-		if (IsLoading || IsRefreshing) return;
+		// Same dual-caller story as LoadEmailsAsync: invoked from the UI
+		// (PullToRefresh) and from the 30-second timer on a pool thread.
+		// IsRefreshing is bound to the RefreshView spinner, so the writes
+		// have to happen on the UI thread.
+		await MainThread.InvokeOnMainThreadAsync(async () =>
+		{
+			if (IsLoading || IsRefreshing) return;
 
-		try
-		{
-			IsRefreshing = true;
-			await LoadEmailsAsync();
-		}
-		finally
-		{
-			IsRefreshing = false;
-		}
+			try
+			{
+				IsRefreshing = true;
+				await LoadEmailsAsync();
+			}
+			finally
+			{
+				IsRefreshing = false;
+			}
+		});
 	}
 
 	[RelayCommand]

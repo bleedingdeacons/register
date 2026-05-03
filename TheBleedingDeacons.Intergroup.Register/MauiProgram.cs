@@ -282,7 +282,7 @@ public static class MauiProgram
 		builder.Services.AddTransient<DatabaseBackupPage>();
 		builder.Services.AddTransient<EmailStatusPage>();
 		builder.Services.AddTransient<SettingsPage>();
-		builder.Services.AddTransient<IntegrationsSettingsPage>();		
+		builder.Services.AddTransient<ApiSettingsPage>();		
 		builder.Services.AddTransient<AdminPage>();
 		builder.Services.AddTransient<RegistrationOverviewPage>();
 
@@ -299,7 +299,7 @@ public static class MauiProgram
 		builder.Services.AddTransient<DatabaseBackupViewModel>();
 		builder.Services.AddTransient<EmailStatusViewModel>();
 		builder.Services.AddTransient<SettingsViewModel>();
-		builder.Services.AddTransient<IntegrationsSettingsViewModel>();		
+		builder.Services.AddTransient<ApiSettingsViewModel>();		
 		builder.Services.AddTransient<AdminViewModel>();
 		builder.Services.AddTransient<VerifyPositionViewModel>();
 		builder.Services.AddTransient<VerifyPositionPage>();

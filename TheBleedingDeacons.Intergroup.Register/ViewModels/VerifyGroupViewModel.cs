@@ -276,15 +276,31 @@ public partial class VerifyGroupViewModel : BaseViewModel
 		try
 		{
 			// GDPR gate. Each active GSR who has not previously accepted
-			// the privacy policy must be asked individually before their
-			// data is committed as a registered attendance. The popup is
-			// shown once per outstanding GSR with that GSR's name in the
-			// title, so it's clear whose consent is being captured. If
-			// any GSR declines, the entire group registration is aborted
-			// — we cannot register a group whose members haven't all
-			// consented. GSRs who accept have their acceptance recorded
-			// individually as the loop progresses.
-			var unaccepted = ActiveGsrs.Where(m => m.GdprAccepted != true).ToList();
+			// the privacy policy — OR whose recorded acceptance is for an
+			// earlier version than the currently cached active policy —
+			// must be asked individually before their data is committed
+			// as a registered attendance. The popup is shown once per
+			// outstanding GSR with that GSR's name in the title, so it's
+			// clear whose consent is being captured. If any GSR declines,
+			// the entire group registration is aborted — we cannot register
+			// a group whose members haven't all consented to the current
+			// version. GSRs who accept have their acceptance recorded
+			// individually as the loop progresses, which updates their
+			// stored version to match the cached one.
+			//
+			// The cached version comparison is intentionally an inequality
+			// check, not a "less than" check: PrivacyPolicy.Version is
+			// free-form text per the Scrutiny contract, so any differing
+			// recorded version is treated as out-of-date for the purposes
+			// of re-prompting. If the cache is missing, fall back to the
+			// "never accepted" filter only — PromptForComplianceAsync's
+			// own null-cache guard will then surface the right error.
+			var cachedVersion = _privacyPolicyCache.GetCached()?.Version;
+			var unaccepted = ActiveGsrs.Where(m =>
+				m.GdprAccepted != true
+				|| (!string.IsNullOrWhiteSpace(cachedVersion)
+					&& !string.Equals(m.GdprAcceptanceVersion, cachedVersion, StringComparison.Ordinal)))
+				.ToList();
 			if (unaccepted.Count > 0)
 			{
 				var consentGiven = await PromptForComplianceAsync(unaccepted);

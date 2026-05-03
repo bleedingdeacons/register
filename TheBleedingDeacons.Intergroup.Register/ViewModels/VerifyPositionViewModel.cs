@@ -221,12 +221,27 @@ public partial class VerifyPositionViewModel : BaseViewModel
 		try
 		{
 			// GDPR gate. Any active holder who has not previously accepted
-			// the privacy policy must do so now before their data is
-			// committed as a registered attendance. Show the popup once
-			// for the whole batch — declining aborts the registration
-			// silently, accepting records acceptance for every holder
-			// who didn't already have it on file.
-			var unaccepted = ActiveHolders.Where(m => m.GdprAccepted != true).ToList();
+			// the privacy policy — OR whose recorded acceptance is for an
+			// earlier version than the currently cached active policy —
+			// must do so now before their data is committed as a registered
+			// attendance. Show the popup once for the whole batch —
+			// declining aborts the registration silently, accepting records
+			// (or refreshes) acceptance for every holder who didn't already
+			// have it on file at the current version.
+			//
+			// The cached version comparison is intentionally an inequality
+			// check, not a "less than" check: PrivacyPolicy.Version is
+			// free-form text per the Scrutiny contract, so any differing
+			// recorded version is treated as out-of-date for the purposes
+			// of re-prompting. If the cache is missing, fall back to the
+			// "never accepted" filter only — PromptForComplianceAsync's
+			// own null-cache guard will then surface the right error.
+			var cachedVersion = _privacyPolicyCache.GetCached()?.Version;
+			var unaccepted = ActiveHolders.Where(m =>
+				m.GdprAccepted != true
+				|| (!string.IsNullOrWhiteSpace(cachedVersion)
+					&& !string.Equals(m.GdprAcceptanceVersion, cachedVersion, StringComparison.Ordinal)))
+				.ToList();
 			if (unaccepted.Count > 0)
 			{
 				var consentGiven = await PromptForComplianceAsync(unaccepted);

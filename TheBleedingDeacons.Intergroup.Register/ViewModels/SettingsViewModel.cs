@@ -289,7 +289,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 				// — this is a config issue, not a stale-cache issue.
 				Logger.Warning(ex, "Cannot refresh privacy policy: base URL not configured");
 				ShowPrivacyPolicyStatus(
-					"Configure the Unity base URL in Integrations first.",
+					"Configure the Unity base URL in API Settings first.",
 					isError: true);
 			}
 			catch (HttpRequestException ex)
@@ -483,17 +483,17 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 		}
 
 		/// <summary>
-		/// Navigate to the combined Integrations settings page. Replaces the
+		/// Navigate to the combined API settings page. Replaces the
 		/// previous two separate <c>NavigateToUnitySetting</c> and
 		/// <c>NavigateToBetterStackSetting</c> commands — both Unity API and
 		/// Better Stack configuration now live under a single page with an
 		/// unsaved-changes guard.
 		/// </summary>
 		[RelayCommand]
-		private async Task NavigateToIntegrationsSetting()
+		private async Task NavigateToApiSettings()
 		{
 			await ShowFeedback();
-			await Shell.Current.GoToAsync(nameof(IntegrationsSettingsPage));
+			await Shell.Current.GoToAsync(nameof(ApiSettingsPage));
 		}
 
 		[RelayCommand]

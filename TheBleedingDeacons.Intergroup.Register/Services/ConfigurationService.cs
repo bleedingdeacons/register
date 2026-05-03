@@ -73,13 +73,20 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 				return _cachedSmtpConfig;
 
 #if USE_DEV_CREDENTIALS
-			var (_, password) = LoadEmbeddedDevCredentials(
-				"SmtpSettings", "Host", "Password");
+			// Dev/test mode: every SMTP field comes from the embedded
+			// devsettings.json — host, port, username, password, the lot.
+			// Don't fall through to BuildSmtpConfiguration: that binds
+			// from _configuration, which only sees appsettings.json plus
+			// the user-saved mailsettings.json overlay, and devsettings
+			// is in neither. A partial bake-in (password only, host blank)
+			// would silently produce an invalid config and skip SMTP setup
+			// at startup — which is exactly the failure mode this branch
+			// exists to avoid in dev builds.
+			_cachedSmtpConfig = LoadEmbeddedDevSmtpConfiguration();
 #else
 			var password = GetSecretSync(SMTP_PASSWORD_KEY, "SMTP password");
-#endif
-
 			_cachedSmtpConfig = BuildSmtpConfiguration(password);
+#endif
 			return _cachedSmtpConfig;
 		}
 
@@ -101,14 +108,20 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		public async Task<SmtpConfiguration> LoadSmtpConfigurationAsync()
 		{
 #if USE_DEV_CREDENTIALS
-			var (_, password) = LoadEmbeddedDevCredentials(
-				"SmtpSettings", "Host", "Password");
+			// Mirrors GetSmtpConfiguration: in dev builds the full SMTP
+			// section is read from embedded devsettings.json. The async
+			// shape is preserved for callers (the reachability probe in
+			// EmailStatusViewModel.TestConnectionAsync, the Settings page
+			// reload path) but the read itself is from an in-memory
+			// resource so there's no real I/O to await — Task.FromResult
+			// keeps the signature without spawning unnecessary work.
+			_cachedSmtpConfig = LoadEmbeddedDevSmtpConfiguration();
+			return await Task.FromResult(_cachedSmtpConfig);
 #else
 			var password = await GetSecretAsync(SMTP_PASSWORD_KEY, "SMTP password");
-#endif
-
 			_cachedSmtpConfig = BuildSmtpConfiguration(password);
 			return _cachedSmtpConfig;
+#endif
 		}
 
 		/// <summary>
@@ -704,6 +717,88 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			}
 
 			return ("", "");
+		}
+
+		/// <summary>
+		/// Reads the entire <c>SmtpSettings</c> section from the embedded
+		/// <c>devsettings.json</c> resource and binds it onto a fresh
+		/// <see cref="SmtpConfiguration"/>. Used by <see cref="GetSmtpConfiguration"/>
+		/// and <see cref="LoadSmtpConfigurationAsync"/> in dev builds so the
+		/// host, port, username, password, EnableSsl, FromDisplayName, and
+		/// TimeoutSeconds all come from devsettings — not just the password.
+		///
+		/// <para>Uses the same <see cref="ConfigurationBuilder"/> +
+		/// <see cref="ConfigurationBinder.Bind(IConfiguration, object)"/>
+		/// path as <see cref="BuildSmtpConfiguration"/>, so type conversion
+		/// for Port (int) / EnableSsl (bool) / TimeoutSeconds (int) follows
+		/// identical rules between dev and prod paths and the
+		/// <see cref="SmtpConfiguration"/> defaults (Port=587, EnableSsl=true,
+		/// TimeoutSeconds=30, MaxRetries=10) take effect for any field
+		/// missing from devsettings.</para>
+		///
+		/// <para>Returns a default-constructed <see cref="SmtpConfiguration"/>
+		/// on any failure (resource missing, parse error, section missing).
+		/// That instance fails <see cref="SmtpConfiguration.IsValid"/> on the
+		/// blank Host / Username / Password, so the EmailService startup
+		/// path skips configuration cleanly instead of throwing — matching
+		/// the silent-failure contract of <see cref="LoadEmbeddedDevCredentials"/>.</para>
+		/// </summary>
+		private static SmtpConfiguration LoadEmbeddedDevSmtpConfiguration()
+		{
+			var assembly = Assembly.GetExecutingAssembly();
+			using var stream = assembly.GetManifestResourceStream(DEV_CREDENTIALS_RESOURCE);
+			if (stream == null)
+			{
+				Logger.Error(
+					"Embedded resource {Resource} not found. Dev SMTP credentials will be empty. " +
+					"Ensure devsettings.json exists in the project root and " +
+					"UseDevCredentials=true when building.",
+					DEV_CREDENTIALS_RESOURCE);
+				return new SmtpConfiguration();
+			}
+
+			try
+			{
+				// Layer the embedded devsettings.json into a fresh
+				// IConfiguration and bind the SmtpSettings section through
+				// the same Bind() path BuildSmtpConfiguration uses, so the
+				// dev path produces an identically-shaped result to the
+				// production path — same defaults, same type conversion,
+				// same field coverage. Anything in devsettings's
+				// SmtpSettings section maps onto SmtpConfiguration by
+				// property name; anything missing keeps its model default.
+				var config = new ConfigurationBuilder()
+					.AddJsonStream(stream)
+					.Build();
+
+				var smtp = new SmtpConfiguration();
+				config.GetSection("SmtpSettings").Bind(smtp);
+
+				if (string.IsNullOrWhiteSpace(smtp.Host))
+				{
+					Logger.Warning(
+						"SmtpSettings section in embedded {Resource} is missing or has no Host; " +
+						"returning a blank SmtpConfiguration. EmailService will skip setup at startup.",
+						DEV_CREDENTIALS_RESOURCE);
+				}
+				else
+				{
+					Logger.Information(
+						"Loaded dev SMTP configuration from embedded {Resource}: " +
+						"host={Host} port={Port} username={Username} ssl={Ssl}",
+						DEV_CREDENTIALS_RESOURCE,
+						smtp.Host, smtp.Port, smtp.Username, smtp.EnableSsl);
+				}
+
+				return smtp;
+			}
+			catch (Exception ex)
+			{
+				Logger.Error(ex,
+					"Failed to parse embedded {Resource} for SMTP configuration",
+					DEV_CREDENTIALS_RESOURCE);
+				return new SmtpConfiguration();
+			}
 		}
 #endif
 

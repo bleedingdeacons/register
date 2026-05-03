@@ -1,6 +1,5 @@
 using TheBleedingDeacons.Intergroup.Register.Support;
 using TheBleedingDeacons.Intergroup.Register.ViewModels;
-using TaskExtensions = TheBleedingDeacons.Intergroup.Register.Support.TaskExtensions;
 
 namespace TheBleedingDeacons.Intergroup.Register.Views;
 
@@ -35,12 +34,19 @@ public partial class EmailStatusPage : ContentPage
 	{
 		base.OnAppearing();
 
-		// Refresh data when page appears
+		// Refresh data when page appears. Invoke the command directly
+		// on the UI thread (which is where OnAppearing already runs) —
+		// don't Task.Run it. The previous RunSafeFireAndForget put the
+		// command on a thread-pool thread, and the IsLoading /
+		// StatusMessage property writes inside the command then raised
+		// PropertyChanged on that pool thread, which the bound
+		// ActivityIndicator / Label couldn't touch from a background
+		// thread on Android. The command itself awaits I/O internally,
+		// so the UI thread is released for the duration of the DB read.
 		if (BindingContext is EmailStatusViewModel viewModel)
 		{
-			TaskExtensions.RunSafeFireAndForget(
-				() => viewModel.LoadEmailsCommand.ExecuteAsync(null),
-				nameof(EmailStatusPage) + "." + nameof(OnAppearing));
+			viewModel.LoadEmailsCommand.ExecuteAsync(null)
+				.SafeFireAndForget(nameof(EmailStatusPage) + "." + nameof(OnAppearing));
 		}
 	}
 

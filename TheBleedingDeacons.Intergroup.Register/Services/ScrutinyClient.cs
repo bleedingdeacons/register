@@ -188,7 +188,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
             if (string.IsNullOrWhiteSpace(baseUrl))
             {
                 throw new InvalidOperationException(
-                    "Scrutiny base URL is not configured. Set UnitySettings.BaseUrl in the integrations settings — " +
+                    "Scrutiny base URL is not configured. Set UnitySettings.BaseUrl in the API settings — " +
                     "Scrutiny lives on the same WordPress site as Unity and shares its base URL.");
             }
 

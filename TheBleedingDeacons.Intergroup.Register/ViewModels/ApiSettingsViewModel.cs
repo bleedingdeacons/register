@@ -8,7 +8,7 @@ using TheBleedingDeacons.Intergroup.Register.Support;
 namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 {
 	/// <summary>
-	/// Combined ViewModel for the Integrations settings page, backing both the
+	/// Combined ViewModel for the API settings page, backing both the
 	/// Unity API section and the Better Stack logging section on a single page.
 	///
 	/// Each section keeps its own Test / Save commands and its own status bar
@@ -18,9 +18,9 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 	/// is true when *either* form differs from the last-loaded/saved snapshot
 	/// — this drives the navigation-away prompt on the page.
 	/// </summary>
-	public partial class IntegrationsSettingsViewModel : ObservableObject
+	public partial class ApiSettingsViewModel : ObservableObject
 	{
-		private static readonly ILogger Logger = AppLogger.ForContext<IntegrationsSettingsViewModel>();
+		private static readonly ILogger Logger = AppLogger.ForContext<ApiSettingsViewModel>();
 
 		private readonly IConfigurationService _configService;
 		private readonly IBetterStackLoggerController _loggerController;
@@ -39,13 +39,13 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 		// would flip HasUnsavedChanges to true and back again.
 		private bool _suppressDirtyCheck;
 
-		public IntegrationsSettingsViewModel(
+		public ApiSettingsViewModel(
 			IConfigurationService configService,
 			IBetterStackLoggerController loggerController)
 		{
 			_configService = configService;
 			_loggerController = loggerController;
-			LoadConfigurationAsync().SafeFireAndForget("LoadIntegrationsConfig");
+			LoadConfigurationAsync().SafeFireAndForget("LoadApiSettingsConfig");
 		}
 
 		// ─── Unity fields ─────────────────────────────────────────────────
