@@ -13,7 +13,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		private static readonly ILogger Logger = AppLogger.ForContext<ConfigurationService>();
 
 		private static readonly JsonSerializerOptions WriteOptions = new() { WriteIndented = true };
-
+		private const string COMPLIANCE_ACCEPTANCE_EMAIL_ENABLED_KEY = "compliance_acceptance_email_enabled";
 		private const string SMTP_PASSWORD_KEY = "smtp_password";
 		private const string UNITY_API_KEY = "unity_api_key";
 		private const string UNITY_ACTIVE_MEETING_KEY = "unity_active_meeting_id";
@@ -759,5 +759,49 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 				Logger.Warning(ex, "SecureStorage unavailable for {Description}", description);
 			}
 		}
+
+		/// <summary>
+		/// Reads the toggle from Preferences. Defaults to <c>false</c> when
+		/// the preference has never been written — fresh installs do not
+		/// send acceptance-confirmation email until an operator opts in.
+		/// The per-recipient send path in <c>ComplianceService</c> is gated
+		/// on this read, so flipping the value in Settings takes effect on
+		/// the next acceptance action without an app restart.
+		/// </summary>
+		public bool IsComplianceAcceptanceEmailEnabled
+		{
+			get
+			{
+				try
+				{
+					var raw = Preferences.Get(COMPLIANCE_ACCEPTANCE_EMAIL_ENABLED_KEY, string.Empty);
+					if (string.IsNullOrEmpty(raw)) return false;
+					return bool.TryParse(raw, out var value) ? value : false;
+				}
+				catch (Exception ex)
+				{
+					// If Preferences is unavailable, fail safe by treating
+					// the feature as off — matches the default for fresh
+					// installs and keeps the no-surprise-emails invariant
+					// if the prefs store is broken.
+					Logger.Warning(ex, "Failed to read compliance-acceptance-email toggle — defaulting to disabled");
+					return false;
+				}
+			}
+		}
+
+		public void SetComplianceAcceptanceEmailEnabled(bool enabled)
+		{
+			try
+			{
+				Preferences.Set(COMPLIANCE_ACCEPTANCE_EMAIL_ENABLED_KEY, enabled ? "true" : "false");
+				Logger.Information("Compliance-acceptance-email {State}", enabled ? "ENABLED" : "DISABLED");
+			}
+			catch (Exception ex)
+			{
+				Logger.Warning(ex, "Failed to save compliance-acceptance-email toggle");
+			}
+		}
+
 	}
 }

@@ -9,6 +9,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services.Interfaces
 {
 	public interface IConfigurationService
 	{
+
 		SmtpConfiguration GetSmtpConfiguration();
 		Task SaveSmtpConfigurationAsync(SmtpConfiguration config);
 		Task<SmtpConfiguration> LoadSmtpConfigurationAsync();
@@ -131,5 +132,31 @@ namespace TheBleedingDeacons.Intergroup.Register.Services.Interfaces
 		/// fall back to the auto-default.
 		/// </summary>
 		void SetDeviceLabel(string? label);
+
+		/// <summary>
+		/// When true, a confirmation email is queued for each member who
+		/// accepts the active privacy policy via
+		/// <see cref="Services.ComplianceService.RecordAcceptance"/>. The
+		/// email captures the audit trail (timestamp, capture method,
+		/// policy version, policy contact details) and the exact statement
+		/// the member accepted, giving them a copy independent of the
+		/// local SQLite store.
+		///
+		/// <para>Defaults to <c>false</c> — fresh installs do not send
+		/// any acceptance-confirmation email until an operator explicitly
+		/// opts in from Settings. Members without a <c>PersonalEmail</c>
+		/// on file are silently skipped regardless of the toggle.</para>
+		///
+		/// <para>Read per-call inside <c>ComplianceService</c> so flipping
+		/// the value in Settings takes effect on the next acceptance
+		/// without an app restart.</para>
+		/// </summary>
+		bool IsComplianceAcceptanceEmailEnabled { get; }
+
+		/// <summary>
+		/// Persists the compliance-acceptance-email toggle. Takes effect
+		/// on the next acceptance action; no restart required.
+		/// </summary>
+		void SetComplianceAcceptanceEmailEnabled(bool enabled);
 	}
 }
