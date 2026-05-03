@@ -1,4 +1,4 @@
-﻿*Data Privacy & Consent*
+﻿Data Privacy & Consent
 
 To register this AA Inter-group meeting and manage related communications, we need to collect and securely store the details you provide.
 
@@ -7,5 +7,3 @@ Your information will be processed only for meeting administration, service comm
 You may request access to, correction of, or deletion of your personal information at any time.
 
 Please confirm that you understand and agree to the storage and processing of your details for these purposes.
-
-V.1.0.0 - 2026-04-28
