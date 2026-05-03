@@ -36,6 +36,7 @@ public partial class VerifyPositionViewModel : BaseViewModel
 	private readonly IPositionRepository _positionRepository;
 	private readonly IPopupNotification _popupService;
 	private readonly IComplianceRegistration _complianceRegistration;
+	private readonly IPrivacyPolicyCache _privacyPolicyCache;
 
 	[ObservableProperty]
 	private Position? position;
@@ -97,12 +98,14 @@ public partial class VerifyPositionViewModel : BaseViewModel
 		IAttendanceRegistration<Position> attendanceRegistration,
 		IPositionRepository positionRepository,
 		IPopupNotification popupService,
-		IComplianceRegistration complianceRegistration)
+		IComplianceRegistration complianceRegistration,
+		IPrivacyPolicyCache privacyPolicyCache)
 	{
 		_attendanceRegistration = attendanceRegistration;
 		_positionRepository = positionRepository;
 		_popupService = popupService;
 		_complianceRegistration = complianceRegistration;
+		_privacyPolicyCache = privacyPolicyCache;
 	}
 
 	#region Query Attributes Handling
@@ -280,10 +283,31 @@ public partial class VerifyPositionViewModel : BaseViewModel
 	/// </summary>
 	private async Task<bool> PromptForComplianceAsync(IEnumerable<Member> members)
 	{
-		ComplianceText policy;
+		// Read the cached active policy first. The sync-stage gate
+		// guarantees this is populated before a meeting can start, so
+		// reaching this method with an empty cache means the sync was
+		// bypassed or a sync cleared the cache because Scrutiny had
+		// no active policy. Either way, refuse to record consent —
+		// recording an acceptance with no version would corrupt the
+		// audit trail. (See VerifyGroupViewModel for the equivalent
+		// guard on the group-registration flow.)
+		var cachedPolicy = _privacyPolicyCache.GetCached();
+		if (cachedPolicy is null)
+		{
+			Logger.Error(
+				"No cached privacy policy on device; refusing to prompt for consent. " +
+				"This indicates the sync-stage gate was bypassed.");
+			await _popupService.ShowErrorAsync(
+				"Cannot record consent",
+				"This device has no active privacy policy on record. " +
+				"Re-sync from the Admin page before continuing.");
+			return false;
+		}
+
+		string termsBody;
 		try
 		{
-			policy = await ComplianceTextLoader.LoadAsync();
+			termsBody = await TermsTextLoader.LoadAsync();
 		}
 		catch (Exception ex)
 		{
@@ -294,13 +318,22 @@ public partial class VerifyPositionViewModel : BaseViewModel
 			return false;
 		}
 
-		bool accepted = await _popupService.ShowCompliance(policy.Title, policy.Body);
+		// Title comes from the cached Scrutiny record, body from
+		// the bundled Terms.txt. The popup is shown once for the
+		// whole batch — the position-holder confirms consent for
+		// themselves, not per-member like the GSR flow.
+		bool accepted = await _popupService.ShowTerms(cachedPolicy.Title, termsBody);
 		if (!accepted)
 			return false;
 
 		// Record acceptance for every member that didn't already have it.
 		// One timestamp per call so the batch reads as a single coordinated
 		// event in the audit log.
+		//
+		// Version is the cached Scrutiny version (authoritative).
+		// Statement is the bundled Terms.txt body — the exact prose
+		// the position-holder just read. See the equivalent block in
+		// VerifyGroupViewModel for the full rationale.
 		var ts = DateTime.UtcNow;
 		foreach (var member in members)
 		{
@@ -308,8 +341,8 @@ public partial class VerifyPositionViewModel : BaseViewModel
 			{
 				await _complianceRegistration.RecordAcceptance(
 					member,
-					version: policy.Version,
-					statement: policy.Body,
+					version: cachedPolicy.Version,
+					statement: termsBody,
 					method: "register-app",
 					acceptedAtUtc: ts);
 

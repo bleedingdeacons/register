@@ -89,6 +89,7 @@ public static class MauiProgram
 
 		builder.Services.AddSingleton<RegistrationEventLog>();
 		builder.Services.AddSingleton<ComplianceEventLog>();
+		builder.Services.AddSingleton<ComplianceEventLog>();
 
 		// Add configuration service
 		builder.Services.AddSingleton<IConfigurationService, ConfigurationService>();
@@ -187,6 +188,24 @@ public static class MauiProgram
 				return new UnityRestSharp(config.BaseUrl, config.ApiKey, platformClient, logger: logger);
 			};
 		});
+
+		// Scrutiny REST client — read-only access to the privacy-policy
+		// endpoints exposed by the Scrutiny WordPress plugin. Public on
+		// the server side (no API key needed), but routed through the
+		// same platform-native HttpClient as Unity so requests share the
+		// OS TLS fingerprint at the edge WAF that fronts the same site.
+		// Singleton: stateless beyond its dependencies, and the
+		// configuration service it reads from caches its own results, so
+		// there's no benefit to a per-call factory like UnityRestSharp's.
+		builder.Services.AddSingleton<IScrutinyClient, ScrutinyClient>();
+
+		// Privacy-policy cache — Preferences-backed, written by the
+		// sync stage and read by ComplianceService (via the Verify*
+		// view-models) and the Settings page. Singleton: stateless
+		// beyond Preferences itself, which is process-wide and
+		// thread-safe, so there's no concurrency concern in sharing
+		// one instance across the app.
+		builder.Services.AddSingleton<IPrivacyPolicyCache, PrivacyPolicyCache>();
 
 		// UnitySyncService — fetches from API and replaces local SQLite data
 		builder.Services.AddScoped<UnitySyncService>();

@@ -18,7 +18,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 	{
 		private static readonly ILogger Logger = AppLogger.ForContext<PopupNotificationService>();
 
-		public async Task<bool> ShowCompliance(string title, string text)
+		public async Task<bool> ShowTerms(string title, string text)
 		{
 			var popup = new AcceptTermsPopup(title, text);
 
@@ -34,7 +34,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 				// the user agreed). Mirrors ShowErrorAsync's defensive
 				// handling of the same condition.
 				Logger.Warning(
-					"ShowCompliance called with no active page. Title={Title}", title);
+					"ShowTerms called with no active page. Title={Title}", title);
 				return false;
 			}
 

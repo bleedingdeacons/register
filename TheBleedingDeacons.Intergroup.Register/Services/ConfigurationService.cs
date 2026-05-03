@@ -22,6 +22,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		private const string AUTO_REGISTER_POSITIONS_KEY = "auto_register_positions_on_group";
 		private const string SINGLE_GSR_SHORTCUT_KEY = "single_gsr_shortcut_enabled";
 		private const string COMPLIANCE_LOG_ENABLED_KEY = "compliance_log_enabled";
+		private const string WELCOME_EMAIL_ENABLED_KEY = "welcome_email_on_registration_enabled";
 		private const string DEVICE_LABEL_KEY = "device_label";
 
 #if USE_DEV_CREDENTIALS
@@ -431,6 +432,53 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			catch (Exception ex)
 			{
 				Logger.Warning(ex, "Failed to save single-GSR shortcut toggle");
+			}
+		}
+
+		// =================================================================
+		// Welcome-email-on-registration toggle
+		// =================================================================
+
+		/// <summary>
+		/// Reads the toggle from Preferences. Defaults to <c>false</c> when
+		/// the preference has never been written — fresh installs do not
+		/// send registration-time emails until an operator opts in. The
+		/// per-recipient send path in <c>AttendanceService</c> is gated on
+		/// this read, so flipping the value in Settings takes effect on
+		/// the next registration action without an app restart.
+		/// </summary>
+		public bool IsWelcomeEmailOnRegistrationEnabled
+		{
+			get
+			{
+				try
+				{
+					var raw = Preferences.Get(WELCOME_EMAIL_ENABLED_KEY, string.Empty);
+					if (string.IsNullOrEmpty(raw)) return false;
+					return bool.TryParse(raw, out var value) ? value : false;
+				}
+				catch (Exception ex)
+				{
+					// If Preferences is unavailable, fail safe by treating
+					// the feature as off — matches the default for fresh
+					// installs and keeps the no-surprise-emails invariant
+					// if the prefs store is broken.
+					Logger.Warning(ex, "Failed to read welcome-email toggle — defaulting to disabled");
+					return false;
+				}
+			}
+		}
+
+		public void SetWelcomeEmailOnRegistrationEnabled(bool enabled)
+		{
+			try
+			{
+				Preferences.Set(WELCOME_EMAIL_ENABLED_KEY, enabled ? "true" : "false");
+				Logger.Information("Welcome-email-on-registration {State}", enabled ? "ENABLED" : "DISABLED");
+			}
+			catch (Exception ex)
+			{
+				Logger.Warning(ex, "Failed to save welcome-email toggle");
 			}
 		}
 

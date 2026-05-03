@@ -2,7 +2,10 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
+using System.Globalization;
 using System.Threading.Tasks;
+using TheBleedingDeacons.Intergroup.Register.Exceptions;
+using TheBleedingDeacons.Intergroup.Register.Models;
 using TheBleedingDeacons.Intergroup.Register.Services;
 using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Support;
@@ -19,6 +22,8 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 		private readonly IDbContextFactory<UnityDbContext> _dbContextFactory;
 		private readonly RegistrationEventLog _eventLog;
 		private readonly IBetterStackLoggerController _betterStackController;
+		private readonly IScrutinyClient _scrutinyClient;
+		private readonly IPrivacyPolicyCache _privacyPolicyCache;
 
 		[ObservableProperty]
 		private bool isPurging;
@@ -56,22 +61,90 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 		[ObservableProperty]
 		private bool isDeviceLabelStatusVisible;
 
+		// =================================================================
+		// Active privacy policy (read from on-device Scrutiny cache)
+		// =================================================================
+		//
+		// The Settings page reads the cached policy populated by the
+		// sync stage. It does NOT call Scrutiny on every page-load,
+		// because the page can be opened mid-meeting on a device that
+		// has no internet at this moment, and we want it to show
+		// useful information in that case.
+		//
+		// The Refresh button does a live Scrutiny fetch + cache update
+		// — same code path as the sync-stage refresh — so the operator
+		// has a way to manually pull the latest active policy when
+		// they're online and want to confirm what's published.
+
+		[ObservableProperty]
+		private string privacyPolicyTitle = string.Empty;
+
+		[ObservableProperty]
+		private string privacyPolicyVersion = string.Empty;
+
+		[ObservableProperty]
+		private string privacyPolicyContact = string.Empty;
+
+		[ObservableProperty]
+		private string privacyPolicyModified = string.Empty;
+
+		/// <summary>
+		/// Local "last refreshed N minutes ago" string. Populated from
+		/// <see cref="CachedPrivacyPolicy.CachedAt"/>. Lets the operator
+		/// see at a glance how stale the cached value is when they're
+		/// working offline.
+		/// </summary>
+		[ObservableProperty]
+		private string privacyPolicyCachedAt = string.Empty;
+
+		/// <summary>
+		/// True only when the cache contains a populated entry. Drives
+		/// the visibility of the details block in the XAML so we don't
+		/// show empty fields when no sync has ever happened on this
+		/// device.
+		/// </summary>
+		[ObservableProperty]
+		private bool hasActivePrivacyPolicy;
+
+		[ObservableProperty]
+		private bool isPrivacyPolicyLoading;
+
+		[ObservableProperty]
+		private string privacyPolicyStatusMessage = string.Empty;
+
+		[ObservableProperty]
+		private bool isPrivacyPolicyStatusVisible;
+
+		[ObservableProperty]
+		private bool isPrivacyPolicyStatusError;
+
 		public SettingsViewModel(
 			IConfigurationService configService,
 			IDbContextFactory<UnityDbContext> dbContextFactory,
 			RegistrationEventLog eventLog,
-			IBetterStackLoggerController betterStackController)
+			IBetterStackLoggerController betterStackController,
+			IScrutinyClient scrutinyClient,
+			IPrivacyPolicyCache privacyPolicyCache)
 		{
 			_configService = configService;
 			_dbContextFactory = dbContextFactory;
 			_eventLog = eventLog;
 			_betterStackController = betterStackController;
+			_scrutinyClient = scrutinyClient;
+			_privacyPolicyCache = privacyPolicyCache;
 
 			// Seed the editable copy with whatever's currently in effect (either
 			// the user-set value or the auto-default), and capture the auto-default
 			// separately so we can show it as an Entry placeholder.
 			DeviceLabel = _configService.DeviceLabel;
 			DeviceLabelPlaceholder = _configService.DeviceLabel;
+
+			// Load the cached privacy policy synchronously — Preferences
+			// is a synchronous KVS so there's no async work to fire-and-
+			// forget here. The page paints with the cache's contents
+			// already populated; the live Refresh path runs only when
+			// the user explicitly taps the button.
+			LoadFromCache();
 		}
 
 		/// <summary>
@@ -113,6 +186,204 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 		{
 			DeviceLabelStatusMessage = message;
 			IsDeviceLabelStatusVisible = true;
+		}
+
+		// =================================================================
+		// Privacy policy cache: display + manual refresh
+		// =================================================================
+
+		/// <summary>
+		/// Pulls the cached active policy out of <see cref="IPrivacyPolicyCache"/>
+		/// and pushes it onto the bound display fields. Synchronous — Preferences
+		/// is a synchronous KVS — so there's no in-flight state to worry about.
+		/// Called on construction and after every successful Refresh.
+		/// </summary>
+		private void LoadFromCache()
+		{
+			var cached = _privacyPolicyCache.GetCached();
+			if (cached is null)
+			{
+				HasActivePrivacyPolicy = false;
+				PrivacyPolicyTitle = string.Empty;
+				PrivacyPolicyVersion = string.Empty;
+				PrivacyPolicyContact = string.Empty;
+				PrivacyPolicyModified = string.Empty;
+				PrivacyPolicyCachedAt = string.Empty;
+				ShowPrivacyPolicyStatus(
+					"No cached privacy policy on this device. Sync from Admin first.",
+					isError: true);
+				return;
+			}
+
+			PrivacyPolicyTitle = cached.Title;
+			PrivacyPolicyVersion = string.IsNullOrWhiteSpace(cached.Version)
+				? "(no version set)"
+				: cached.Version;
+			PrivacyPolicyContact = string.IsNullOrWhiteSpace(cached.Contact)
+				? cached.ContactEmail
+				: $"{cached.Contact} ({cached.ContactEmail})";
+			PrivacyPolicyModified = FormatModifiedRaw(cached.Modified);
+			PrivacyPolicyCachedAt = FormatCachedAt(cached.CachedAt);
+			HasActivePrivacyPolicy = true;
+
+			// Don't auto-show a green "loaded from cache" status row on
+			// first paint — there's nothing to acknowledge. The status
+			// row is for transient feedback after an action (Refresh,
+			// or a failed cache read). HidePrivacyPolicyStatus keeps
+			// the page calm until the user does something.
+			HidePrivacyPolicyStatus();
+		}
+
+		/// <summary>
+		/// Manually re-fetches the active privacy policy from Scrutiny
+		/// and updates the on-device cache. This is the same code path
+		/// the sync stage runs, exposed as a Settings-page button so an
+		/// operator can confirm or refresh the cached value without
+		/// running a full data sync.
+		///
+		/// <para>The 404 / no-active-policy branch clears the cache
+		/// (mirroring sync-stage behaviour) so the Settings display
+		/// can't be left showing a policy that isn't published any
+		/// more. Network failures preserve the cache.</para>
+		/// </summary>
+		[RelayCommand]
+		private async Task RefreshFromScrutinyAsync()
+		{
+			try
+			{
+				IsPrivacyPolicyLoading = true;
+				HidePrivacyPolicyStatus();
+
+				var policy = await _scrutinyClient
+					.GetActivePrivacyPolicyAsync()
+					.ConfigureAwait(true);
+
+				if (policy is null)
+				{
+					// Same call sequence the sync stage uses on 404 —
+					// clear the cache and reload the display. The
+					// reload will then surface the "no cached policy"
+					// status message via LoadFromCache.
+					_privacyPolicyCache.Clear();
+					LoadFromCache();
+					ShowPrivacyPolicyStatus(
+						NoActivePrivacyPolicyException.DefaultMessage,
+						isError: true);
+					Logger.Warning("Manual refresh: Scrutiny reports no active privacy policy; cache cleared");
+					return;
+				}
+
+				_privacyPolicyCache.Save(policy);
+				LoadFromCache();
+				ShowPrivacyPolicyStatus(
+					$"Refreshed from Scrutiny (id {policy.Id.ToString(CultureInfo.InvariantCulture)}, version {policy.Version}).",
+					isError: false);
+				Logger.Information(
+					"Manual refresh: cached active privacy policy {Id} version {Version}",
+					policy.Id, policy.Version);
+			}
+			catch (InvalidOperationException ex)
+			{
+				// Thrown by ScrutinyClient when the Unity base URL
+				// hasn't been configured yet. Cache is left untouched
+				// — this is a config issue, not a stale-cache issue.
+				Logger.Warning(ex, "Cannot refresh privacy policy: base URL not configured");
+				ShowPrivacyPolicyStatus(
+					"Configure the Unity base URL in Integrations first.",
+					isError: true);
+			}
+			catch (HttpRequestException ex)
+			{
+				// Network failure — cache untouched, previous values
+				// remain on screen. This is the offline case the user
+				// flagged: the Settings page is still useful while
+				// disconnected.
+				Logger.Warning(ex, "Network error refreshing privacy policy from Scrutiny");
+				ShowPrivacyPolicyStatus(
+					$"Could not reach Scrutiny: {ex.Message}. Showing cached value.",
+					isError: true);
+			}
+			catch (TaskCanceledException)
+			{
+				// HttpClient timeout. Same fallback as a network
+				// failure — keep showing cached values.
+				Logger.Warning("Timed out refreshing privacy policy from Scrutiny");
+				ShowPrivacyPolicyStatus(
+					"Timed out fetching the privacy policy. Showing cached value.",
+					isError: true);
+			}
+			catch (Exception ex)
+			{
+				Logger.Error(ex, "Unexpected error refreshing privacy policy");
+				ShowPrivacyPolicyStatus(
+					$"Could not refresh: {ex.Message}",
+					isError: true);
+			}
+			finally
+			{
+				IsPrivacyPolicyLoading = false;
+			}
+		}
+
+		/// <summary>
+		/// Reformats the upstream "modified" ISO-8601 timestamp into
+		/// something readable. Falls back to the raw string if parsing
+		/// fails — better to show the upstream value verbatim than to
+		/// swallow it on a server-side format change.
+		/// </summary>
+		private static string FormatModifiedRaw(string raw)
+		{
+			if (string.IsNullOrWhiteSpace(raw))
+				return string.Empty;
+
+			if (DateTimeOffset.TryParse(
+					raw,
+					CultureInfo.InvariantCulture,
+					DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+					out var when))
+			{
+				// Local time so the timestamp matches what the operator
+				// would see in their email client / WordPress admin.
+				return when.ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
+			}
+
+			return raw;
+		}
+
+		/// <summary>
+		/// Formats the local CachedAt timestamp for display. Shows both
+		/// a friendly absolute time (so the operator can correlate with
+		/// log entries) and a relative "N minutes ago" tail (so the
+		/// staleness is obvious at a glance).
+		/// </summary>
+		private static string FormatCachedAt(DateTime cachedAtUtc)
+		{
+			if (cachedAtUtc == default)
+				return string.Empty;
+
+			var local = cachedAtUtc.ToLocalTime();
+			var delta = DateTime.UtcNow - cachedAtUtc;
+
+			string relative = delta.TotalSeconds < 60 ? "just now"
+				: delta.TotalMinutes < 60 ? $"{(int)delta.TotalMinutes} min ago"
+				: delta.TotalHours < 24 ? $"{(int)delta.TotalHours} h ago"
+				: $"{(int)delta.TotalDays} d ago";
+
+			return $"{local.ToString("g", CultureInfo.CurrentCulture)} ({relative})";
+		}
+
+		private void ShowPrivacyPolicyStatus(string message, bool isError)
+		{
+			PrivacyPolicyStatusMessage = message;
+			IsPrivacyPolicyStatusError = isError;
+			IsPrivacyPolicyStatusVisible = true;
+		}
+
+		private void HidePrivacyPolicyStatus()
+		{
+			IsPrivacyPolicyStatusVisible = false;
+			PrivacyPolicyStatusMessage = string.Empty;
+			IsPrivacyPolicyStatusError = false;
 		}
 
 		// =================================================================
@@ -174,6 +445,28 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 			{
 				if (_configService.IsSingleGsrShortcutEnabled == value) return;
 				_configService.SetSingleGsrShortcutEnabled(value);
+				OnPropertyChanged();
+			}
+		}
+
+		/// <summary>
+		/// Two-way bound to a Switch on SettingsPage. When on, every
+		/// successful registration (group or position) queues a welcome /
+		/// confirmation email to each affected member who has a
+		/// <c>PersonalEmail</c> on file. Group registrations dedupe across
+		/// active GSRs and any cascaded position holders, so no member is
+		/// emailed twice from a single tap. See
+		/// <see cref="IConfigurationService.IsWelcomeEmailOnRegistrationEnabled"/>.
+		/// Defaults to off — fresh installs do not send any emails on
+		/// registration until an operator turns this on.
+		/// </summary>
+		public bool IsWelcomeEmailOnRegistrationEnabled
+		{
+			get => _configService.IsWelcomeEmailOnRegistrationEnabled;
+			set
+			{
+				if (_configService.IsWelcomeEmailOnRegistrationEnabled == value) return;
+				_configService.SetWelcomeEmailOnRegistrationEnabled(value);
 				OnPropertyChanged();
 			}
 		}

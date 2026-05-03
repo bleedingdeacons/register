@@ -38,6 +38,7 @@ public partial class VerifyGroupViewModel : BaseViewModel
 	private readonly IPopupNotification _popupService;
 	private readonly IConfigurationService _configService;
 	private readonly IComplianceRegistration _complianceRegistration;
+	private readonly IPrivacyPolicyCache _privacyPolicyCache;
 
 	[ObservableProperty]
 	private Group? group;
@@ -111,13 +112,15 @@ public partial class VerifyGroupViewModel : BaseViewModel
 		IGroupRepository groupRepository,
 		IPopupNotification popupService,
 		IConfigurationService configService,
-		IComplianceRegistration complianceRegistration)
+		IComplianceRegistration complianceRegistration,
+		IPrivacyPolicyCache privacyPolicyCache)
 	{
 		_attendanceRegistration = attendanceRegistration;
 		_groupRepository = groupRepository;
 		_popupService = popupService;
 		_configService = configService;
 		_complianceRegistration = complianceRegistration;
+		_privacyPolicyCache = privacyPolicyCache;
 	}
 
 	#region Query Attributes Handling
@@ -350,10 +353,32 @@ public partial class VerifyGroupViewModel : BaseViewModel
 	/// </summary>
 	private async Task<bool> PromptForComplianceAsync(IEnumerable<Member> members)
 	{
-		ComplianceText policy;
+		// Read the cached active policy first. The sync-stage gate
+		// guarantees this is populated before a meeting can start, so
+		// reaching this method with an empty cache means either (a) the
+		// device hasn't synced at all (unusual but possible if the
+		// flow is reached via a code path that bypassed sync), or
+		// (b) the cache was cleared by a sync that found "no active
+		// policy". Either way, the right behaviour is to refuse to
+		// record consent — recording an acceptance with no version
+		// would corrupt the audit trail.
+		var cachedPolicy = _privacyPolicyCache.GetCached();
+		if (cachedPolicy is null)
+		{
+			Logger.Error(
+				"No cached privacy policy on device; refusing to prompt for consent. " +
+				"This indicates the sync-stage gate was bypassed.");
+			await _popupService.ShowErrorAsync(
+				"Cannot record consent",
+				"This device has no active privacy policy on record. " +
+				"Re-sync from the Admin page before continuing.");
+			return false;
+		}
+
+		string termsBody;
 		try
 		{
-			policy = await ComplianceTextLoader.LoadAsync();
+			termsBody = await TermsTextLoader.LoadAsync();
 		}
 		catch (Exception ex)
 		{
@@ -367,14 +392,16 @@ public partial class VerifyGroupViewModel : BaseViewModel
 		foreach (var member in members)
 		{
 			// Compose a per-GSR title so the user can see which member's
-			// consent the popup is asking for. Falls back to the policy's
-			// own title when the member has no display name on file.
+			// consent the popup is asking for. The base title comes from
+			// the cached Scrutiny record, not from Terms.txt — Scrutiny
+			// is authoritative for every audit-trail and display field
+			// other than the body prose.
 			string memberName = !string.IsNullOrWhiteSpace(member.AnonymousName)
 				? member.AnonymousName!
 				: "this GSR";
-			string perMemberTitle = $"{policy.Title} — {memberName}";
+			string perMemberTitle = $"{cachedPolicy.Title} — {memberName}";
 
-			bool accepted = await _popupService.ShowCompliance(perMemberTitle, policy.Body);
+			bool accepted = await _popupService.ShowTerms(perMemberTitle, termsBody);
 			if (!accepted)
 			{
 				Logger.Information(
@@ -387,13 +414,20 @@ public partial class VerifyGroupViewModel : BaseViewModel
 			// timestamps mean each row in the audit log carries the
 			// real moment the user clicked Accept for that GSR, rather
 			// than a single shared batch timestamp.
+			//
+			// Version is the cached Scrutiny version (authoritative).
+			// Statement is the bundled Terms.txt body — the exact
+			// prose the user just read on screen. The audit trail
+			// therefore captures both "which version they accepted"
+			// and "what wording they actually saw", which can drift
+			// if the bundled file ships out of sync with the server.
 			var ts = DateTime.UtcNow;
 			try
 			{
 				await _complianceRegistration.RecordAcceptance(
 					member,
-					version: policy.Version,
-					statement: policy.Body,
+					version: cachedPolicy.Version,
+					statement: termsBody,
 					method: "register-app",
 					acceptedAtUtc: ts);
 

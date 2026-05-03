@@ -224,6 +224,46 @@
                 </Grid>
             </Border>
 
+            <Border
+                Padding="15,12"
+                BackgroundColor="{AppThemeBinding Light=White,
+                                                  Dark=#2D2D30}"
+                Stroke="{AppThemeBinding Light=#E0E0E0,
+                                         Dark=#424242}"
+                StrokeShape="RoundRectangle 10"
+                StrokeThickness="1">
+                <Grid
+                    ColumnDefinitions="*,Auto"
+                    ColumnSpacing="12"
+                    RowDefinitions="Auto,Auto"
+                    RowSpacing="4">
+
+                    <Label
+                        Grid.Row="0"
+                        Grid.Column="0"
+                        FontAttributes="Bold"
+                        FontSize="16"
+                        Text="Welcome Email on Registration"
+                        VerticalOptions="Center" />
+
+                    <Switch
+                        Grid.Row="0"
+                        Grid.RowSpan="2"
+                        Grid.Column="1"
+                        IsToggled="{Binding IsWelcomeEmailOnRegistrationEnabled, Mode=TwoWay}"
+                        VerticalOptions="Center" />
+
+                    <Label
+                        Grid.Row="1"
+                        Grid.Column="0"
+                        FontSize="13"
+                        LineBreakMode="WordWrap"
+                        Text="When on, each successful registration queues a confirmation email to every affected member who has a personal email on file, including a copy of the privacy statement they accepted. Off by default — turn on only after SMTP is configured and tested."
+                        TextColor="{AppThemeBinding Light={StaticResource Gray600},
+                                                    Dark={StaticResource Gray300}}" />
+                </Grid>
+            </Border>
+
             <!--
                 ═══════════════════════════════════════════════════════
                 Logging
@@ -288,6 +328,202 @@
                         Text="{Binding DeviceLabelStatusMessage}"
                         TextColor="{AppThemeBinding Light=#388E3C,
                                                     Dark=#66BB6A}" />
+                </StackLayout>
+            </Border>
+
+            <!--
+                ═══════════════════════════════════════════════════════
+                Privacy Policy
+                ═══════════════════════════════════════════════════════
+                Displays the on-device cached active policy populated
+                by the sync stage. Reads from Preferences synchronously
+                so the page is useful offline. The Refresh button does
+                a live Scrutiny fetch + cache update — same code path
+                the sync stage runs — so an operator can manually pull
+                the latest active policy without running a full data
+                sync.
+            -->
+            <BoxView
+                Margin="0,10,0,0"
+                HeightRequest="1"
+                Color="{AppThemeBinding Light=#E0E0E0,
+                                        Dark=#424242}" />
+
+            <Label
+                FontAttributes="Bold"
+                FontSize="14"
+                HorizontalOptions="Start"
+                Text="Privacy Policy"
+                TextColor="{AppThemeBinding Light={StaticResource Gray600},
+                                            Dark={StaticResource Gray300}}" />
+
+            <Border
+                Padding="15,12"
+                BackgroundColor="{AppThemeBinding Light=White,
+                                                  Dark=#2D2D30}"
+                Stroke="{AppThemeBinding Light=#E0E0E0,
+                                         Dark=#424242}"
+                StrokeShape="RoundRectangle 10"
+                StrokeThickness="1">
+                <StackLayout Spacing="8">
+
+                    <Label
+                        FontAttributes="Bold"
+                        FontSize="16"
+                        Text="Active Privacy Policy" />
+
+                    <Label
+                        FontSize="13"
+                        LineBreakMode="WordWrap"
+                        Text="The active policy cached on this device, populated by the sync stage. Compliance acceptance flows record the version shown here against each member who agrees. Tap Refresh to pull the latest active policy from Scrutiny."
+                        TextColor="{AppThemeBinding Light={StaticResource Gray600},
+                                                    Dark={StaticResource Gray300}}" />
+
+                    <!--
+                        Details block. Hidden until the cache contains
+                        a policy so the placeholder layout never flashes
+                        a row of empty fields on first paint.
+                    -->
+                    <Grid
+                        ColumnDefinitions="Auto,*"
+                        ColumnSpacing="12"
+                        IsVisible="{Binding HasActivePrivacyPolicy}"
+                        RowDefinitions="Auto,Auto,Auto,Auto,Auto"
+                        RowSpacing="4">
+
+                        <Label
+                            Grid.Row="0"
+                            Grid.Column="0"
+                            FontSize="13"
+                            Text="Title"
+                            TextColor="{AppThemeBinding Light={StaticResource Gray600},
+                                                        Dark={StaticResource Gray300}}"
+                            VerticalOptions="Center" />
+                        <Label
+                            Grid.Row="0"
+                            Grid.Column="1"
+                            FontAttributes="Bold"
+                            FontSize="14"
+                            LineBreakMode="WordWrap"
+                            Text="{Binding PrivacyPolicyTitle}" />
+
+                        <Label
+                            Grid.Row="1"
+                            Grid.Column="0"
+                            FontSize="13"
+                            Text="Version"
+                            TextColor="{AppThemeBinding Light={StaticResource Gray600},
+                                                        Dark={StaticResource Gray300}}"
+                            VerticalOptions="Center" />
+                        <Label
+                            Grid.Row="1"
+                            Grid.Column="1"
+                            FontAttributes="Bold"
+                            FontSize="14"
+                            Text="{Binding PrivacyPolicyVersion}" />
+
+                        <Label
+                            Grid.Row="2"
+                            Grid.Column="0"
+                            FontSize="13"
+                            Text="Contact"
+                            TextColor="{AppThemeBinding Light={StaticResource Gray600},
+                                                        Dark={StaticResource Gray300}}"
+                            VerticalOptions="Center" />
+                        <Label
+                            Grid.Row="2"
+                            Grid.Column="1"
+                            FontSize="14"
+                            LineBreakMode="WordWrap"
+                            Text="{Binding PrivacyPolicyContact}" />
+
+                        <Label
+                            Grid.Row="3"
+                            Grid.Column="0"
+                            FontSize="13"
+                            Text="Modified"
+                            TextColor="{AppThemeBinding Light={StaticResource Gray600},
+                                                        Dark={StaticResource Gray300}}"
+                            VerticalOptions="Center" />
+                        <Label
+                            Grid.Row="3"
+                            Grid.Column="1"
+                            FontSize="14"
+                            Text="{Binding PrivacyPolicyModified}" />
+
+                        <Label
+                            Grid.Row="4"
+                            Grid.Column="0"
+                            FontSize="13"
+                            Text="Cached"
+                            TextColor="{AppThemeBinding Light={StaticResource Gray600},
+                                                        Dark={StaticResource Gray300}}"
+                            VerticalOptions="Center" />
+                        <Label
+                            Grid.Row="4"
+                            Grid.Column="1"
+                            FontSize="14"
+                            Text="{Binding PrivacyPolicyCachedAt}" />
+                    </Grid>
+
+                    <!--
+                        Refresh + activity row. ActivityIndicator runs
+                        only while the live Scrutiny call is in flight;
+                        the button disables itself during the same
+                        window so the operator can't queue overlapping
+                        requests.
+                    -->
+                    <Grid
+                        ColumnDefinitions="Auto,*,Auto"
+                        ColumnSpacing="8">
+
+                        <ActivityIndicator
+                            Grid.Column="0"
+                            IsRunning="{Binding IsPrivacyPolicyLoading}"
+                            IsVisible="{Binding IsPrivacyPolicyLoading}"
+                            VerticalOptions="Center"
+                            WidthRequest="20" />
+
+                        <Button
+                            Grid.Column="2"
+                            BackgroundColor="{AppThemeBinding Light={StaticResource Primary},
+                                                              Dark={StaticResource PrimaryDark}}"
+                            Command="{Binding RefreshFromScrutinyCommand}"
+                            CornerRadius="8"
+                            FontSize="16"
+                            HeightRequest="44"
+                            HorizontalOptions="End"
+                            IsEnabled="{Binding IsPrivacyPolicyLoading, Converter={toolkit:InvertedBoolConverter}}"
+                            Text="Refresh"
+                            TextColor="White"
+                            WidthRequest="160" />
+                    </Grid>
+
+                    <!--
+                        Status row. Reuses the green-on-success / red-on-
+                        error pattern used elsewhere on this page (cf.
+                        the Reset Device status label) via DataTriggers
+                        on IsPrivacyPolicyStatusError.
+                    -->
+                    <Label
+                        FontSize="13"
+                        IsVisible="{Binding IsPrivacyPolicyStatusVisible}"
+                        Text="{Binding PrivacyPolicyStatusMessage}">
+                        <Label.Triggers>
+                            <DataTrigger
+                                Binding="{Binding IsPrivacyPolicyStatusError}"
+                                TargetType="Label"
+                                Value="True">
+                                <Setter Property="TextColor" Value="{AppThemeBinding Light=#D32F2F, Dark=#EF5350}" />
+                            </DataTrigger>
+                            <DataTrigger
+                                Binding="{Binding IsPrivacyPolicyStatusError}"
+                                TargetType="Label"
+                                Value="False">
+                                <Setter Property="TextColor" Value="{AppThemeBinding Light=#388E3C, Dark=#66BB6A}" />
+                            </DataTrigger>
+                        </Label.Triggers>
+                    </Label>
                 </StackLayout>
             </Border>
 

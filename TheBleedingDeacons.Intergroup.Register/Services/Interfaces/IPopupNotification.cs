@@ -18,6 +18,6 @@ namespace TheBleedingDeacons.Intergroup.Register.Services.Interfaces
 		/// </summary>
 		Task ShowErrorAsync(string title, string message);
 
-		Task<bool> ShowCompliance(string title, string text);
+		Task<bool> ShowTerms(string title, string text);
 	}
 }

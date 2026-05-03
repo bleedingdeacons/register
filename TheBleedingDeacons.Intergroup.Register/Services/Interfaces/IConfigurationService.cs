@@ -86,6 +86,28 @@ namespace TheBleedingDeacons.Intergroup.Register.Services.Interfaces
 		void SetSingleGsrShortcutEnabled(bool enabled);
 
 		/// <summary>
+		/// When true, a welcome / confirmation email is queued for each
+		/// recipient as part of every successful registration:
+		/// <list type="bullet">
+		/// <item>Group registrations email each active GSR (and any member
+		/// whose held position is auto-registered as a cascade), deduped
+		/// by member id so a person who fits both criteria is emailed once.</item>
+		/// <item>Position registrations email each holder.</item>
+		/// </list>
+		/// Defaults to <c>false</c> — fresh installs do not send any
+		/// registration-time email until an operator explicitly opts in
+		/// from Settings. Members without a <c>PersonalEmail</c> on file
+		/// are silently skipped regardless of the toggle.
+		/// </summary>
+		bool IsWelcomeEmailOnRegistrationEnabled { get; }
+
+		/// <summary>
+		/// Persists the welcome-email toggle. Takes effect on the next
+		/// registration action; no restart required.
+		/// </summary>
+		void SetWelcomeEmailOnRegistrationEnabled(bool enabled);
+
+		/// <summary>
 		/// A short human-readable label that identifies this physical device
 		/// in the Better Stack live tail (and any other log sink). Resolution
 		/// order:
