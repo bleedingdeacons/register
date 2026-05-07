@@ -65,6 +65,16 @@ public class Member
     /// </summary>
     public string? GdprAcceptanceStatement { get; set; }
 
+    /// <summary>
+    /// WordPress post ID of the privacy policy that the member accepted.
+    /// Sent to the Unity server during reconciliation in place of the
+    /// statement body — the server resolves the body itself via
+    /// Scrutiny's <c>PrivacyPolicyRepository</c>, so the wire payload
+    /// only carries the identifier. Null after a revocation, or when
+    /// no acceptance has been recorded.
+    /// </summary>
+    public int? GdprAcceptancePolicyId { get; set; }
+
     // FK to the member's home group (nullable — some members may not have a home group)
     public int? HomeGroupId { get; set; }
     public Group? HomeGroup { get; set; }

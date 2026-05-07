@@ -19,10 +19,9 @@ namespace TheBleedingDeacons.Intergroup.Register.Models
 	/// the capture method.</item>
 	/// <item>The cached active <see cref="PrivacyPolicy"/> — supplies the
 	/// audit-trail metadata that doesn't live on the Member row: policy
-	/// id, title, version, named contact, contact email and the
-	/// upstream-modified timestamp. These are the bits a regulator or
-	/// the member themselves would want as proof of "what was the policy
-	/// at the moment of acceptance".</item>
+	/// id, title, version and the upstream-modified timestamp. These
+	/// are the bits a regulator or the member themselves would want as
+	/// proof of "what was the policy at the moment of acceptance".</item>
 	/// </list>
 	///
 	/// <para>All fields are <see cref="string"/> rather than typed
@@ -94,19 +93,6 @@ namespace TheBleedingDeacons.Intergroup.Register.Models
 		public string PolicyVersion { get; set; } = string.Empty;
 
 		/// <summary>
-		/// Named data-protection contact for the policy (e.g.
-		/// "Data Protection Officer"). Comes from the cached policy.
-		/// </summary>
-		public string PolicyContact { get; set; } = string.Empty;
-
-		/// <summary>
-		/// Email address for data-protection enquiries. Surfaced in
-		/// the email so the member has an immediate route to exercise
-		/// their data rights without hunting through the website.
-		/// </summary>
-		public string PolicyContactEmail { get; set; } = string.Empty;
-
-		/// <summary>
 		/// ISO-8601 timestamp of the policy's last modification on the
 		/// server. Helpful in the audit trail to disambiguate two
 		/// acceptances against the "same" version when wording was
@@ -117,18 +103,19 @@ namespace TheBleedingDeacons.Intergroup.Register.Models
 		// ── The wording the member actually saw ───────────────────────
 
 		/// <summary>
-		/// HTML-ready rendering of the exact statement the member
-		/// accepted on screen. Populated from the member's
-		/// <c>GdprAcceptanceStatement</c> rather than a freshly-loaded
-		/// copy of the policy file, so the email captures the precise
-		/// wording shown to that user even if the bundled
-		/// <c>Terms.txt</c> has changed since.
+		/// HTML-ready rendering of the active policy body at the moment
+		/// of acceptance, sourced from <see cref="CachedPrivacyPolicy.Policy"/>.
+		/// The same value is also persisted to
+		/// <c>Member.GdprAcceptanceStatement</c> for the local audit trail
+		/// — DB row, durability log, and email body all derive from the
+		/// cache, so the audit trail is internally consistent.
 		///
 		/// <para>The sender wraps plain-text statements in <c>&lt;p&gt;</c>
 		/// blocks (HTML-encoded) so paragraphs render in HTML mail
 		/// clients; statements that already contain HTML are passed
 		/// through untouched. Same rule as
-		/// <see cref="WelcomeEmail.Policy"/>.</para>
+		/// <see cref="WelcomeEmail.Policy"/>. Empty when no policy has
+		/// ever been cached on the device.</para>
 		/// </summary>
 		public string PolicyStatementHtml { get; set; } = string.Empty;
 	}

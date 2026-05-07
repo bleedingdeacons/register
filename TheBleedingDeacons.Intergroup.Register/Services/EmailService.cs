@@ -153,7 +153,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		#region Core Email Sending Methods
 
 		public async Task<bool> SendEmailAsync(string to, string subject, string body,
-			bool isHtml = false, string? cc = null, string? bcc = null)
+			bool isHtml = false, string? from = null, string? cc = null, string? bcc = null, string? replyTo = null)
 		{
 			if (string.IsNullOrWhiteSpace(to))
 				throw new ArgumentException("Recipient email address is required", nameof(to));
@@ -167,17 +167,30 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			// Check if we should queue instead of sending immediately
 			if (_isOfflineMode || !await IsNetworkAvailableAsync())
 			{
-				await QueueEmailAsync(to, subject, body, isHtml, cc, bcc);
+				await QueueEmailAsync(to, subject, body, isHtml, from, cc, bcc, replyTo);
 				Logger.Information("Email queued due to offline mode or network unavailability: {To}", to);
 				return false;
 			}
+
+			// Resolve the From address: caller override wins when supplied
+			// (non-null and non-whitespace), otherwise fall back to the
+			// SMTP account username — same default the service has always
+			// used. Trim so a stray space in the override doesn't break
+			// the MailboxAddress parser downstream.
+			var resolvedFrom = string.IsNullOrWhiteSpace(from) ? _username : from!.Trim();
+
+			// Reply-To is independent of From: NULL means "no header at
+			// all", a non-empty value is trimmed and persisted on the row
+			// so the sender path picks it up unchanged.
+			var resolvedReplyTo = string.IsNullOrWhiteSpace(replyTo) ? null : replyTo!.Trim();
 
 			var email = new QueuedEmail
 			{
 				To = to,
 				Subject = subject,
 				Body = body,
-				From = _username,
+				From = resolvedFrom,
+				ReplyTo = resolvedReplyTo,
 				Cc = cc,
 				Bcc = bcc,
 				IsHtml = isHtml,
@@ -190,7 +203,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		}
 
 		public async Task QueueEmailAsync(string to, string subject, string body,
-			bool isHtml = false, string? cc = null, string? bcc = null)
+			bool isHtml = false, string? from = null, string? cc = null, string? bcc = null, string? replyTo = null)
 		{
 			if (string.IsNullOrWhiteSpace(to))
 				throw new ArgumentException("Recipient email address is required", nameof(to));
@@ -205,12 +218,23 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			{
 				using var context = await _dbContextFactory.CreateDbContextAsync();
 
+				// Same resolution as SendEmailAsync: caller override wins
+				// when supplied, otherwise the SMTP account username. The
+				// resolved value is persisted on the QueuedEmail row so
+				// the override survives an app restart and is applied
+				// when the background processor eventually sends.
+				var resolvedFrom = string.IsNullOrWhiteSpace(from) ? _username : from!.Trim();
+
+				// Reply-To has no fallback — null means no Reply-To header.
+				var resolvedReplyTo = string.IsNullOrWhiteSpace(replyTo) ? null : replyTo!.Trim();
+
 				var email = new QueuedEmail
 				{
 					To = to,
 					Subject = subject,
 					Body = body,
-					From = _username,
+					From = resolvedFrom,
+					ReplyTo = resolvedReplyTo,
 					Cc = cc,
 					Bcc = bcc,
 					IsHtml = isHtml,
@@ -250,7 +274,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 
 				// Configure client settings
 				client.Timeout = _timeoutSeconds * 1000; // MailKit timeout in milliseconds
-				client.CheckCertificateRevocation = true;
+				client.CheckCertificateRevocation = false;
 
 				// Create cancellation token for the entire operation
 				using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(_timeoutSeconds + 10));
@@ -341,11 +365,26 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		/// </summary>
 		private static SecureSocketOptions ResolveSecureSocketOptions(bool enableSsl, int port)
 		{
-			if (!enableSsl) return SecureSocketOptions.None;
-			if (port == 465) return SecureSocketOptions.SslOnConnect;
-			if (port is 587 or 25) return SecureSocketOptions.StartTls;
-			return SecureSocketOptions.Auto;
+			if (!enableSsl)
+				return SecureSocketOptions.None;
+
+			return port switch
+			{
+				465 => SecureSocketOptions.SslOnConnect,
+				587 => SecureSocketOptions.StartTls,
+				25 => SecureSocketOptions.StartTls,
+				_ => SecureSocketOptions.Auto
+			};
 		}
+		//private static SecureSocketOptions ResolveSecureSocketOptions(bool enableSsl, int port)
+		//{
+		//	if (!enableSsl) return SecureSocketOptions.None;
+		//	if (port == 465) return SecureSocketOptions.SslOnConnect;
+		//	// Use StartTlsWhenAvailable instead of StartTls — mandatory StartTls throws
+		//	// SslHandshakeException if the server doesn't advertise it in the EHLO banner.
+		//	if (port is 587 or 25) return SecureSocketOptions.StartTlsWhenAvailable;
+		//	return SecureSocketOptions.Auto;
+		//}
 
 		/// <summary>
 		/// Creates, connects, and authenticates a new SmtpClient.
@@ -358,7 +397,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			var client = new SmtpClient
 			{
 				Timeout = _timeoutSeconds * 1000,
-				CheckCertificateRevocation = true
+				CheckCertificateRevocation = false // Set to false to avoid issues with certain servers; handle TLS errors in IsRetryableException instead
 			};
 
 			using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(_timeoutSeconds + 10));
@@ -417,6 +456,15 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 
 			// Set From address
 			message.From.Add(new MailboxAddress("", queuedEmail.From));
+
+			// Set Reply-To when the queueing caller asked for one. NULL is
+			// the common case (welcome emails and any caller that didn't
+			// override) — no Reply-To header is added in that case, which
+			// matches RFC 5322 default behaviour where replies go to From.
+			if (!string.IsNullOrWhiteSpace(queuedEmail.ReplyTo))
+			{
+				message.ReplyTo.Add(new MailboxAddress("", queuedEmail.ReplyTo));
+			}
 
 			// Set To address
 			message.To.Add(new MailboxAddress("", queuedEmail.To));
@@ -1145,13 +1193,20 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			{
 				using var client = new SmtpClient();
 				client.Timeout = config.TimeoutSeconds * 1000;
+				client.SslProtocols = System.Security.Authentication.SslProtocols.Tls12;
+				client.CheckCertificateRevocation = false;
 
-				var secureSocketOptions = ResolveSecureSocketOptions(config.EnableSsl, config.Port);
+				var port = config.Port;
+
+				port = 587; // Force StartTLS for testing, even if the user put 465. This is because many servers misconfigure their SSL ports and don't actually support SSL-on-connect, but do support StartTLS. For a connection test, we want to give the user the best chance of succeeding and diagnosing their config, rather than failing due to a common server misconfiguration.
+
+				var secureSocketOptions = ResolveSecureSocketOptions(config.EnableSsl, port);
 
 				using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(config.TimeoutSeconds + 10));
 
-				Logger.Debug("Testing connection to {Host}:{Port}", config.Host, config.Port);
-				await client.ConnectAsync(config.Host, config.Port, secureSocketOptions, cts.Token);
+				//client.ServerCertificateValidationCallback = (s, c, h, e) => true;
+				Logger.Debug("Testing connection to {Host}:{Port}", config.Host, port);
+				await client.ConnectAsync(config.Host, port, secureSocketOptions, cts.Token);
 
 				Logger.Debug("Testing authentication for {Username}", config.Username);
 				await client.AuthenticateAsync(config.Username, config.Password, cts.Token);

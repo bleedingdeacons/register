@@ -92,11 +92,24 @@ public sealed class ComplianceEventLog : IAsyncDisposable
 	/// most recent state change rather than the whole session.
 	///
 	/// <para>
-	/// Mirrors the five fields the Unity API's compliance endpoint
-	/// accepts and stores. Field names are JSON-serialised camelCase
-	/// (matching the JSON options); they're independent of the Unity
-	/// server's snake_case wire format because this log is read back
-	/// by this same process, not by the server.
+	/// Mirrors the fields the Unity API's compliance endpoint accepts
+	/// and stores. Field names are JSON-serialised camelCase (matching
+	/// the JSON options); they're independent of the Unity server's
+	/// snake_case wire format because this log is read back by this
+	/// same process, not by the server.
+	/// </para>
+	///
+	/// <para>
+	/// <see cref="PolicyId"/> is the WordPress post ID of the privacy
+	/// policy the member accepted. Sent to Unity on reconcile in place
+	/// of the statement body — Unity resolves the body itself via the
+	/// Scrutiny repository — so the entry needs to carry it across a
+	/// process restart. Older log lines written before this field
+	/// existed deserialise with <c>PolicyId = null</c>, which the
+	/// reconcile push treats the same way as "no id known": send the
+	/// other compliance fields, omit policy_id, and the server falls
+	/// back to recording an empty statement (the same fallback used
+	/// for fresh devices that haven't synced a policy yet).
 	/// </para>
 	/// </summary>
 	public sealed record Entry(
@@ -106,7 +119,8 @@ public sealed class ComplianceEventLog : IAsyncDisposable
 		DateTime AcceptedAt,
 		string? Version,
 		string? Method,
-		string? Statement);
+		string? Statement,
+		int? PolicyId = null);
 
 	// ────────────────────────────────────────────────────────────────
 	// Write path
@@ -117,6 +131,10 @@ public sealed class ComplianceEventLog : IAsyncDisposable
 	/// timestamp the user accepted at — passed through to the Unity
 	/// server verbatim during reconciliation, so callers should pass
 	/// UTC values (use <c>DateTime.UtcNow</c> when in doubt).
+	/// <paramref name="policyId"/> is the WordPress post ID of the
+	/// accepted policy, sent to the server on reconcile in place of
+	/// the statement body; null when the device has never synced a
+	/// policy and the acceptance is being recorded "wording unknown".
 	/// </summary>
 	public Task AppendAcceptanceAsync(
 		int memberId,
@@ -124,9 +142,10 @@ public sealed class ComplianceEventLog : IAsyncDisposable
 		string? version,
 		string? method,
 		string? statement,
+		int? policyId,
 		CancellationToken ct = default)
 		=> AppendAsync(
-			new Entry(DateTime.UtcNow, memberId, Accepted: true, acceptedAt, version, method, statement),
+			new Entry(DateTime.UtcNow, memberId, Accepted: true, acceptedAt, version, method, statement, policyId),
 			ct);
 
 	/// <summary>
@@ -344,6 +363,7 @@ public sealed class ComplianceEventLog : IAsyncDisposable
 			member.GdprAcceptanceVersion = entry.Version;
 			member.GdprAcceptanceMethod = entry.Method;
 			member.GdprAcceptanceStatement = entry.Statement;
+			member.GdprAcceptancePolicyId = entry.PolicyId;
 		}
 		else
 		{
@@ -353,6 +373,7 @@ public sealed class ComplianceEventLog : IAsyncDisposable
 			member.GdprAcceptanceVersion = null;
 			member.GdprAcceptanceMethod = null;
 			member.GdprAcceptanceStatement = null;
+			member.GdprAcceptancePolicyId = null;
 		}
 	}
 

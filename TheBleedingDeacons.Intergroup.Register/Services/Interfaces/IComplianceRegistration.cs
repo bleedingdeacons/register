@@ -24,7 +24,17 @@ namespace TheBleedingDeacons.Intergroup.Register.Services.Interfaces
 		/// </summary>
 		/// <param name="member">The member who accepted. Must already exist in the local DB.</param>
 		/// <param name="version">The privacy policy version that was accepted (e.g. <c>"2.1"</c>).</param>
-		/// <param name="statement">The exact statement the member accepted.</param>
+		/// <param name="statement">
+		/// Historically the exact statement the member accepted. Retained
+		/// in the signature for ABI continuity, but no longer used by
+		/// <see cref="Services.ComplianceService"/>: the wording persisted
+		/// against the acceptance and surfaced in the confirmation email
+		/// is now sourced from the cached active policy
+		/// (<see cref="Models.CachedPrivacyPolicy.Policy"/>) so the DB,
+		/// the durability log, and the email all carry the same
+		/// upstream-authoritative wording. Pass any value (including
+		/// <c>string.Empty</c>); it is ignored.
+		/// </param>
 		/// <param name="method">
 		/// How acceptance was captured. Defaults to <c>"register-app"</c>;
 		/// callers can override (e.g. <c>"web-form"</c>, <c>"import"</c>).

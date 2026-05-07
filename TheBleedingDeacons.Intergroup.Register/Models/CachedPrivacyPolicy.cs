@@ -7,12 +7,12 @@ namespace TheBleedingDeacons.Intergroup.Register.Models
 	/// from the Scrutiny <c>/privacy-policies/active</c> endpoint and read
 	/// from cache by the registration flow.
 	///
-	/// <para>This is deliberately a slimmer shape than
-	/// <see cref="PrivacyPolicy"/>: we drop the <c>Policy</c> HTML body,
-	/// because the body shown to the user during acceptance comes from
-	/// <c>Resources/Raw/Terms.txt</c>, not from Scrutiny. The cache
-	/// only carries the audit-trail fields (Id, Version, Contact,
-	/// Modified) that we need to record against each acceptance.</para>
+	/// <para>The cache carries the audit-trail fields (Id, Version,
+	/// Modified) that we need to record against each acceptance, plus
+	/// the <c>Policy</c> HTML body itself. The body is what the consent
+	/// popup displays to the user and what the compliance acceptance
+	/// email quotes — Scrutiny is the single source of truth for both
+	/// the on-screen wording and the audit trail.</para>
 	///
 	/// <para>The <see cref="CachedAt"/> field is local-only — Scrutiny
 	/// doesn't emit it. It records when the cache was last refreshed,
@@ -37,20 +37,19 @@ namespace TheBleedingDeacons.Intergroup.Register.Models
 		public string Title { get; set; } = string.Empty;
 
 		/// <summary>
-		/// The version stamp recorded against each acceptance. This is
-		/// the value that wins over the version parsed out of
-		/// <c>Terms.txt</c> when the two disagree.
+		/// The version stamp recorded against each acceptance.
 		/// </summary>
 		[JsonPropertyName("version")]
 		public string Version { get; set; } = string.Empty;
 
-		/// <summary>Named data-protection contact.</summary>
-		[JsonPropertyName("contact")]
-		public string Contact { get; set; } = string.Empty;
-
-		/// <summary>Email address for data-protection enquiries.</summary>
-		[JsonPropertyName("contact_email")]
-		public string ContactEmail { get; set; } = string.Empty;
+		/// <summary>
+		/// The full policy body as rendered HTML, copied verbatim from
+		/// <see cref="PrivacyPolicy.Policy"/>. This is both what the
+		/// consent popup displays and what the compliance acceptance
+		/// email quotes against the cached version stamp.
+		/// </summary>
+		[JsonPropertyName("policy")]
+		public string Policy { get; set; } = string.Empty;
 
 		/// <summary>
 		/// ISO-8601 timestamp of the policy's last modification on the

@@ -45,7 +45,10 @@ public class SnapshotService
 		int Positions,
 		int Meetings,
 		int Contacts,
-		int IntergroupMeetings);
+		int IntergroupMeetings,
+		int RegisteredGroups,
+		int RegisteredPositions,
+		int AcceptedTerms);
 
 	/// <summary>
 	/// Deletes any existing snapshot and captures a fresh one from the current
@@ -78,18 +81,40 @@ public class SnapshotService
 
 		// ── Groups ───────────────────────────────────────────────────
 		var groups = await db.Groups.AsNoTracking().ToListAsync(ct);
+		int registeredGroups = 0;
 		foreach (var g in groups)
+		{
 			snapshots.Add(CreateSnapshot("Group", g.Id, g, now));
+
+			if (g.Registered)
+				registeredGroups++;
+		}
 
 		// ── Members ──────────────────────────────────────────────────
 		var members = await db.Members.AsNoTracking().ToListAsync(ct);
+		int acceptedTerms = 0;
 		foreach (var m in members)
+		{
 			snapshots.Add(CreateSnapshot("Member", m.Id, m, now));
+
+			// Count members with a positive GDPR acceptance recorded.
+			// GdprAccepted is nullable: null = never recorded,
+			// false = explicitly revoked, true = accepted. Only the
+			// last counts as "acceptance of terms" for the summary.
+			if (m.GdprAccepted == true)
+				acceptedTerms++;
+		}
 
 		// ── Positions ────────────────────────────────────────────────
 		var positions = await db.Positions.AsNoTracking().ToListAsync(ct);
+		int registeredPositions = 0;
 		foreach (var p in positions)
+		{
 			snapshots.Add(CreateSnapshot("Position", p.Id, p, now));
+
+			if (p.Registered)
+				registeredPositions++;
+		}
 
 		// ── Meetings ─────────────────────────────────────────────────
 		var meetings = await db.Meetings.AsNoTracking().ToListAsync(ct);
@@ -120,7 +145,10 @@ public class SnapshotService
 			positions.Count,
 			meetings.Count,
 			contacts.Count,
-			igMeetings.Count);
+			igMeetings.Count,
+			registeredGroups,
+			registeredPositions,
+			acceptedTerms);
 	}
 
 	/// <summary>

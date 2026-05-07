@@ -279,6 +279,16 @@ public partial class EmailStatusViewModel : BaseViewModel
 	{
 		if (emailModel?.Id == null) return;
 
+		// Guard the destructive action with a confirm prompt — the swipe
+		// gesture is easy to trigger accidentally and there's no undo.
+		// Wording names the recipient so the user can sanity-check which
+		// row they actually swiped.
+		var confirmed = await ConfirmAsync(
+			"Delete email?",
+			$"Remove the queued email to {emailModel.To} from the list? This cannot be undone.",
+			affirmText: "Delete");
+		if (!confirmed) return;
+
 		try
 		{
 			// Note: You'll need to add a delete method to your mail service
@@ -361,6 +371,18 @@ public partial class EmailStatusViewModel : BaseViewModel
 	[RelayCommand]
 	private async Task ClearSentEmailsAsync()
 	{
+		// Bulk destructive: deletes every successfully-sent email from
+		// the local queue store. Confirmation is mandatory because the
+		// button sits in the action sidebar where mis-taps are easy and
+		// the operation is irreversible. Cancel exits before any work
+		// happens — IsLoading and StatusMessage stay untouched so the
+		// UI doesn't flicker on a no-op.
+		var confirmed = await ConfirmAsync(
+			"Clear sent emails?",
+			"This permanently removes all successfully-sent emails from the local queue. This cannot be undone.",
+			affirmText: "Clear");
+		if (!confirmed) return;
+
 		try
 		{
 			IsLoading = true;
@@ -557,6 +579,31 @@ public partial class EmailStatusViewModel : BaseViewModel
 		{
 			IsTestingConnection = false;
 		}
+	}
+
+	/// <summary>
+	/// Shows a yes/no confirmation dialog on the active page and returns
+	/// the user's choice. Used to gate destructive actions (single-email
+	/// delete, bulk Clear Sent) so an accidental swipe or sidebar tap
+	/// doesn't permanently lose data.
+	///
+	/// <para>Resolves the active page via the Application/Window chain
+	/// rather than holding a Page reference on the VM — same idiom the
+	/// rest of the app uses for VM-initiated alerts. If no page can be
+	/// found (during teardown, or if Shell hasn't built a window yet) the
+	/// helper returns <c>false</c> so the destructive path is skipped:
+	/// "no UI available" should never silently destroy data.</para>
+	///
+	/// <para><paramref name="affirmText"/> is the label on the affirmative
+	/// button and should name the action the user is committing to —
+	/// "Delete", "Clear", "Discard". This keeps each prompt's buttons
+	/// honest about what tapping them will actually do.</para>
+	/// </summary>
+	private static async Task<bool> ConfirmAsync(string title, string message, string affirmText = "Confirm")
+	{
+		var page = Application.Current?.Windows?.FirstOrDefault()?.Page;
+		if (page is null) return false;
+		return await page.DisplayAlert(title, message, affirmText, "Cancel");
 	}
 
 	protected override void Dispose(bool disposing)

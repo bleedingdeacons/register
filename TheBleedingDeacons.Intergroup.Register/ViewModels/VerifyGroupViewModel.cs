@@ -5,7 +5,6 @@ using Serilog;
 using TheBleedingDeacons.Intergroup.Register.Extensions;
 using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Support;
-using TheBleedingDeacons.Intergroup.Register.Utilities;
 using TheBleedingDeacons.Intergroup.Register.Views;
 using TheBleedingDeacons.Unity.Intergroup.Entities;
 using TheBleedingDeacons.Unity.Intergroup.Repositories.Interfaces;
@@ -391,33 +390,41 @@ public partial class VerifyGroupViewModel : BaseViewModel
 			return false;
 		}
 
-		string termsBody;
-		try
+		// The body shown in the popup comes from the cached upstream
+		// policy now that the bundled Terms.txt has been retired. An
+		// empty body means the upstream policy was published without
+		// prose filled in — surfacing an empty popup with an "I Agree"
+		// button would be the worst possible audit-trail outcome
+		// ("agreed to nothing"), so refuse to prompt and route the
+		// operator to a re-sync, mirroring the missing-cache branch.
+		if (string.IsNullOrWhiteSpace(cachedPolicy.Policy))
 		{
-			termsBody = await TermsTextLoader.LoadAsync();
-		}
-		catch (Exception ex)
-		{
-			// If we can't load the policy text we cannot show a meaningful
-			// dialog. Treat as "did not consent" — the safe default — and
-			// log so the operator can investigate.
-			Logger.Error(ex, "Failed to load compliance text; aborting consent prompt");
+			Logger.Error(
+				"Cached privacy policy {PolicyId} v{Version} has empty body; refusing to prompt for consent",
+				cachedPolicy.Id, cachedPolicy.Version);
+			await _popupService.ShowErrorAsync(
+				"Cannot record consent",
+				"The cached privacy policy has no body text on record. " +
+				"Re-sync from the Admin page before continuing.");
 			return false;
 		}
+
+		var policyBody = cachedPolicy.Policy;
 
 		foreach (var member in members)
 		{
 			// Compose a per-GSR title so the user can see which member's
-			// consent the popup is asking for. The base title comes from
-			// the cached Scrutiny record, not from Terms.txt — Scrutiny
-			// is authoritative for every audit-trail and display field
-			// other than the body prose.
+			// consent the popup is asking for. Both the title and the
+			// body now come from the cached Scrutiny record — Scrutiny
+			// is the single source of truth for everything the user
+			// sees, the audit trail records, and the confirmation
+			// email quotes.
 			string memberName = !string.IsNullOrWhiteSpace(member.AnonymousName)
 				? member.AnonymousName!
 				: "this GSR";
 			string perMemberTitle = $"{cachedPolicy.Title} — {memberName}";
 
-			bool accepted = await _popupService.ShowTerms(perMemberTitle, termsBody);
+			bool accepted = await _popupService.ShowTerms(perMemberTitle, policyBody);
 			if (!accepted)
 			{
 				Logger.Information(
@@ -431,19 +438,21 @@ public partial class VerifyGroupViewModel : BaseViewModel
 			// real moment the user clicked Accept for that GSR, rather
 			// than a single shared batch timestamp.
 			//
-			// Version is the cached Scrutiny version (authoritative).
-			// Statement is the bundled Terms.txt body — the exact
-			// prose the user just read on screen. The audit trail
-			// therefore captures both "which version they accepted"
-			// and "what wording they actually saw", which can drift
-			// if the bundled file ships out of sync with the server.
+			// Version is the cached Scrutiny version. The `statement`
+			// parameter is no longer used by ComplianceService (it
+			// sources the wording from the cache itself, see the
+			// IComplianceRegistration param doc) — kept on the call
+			// for ABI continuity. Empty would be equally correct; we
+			// pass the popup body for symmetry with what the user
+			// just saw, in case a future change starts honouring it
+			// again.
 			var ts = DateTime.UtcNow;
 			try
 			{
 				await _complianceRegistration.RecordAcceptance(
 					member,
 					version: cachedPolicy.Version,
-					statement: termsBody,
+					statement: policyBody,
 					method: "register-app",
 					acceptedAtUtc: ts);
 

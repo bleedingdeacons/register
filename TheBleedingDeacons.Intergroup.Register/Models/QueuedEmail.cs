@@ -21,6 +21,15 @@ namespace TheBleedingDeacons.Intergroup.Register.Models
         [Required, MaxLength(200)]
         public string From { get; set; }
 
+        // Optional Reply-To address. Set when the queueing caller wants
+        // replies to land somewhere other than the From address — e.g.
+        // compliance acceptance emails, where From stays as the
+        // authenticated SMTP user (so SPF/DMARC checks pass) but replies
+        // are routed to the configured compliance mailbox.
+        // NULL when no override is needed (the common case).
+        [MaxLength(200)]
+        public string? ReplyTo { get; set; }
+
         [MaxLength(500)]
         public string? Cc { get; set; }
 

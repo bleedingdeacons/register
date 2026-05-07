@@ -429,3 +429,5 @@ Properties/launchSettings.json
 
 # Register dev configuration
 **/devsettings.json
+
+*.devsettings.json

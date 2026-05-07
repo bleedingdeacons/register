@@ -525,8 +525,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 
 				var progress = new Progress<SyncProgress>(OnSyncProgress);
 
-				var (meetings, positions, members, groups, contacts, intergroupMeetings,
-					 created, modified, registered, errors, warnings) =
+				var (created, modified, registered, complianceRecorded, errors, warnings) =
 					await _dataService.ImportWithReconciliationAsync(Token, progress);
 
 				// If any non-recoverable errors occurred, stay in Finishing phase
@@ -558,8 +557,8 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 					$"  • {created} new members created\n" +
 					$"  • {modified} members updated\n" +
 					$"  • {registered} registrations recorded\n" +
-					(errors > 0 ? $"  • {errors} API errors\n" : "") +
-					$"\nRe-synced: {groups} groups, {meetings} meetings, {members} members.";
+					$"  • {complianceRecorded} compliance records recorded" +
+					(errors > 0 ? $"\n  • {errors} API errors" : "");
 
 				if (warnings > 0)
 					Logger.Warning("Meeting finished with {Warnings} API warnings (non-fatal)", warnings);
@@ -569,8 +568,9 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 				ResetProgress();
 
 				Logger.Information(
-					"Meeting finished: {Created} created, {Modified} modified, {Registered} registered, {Errors} errors, {Warnings} warnings",
-					created, modified, registered, errors, warnings);
+					"Meeting finished: {Created} created, {Modified} modified, {Registered} registered, " +
+					"{Compliance} compliance recorded, {Errors} errors, {Warnings} warnings",
+					created, modified, registered, complianceRecorded, errors, warnings);
 			}
 			catch (Exception ex)
 			{

@@ -1,9 +1,4 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using TheBleedingDeacons.Intergroup.Register.Models;
 
 namespace TheBleedingDeacons.Intergroup.Register.Data
@@ -20,17 +15,13 @@ namespace TheBleedingDeacons.Intergroup.Register.Data
         {
             base.OnModelCreating(modelBuilder);
 
-            modelBuilder.Entity<QueuedEmail>(entity =>
-            {
-                entity.HasKey(e => e.Id);
-                entity.Property(e => e.Id).ValueGeneratedOnAdd();
-
-                entity.Property(e => e.Status)
-                    .HasConversion<int>();
-
-                entity.HasIndex(e => e.Status);
-                entity.HasIndex(e => e.CreatedAt);
-            });
+            // Per-entity mappings live in dedicated IEntityTypeConfiguration
+            // classes under Data/Configurations. ApplyConfigurationsFromAssembly
+            // discovers and applies every implementation in this assembly,
+            // so adding a new entity is a one-file change (drop in a new
+            // *Configuration.cs) rather than touching this method.
+            modelBuilder.ApplyConfigurationsFromAssembly(typeof(MailDbContext).Assembly);
         }
     }
 }
+

@@ -83,8 +83,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 				Id = policy.Id,
 				Title = policy.Title,
 				Version = policy.Version,
-				Contact = policy.Contact,
-				ContactEmail = policy.ContactEmail,
+				Policy = policy.Policy,
 				Modified = policy.Modified,
 				CachedAt = DateTime.UtcNow,
 			};
@@ -94,8 +93,8 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 				var json = JsonSerializer.Serialize(entry, JsonOptions);
 				Preferences.Set(CacheKey, json);
 				Logger.Information(
-					"Cached active privacy policy: id={Id} version={Version} contact={ContactEmail}",
-					entry.Id, entry.Version, entry.ContactEmail);
+					"Cached active privacy policy: id={Id} version={Version}",
+					entry.Id, entry.Version);
 			}
 			catch (Exception ex)
 			{

@@ -14,6 +14,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 
 		private static readonly JsonSerializerOptions WriteOptions = new() { WriteIndented = true };
 		private const string COMPLIANCE_ACCEPTANCE_EMAIL_ENABLED_KEY = "compliance_acceptance_email_enabled";
+		private const string COMPLIANCE_EMAIL_KEY = "compliance_email";
 		private const string SMTP_PASSWORD_KEY = "smtp_password";
 		private const string UNITY_API_KEY = "unity_api_key";
 		private const string UNITY_ACTIVE_MEETING_KEY = "unity_active_meeting_id";
@@ -61,6 +62,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			}
 
 			_configuration = builder.Build();
+
 		}
 
 		// =================================================================
@@ -75,13 +77,13 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 #if USE_DEV_CREDENTIALS
 			// Dev/test mode: every SMTP field comes from the embedded
 			// devsettings.json — host, port, username, password, the lot.
-			// Don't fall through to BuildSmtpConfiguration: that binds
-			// from _configuration, which only sees appsettings.json plus
-			// the user-saved mailsettings.json overlay, and devsettings
-			// is in neither. A partial bake-in (password only, host blank)
-			// would silently produce an invalid config and skip SMTP setup
-			// at startup — which is exactly the failure mode this branch
-			// exists to avoid in dev builds.
+			// Don't fall through to BuildSmtpConfiguration: even though
+			// devsettings.json is now layered into _configuration in dev
+			// builds (see MauiProgram), the SMTP password is held in
+			// SecureStorage on production devices and we don't want
+			// dev-build code paths to depend on that secret being in
+			// _configuration. Going through LoadEmbeddedDevSmtpConfiguration
+			// keeps the dev path uniform and self-contained.
 			_cachedSmtpConfig = LoadEmbeddedDevSmtpConfiguration();
 #else
 			var password = GetSecretSync(SMTP_PASSWORD_KEY, "SMTP password");
@@ -856,7 +858,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		}
 
 		/// <summary>
-		/// Reads the toggle from Preferences. Defaults to <c>false</c> when
+		/// Reads the toggle from Preferences. Defaults to <c>true</c> when
 		/// the preference has never been written — fresh installs do not
 		/// send acceptance-confirmation email until an operator opts in.
 		/// The per-recipient send path in <c>ComplianceService</c> is gated
@@ -870,7 +872,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 				try
 				{
 					var raw = Preferences.Get(COMPLIANCE_ACCEPTANCE_EMAIL_ENABLED_KEY, string.Empty);
-					if (string.IsNullOrEmpty(raw)) return false;
+					if (string.IsNullOrEmpty(raw)) return true;
 					return bool.TryParse(raw, out var value) ? value : false;
 				}
 				catch (Exception ex)
@@ -895,6 +897,65 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			catch (Exception ex)
 			{
 				Logger.Warning(ex, "Failed to save compliance-acceptance-email toggle");
+			}
+		}
+
+		// =================================================================
+		// Compliance Email (recipient address used by the compliance service)
+		// =================================================================
+
+		/// <summary>
+		/// Reads the configured compliance email address from Preferences.
+		/// Returns <see cref="string.Empty"/> when no value has been written
+		/// (fresh install) or when the prefs store is unavailable — callers
+		/// should treat the empty string as "no compliance recipient
+		/// configured" and skip any send that would otherwise target it.
+		/// String pattern mirrors <see cref="DeviceLabel"/>: persisted in
+		/// Preferences as a plain string, read per-call so a Settings-page
+		/// edit takes effect on the next compliance action without an app
+		/// restart.
+		/// </summary>
+		public string ComplianceEmail
+		{
+			get
+			{
+#if USE_DEV_CREDENTIALS 
+				return "compliance@aa-bristol.org";
+#endif
+				try
+				{
+					return Preferences.Get(COMPLIANCE_EMAIL_KEY, string.Empty);
+				}
+				catch (Exception ex)
+				{
+					// If Preferences is unavailable, fail safe by treating
+					// the recipient as unconfigured — better to skip the
+					// send than to throw mid-acceptance.
+					Logger.Warning(ex, "Failed to read compliance email — treating as unconfigured");
+					return string.Empty;
+				}
+			}
+		}
+
+		public void SetComplianceEmail(string? email)
+		{
+			try
+			{
+				if (string.IsNullOrWhiteSpace(email))
+				{
+					Preferences.Remove(COMPLIANCE_EMAIL_KEY);
+					Logger.Information("Compliance email cleared — no recipient configured");
+				}
+				else
+				{
+					var trimmed = email.Trim();
+					Preferences.Set(COMPLIANCE_EMAIL_KEY, trimmed);
+					Logger.Information("Compliance email set to {ComplianceEmail}", trimmed);
+				}
+			}
+			catch (Exception ex)
+			{
+				Logger.Warning(ex, "Failed to save compliance email");
 			}
 		}
 

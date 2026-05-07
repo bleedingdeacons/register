@@ -142,7 +142,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services.Interfaces
 		/// the member accepted, giving them a copy independent of the
 		/// local SQLite store.
 		///
-		/// <para>Defaults to <c>false</c> — fresh installs do not send
+		/// <para>Defaults to <c>true</c> — fresh installs do not send
 		/// any acceptance-confirmation email until an operator explicitly
 		/// opts in from Settings. Members without a <c>PersonalEmail</c>
 		/// on file are silently skipped regardless of the toggle.</para>
@@ -158,5 +158,27 @@ namespace TheBleedingDeacons.Intergroup.Register.Services.Interfaces
 		/// on the next acceptance action; no restart required.
 		/// </summary>
 		void SetComplianceAcceptanceEmailEnabled(bool enabled);
+
+		/// <summary>
+		/// The email address used by the compliance service — typically
+		/// the data-protection / compliance contact who should receive
+		/// audit-trail copies of acceptance and revocation events. Read
+		/// per-call from Preferences so flipping the value in Settings
+		/// takes effect on the next compliance action without an app
+		/// restart. Returns an empty string when no value has been set,
+		/// which callers should treat as "no compliance recipient
+		/// configured" and skip any send that would otherwise target it.
+		/// </summary>
+		string ComplianceEmail { get; }
+
+		/// <summary>
+		/// Persists the compliance email address. Pass an empty / whitespace
+		/// string to clear the value (no compliance recipient configured).
+		/// The address is trimmed before storage; validity is the caller's
+		/// responsibility — the Settings page validates with
+		/// <see cref="System.ComponentModel.DataAnnotations.EmailAddressAttribute"/>
+		/// before invoking this setter.
+		/// </summary>
+		void SetComplianceEmail(string? email);
 	}
 }

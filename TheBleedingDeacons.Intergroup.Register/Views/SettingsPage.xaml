@@ -22,16 +22,31 @@
                 HorizontalOptions="Center"
                 Text="Settings" />
 
-            <Button
-                x:Name="MailSettingButton"
-                BackgroundColor="{AppThemeBinding Light={StaticResource Primary},
-                                                  Dark={StaticResource PrimaryDark}}"
-                Command="{Binding NavigateToMailSettingCommand}"
-                CornerRadius="8"
-                FontSize="18"
-                HeightRequest="60"
-                Text="Mail Settings"
-                TextColor="White" />
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="20">
+                <Button
+                    x:Name="MailSettingButton"
+                    Grid.Column="0"
+                    BackgroundColor="{AppThemeBinding Light={StaticResource Primary},
+                                                      Dark={StaticResource PrimaryDark}}"
+                    Command="{Binding NavigateToMailSettingCommand}"
+                    CornerRadius="8"
+                    FontSize="18"
+                    HeightRequest="60"
+                    Text="Mail Settings"
+                    TextColor="White" />
+
+                <Button
+                    x:Name="EmailStatusButton"
+                    Grid.Column="1"
+                    BackgroundColor="{AppThemeBinding Light={StaticResource Primary},
+                                                      Dark={StaticResource PrimaryDark}}"
+                    Command="{Binding NavigateToMailStatusCommand}"
+                    CornerRadius="8"
+                    FontSize="18"
+                    HeightRequest="60"
+                    Text="Email Status"
+                    TextColor="White" />
+            </Grid>
 
             <Button
                 x:Name="ApiSettingsButton"
@@ -53,17 +68,6 @@
                 FontSize="18"
                 HeightRequest="60"
                 Text="Database Backup"
-                TextColor="White" />
-
-            <Button
-                x:Name="EmailStatusButton"
-                BackgroundColor="{AppThemeBinding Light={StaticResource Primary},
-                                                  Dark={StaticResource PrimaryDark}}"
-                Command="{Binding NavigateToMailStatusCommand}"
-                CornerRadius="8"
-                FontSize="18"
-                HeightRequest="60"
-                Text="Email Status"
                 TextColor="White" />
 
             <!--
@@ -144,9 +148,7 @@
                 TextColor="{AppThemeBinding Light={StaticResource Gray600},
                                             Dark={StaticResource Gray300}}" />
 
-            <Grid
-                ColumnDefinitions="*,*,*"
-                ColumnSpacing="12">
+            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="12">
 
                 <Border
                     Grid.Column="0"
@@ -396,7 +398,7 @@
                         ColumnDefinitions="Auto,*"
                         ColumnSpacing="12"
                         IsVisible="{Binding HasActivePrivacyPolicy}"
-                        RowDefinitions="Auto,Auto,Auto,Auto,Auto"
+                        RowDefinitions="Auto,Auto,Auto,Auto"
                         RowSpacing="4">
 
                         <Label
@@ -434,7 +436,7 @@
                             Grid.Row="2"
                             Grid.Column="0"
                             FontSize="13"
-                            Text="Contact"
+                            Text="Modified"
                             TextColor="{AppThemeBinding Light={StaticResource Gray600},
                                                         Dark={StaticResource Gray300}}"
                             VerticalOptions="Center" />
@@ -442,25 +444,10 @@
                             Grid.Row="2"
                             Grid.Column="1"
                             FontSize="14"
-                            LineBreakMode="WordWrap"
-                            Text="{Binding PrivacyPolicyContact}" />
-
-                        <Label
-                            Grid.Row="3"
-                            Grid.Column="0"
-                            FontSize="13"
-                            Text="Modified"
-                            TextColor="{AppThemeBinding Light={StaticResource Gray600},
-                                                        Dark={StaticResource Gray300}}"
-                            VerticalOptions="Center" />
-                        <Label
-                            Grid.Row="3"
-                            Grid.Column="1"
-                            FontSize="14"
                             Text="{Binding PrivacyPolicyModified}" />
 
                         <Label
-                            Grid.Row="4"
+                            Grid.Row="3"
                             Grid.Column="0"
                             FontSize="13"
                             Text="Cached"
@@ -468,7 +455,7 @@
                                                         Dark={StaticResource Gray300}}"
                             VerticalOptions="Center" />
                         <Label
-                            Grid.Row="4"
+                            Grid.Row="3"
                             Grid.Column="1"
                             FontSize="14"
                             Text="{Binding PrivacyPolicyCachedAt}" />
@@ -481,9 +468,7 @@
                         window so the operator can't queue overlapping
                         requests.
                     -->
-                    <Grid
-                        ColumnDefinitions="Auto,*,Auto"
-                        ColumnSpacing="8">
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
 
                         <ActivityIndicator
                             Grid.Column="0"
@@ -526,6 +511,74 @@
                             </DataTrigger>
                             <DataTrigger
                                 Binding="{Binding IsPrivacyPolicyStatusError}"
+                                TargetType="Label"
+                                Value="False">
+                                <Setter Property="TextColor" Value="{AppThemeBinding Light=#388E3C, Dark=#66BB6A}" />
+                            </DataTrigger>
+                        </Label.Triggers>
+                    </Label>
+
+                    <!--
+                        Compliance email. Lives inside the Privacy Policy
+                        card because it's the recipient address used by
+                        the compliance service for audit-trail copies of
+                        acceptance / revocation events tied to the policy
+                        shown above. Empty value = no recipient configured;
+                        the send is silently skipped. The Save button
+                        validates with EmailAddressAttribute before
+                        persisting — a validation failure surfaces in the
+                        status label below in red and leaves the stored
+                        value untouched.
+                    -->
+                    <BoxView
+                        Margin="0,8,0,0"
+                        HeightRequest="1"
+                        Color="{AppThemeBinding Light=#E0E0E0,
+                                                Dark=#424242}" />
+
+                    <Label
+                        FontAttributes="Bold"
+                        FontSize="16"
+                        Text="Compliance Email" />
+
+                    <Label
+                        FontSize="13"
+                        LineBreakMode="WordWrap"
+                        Text="The address the compliance service uses as the recipient for audit-trail copies of acceptance and revocation events. Leave blank to disable — sends with no recipient configured are silently skipped."
+                        TextColor="{AppThemeBinding Light={StaticResource Gray600},
+                                                    Dark={StaticResource Gray300}}" />
+
+                    <Entry
+                        ClearButtonVisibility="WhileEditing"
+                        Keyboard="Email"
+                        Placeholder="compliance@example.org"
+                        Text="{Binding ComplianceEmail, Mode=TwoWay}" />
+
+                    <Button
+                        BackgroundColor="{AppThemeBinding Light={StaticResource Primary},
+                                                          Dark={StaticResource PrimaryDark}}"
+                        Command="{Binding SaveComplianceEmailCommand}"
+                        CornerRadius="8"
+                        FontSize="16"
+                        HeightRequest="44"
+                        HorizontalOptions="End"
+                        Text="Save Email"
+                        TextColor="White"
+                        WidthRequest="160" />
+
+                    <Label
+                        FontSize="13"
+                        IsVisible="{Binding IsComplianceEmailStatusVisible}"
+                        Text="{Binding ComplianceEmailStatusMessage}">
+                        <Label.Triggers>
+                            <DataTrigger
+                                Binding="{Binding IsComplianceEmailStatusError}"
+                                TargetType="Label"
+                                Value="True">
+                                <Setter Property="TextColor" Value="{AppThemeBinding Light=#D32F2F, Dark=#EF5350}" />
+                            </DataTrigger>
+                            <DataTrigger
+                                Binding="{Binding IsComplianceEmailStatusError}"
                                 TargetType="Label"
                                 Value="False">
                                 <Setter Property="TextColor" Value="{AppThemeBinding Light=#388E3C, Dark=#66BB6A}" />

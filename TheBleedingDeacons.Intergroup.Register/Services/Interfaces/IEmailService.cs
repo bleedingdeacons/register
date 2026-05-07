@@ -31,8 +31,37 @@ namespace TheBleedingDeacons.Intergroup.Register.Services.Interfaces
 		event EventHandler<CircuitStateChangedEventArgs> CircuitStateChanged;
 
 		// Core email sending methods
-		Task<bool> SendEmailAsync(string to, string subject, string body, bool isHtml = false, string? cc = null, string? bcc = null);
-		Task QueueEmailAsync(string to, string subject, string body, bool isHtml = false, string? cc = null, string? bcc = null);
+		/// <summary>
+		/// Sends an email immediately (or queues it if offline). When <paramref name="from"/>
+		/// is supplied (non-null, non-whitespace), it overrides the default From address
+		/// — which is otherwise the SMTP account username from the active
+		/// <see cref="SmtpConfiguration"/>. Use this when a feature has its own
+		/// sender identity (e.g. a compliance recipient sending audit-trail copies)
+		/// and shouldn't be attributed to the generic SMTP account. The override
+		/// is per-call: it does not mutate the service-wide default.
+		///
+		/// <para><paramref name="replyTo"/> sets the message's Reply-To header
+		/// independently of the From address. Use this to keep From aligned with
+		/// the SMTP login (so SPF/DMARC checks pass and the provider doesn't
+		/// rewrite the header) while still routing replies to a different
+		/// mailbox — the typical pattern for compliance/audit-trail emails.
+		/// Null or whitespace means "no Reply-To header".</para>
+		/// </summary>
+		Task<bool> SendEmailAsync(string to, string subject, string body, bool isHtml = false, string? from = null, string? cc = null, string? bcc = null, string? replyTo = null);
+
+		/// <summary>
+		/// Queues an email for background sending. <paramref name="from"/> behaves
+		/// the same way as on <see cref="SendEmailAsync"/>: a non-empty value
+		/// overrides the default From address for this email only and is persisted
+		/// onto the <c>QueuedEmail</c> row, so it survives an app restart and is
+		/// applied when the queue processor eventually sends the message.
+		///
+		/// <para><paramref name="replyTo"/> behaves the same way: a non-empty
+		/// value is persisted on the <c>QueuedEmail</c> row and applied as the
+		/// Reply-To header when the message is eventually sent, surviving an
+		/// app restart in between.</para>
+		/// </summary>
+		Task QueueEmailAsync(string to, string subject, string body, bool isHtml = false, string? from = null, string? cc = null, string? bcc = null, string? replyTo = null);
 
 		// Configuration methods
 		Task UpdateConfigurationAsync(SmtpConfiguration config);
@@ -558,39 +587,51 @@ namespace TheBleedingDeacons.Intergroup.Register.Services.Interfaces
 	public static class MailServiceExtensions
 	{
 		/// <summary>
-		/// Sends a simple text email.
+		/// Sends a simple text email. <paramref name="from"/> behaves the same
+		/// way as on <see cref="IEmailService.SendEmailAsync"/>: a non-empty
+		/// value overrides the default From address (the SMTP account
+		/// username) for this email only.
 		/// </summary>
 		public static Task<bool> SendTextEmailAsync(this IEmailService mailService,
-			string to, string subject, string body)
+			string to, string subject, string body, string? from = null)
 		{
-			return mailService.SendEmailAsync(to, subject, body, isHtml: false);
+			return mailService.SendEmailAsync(to, subject, body, isHtml: false, from: from);
 		}
 
 		/// <summary>
-		/// Sends a simple HTML email.
+		/// Sends a simple HTML email. <paramref name="from"/> behaves the same
+		/// way as on <see cref="IEmailService.SendEmailAsync"/>: a non-empty
+		/// value overrides the default From address (the SMTP account
+		/// username) for this email only.
 		/// </summary>
 		public static Task<bool> SendHtmlEmailAsync(this IEmailService mailService,
-			string to, string subject, string htmlBody)
+			string to, string subject, string htmlBody, string? from = null)
 		{
-			return mailService.SendEmailAsync(to, subject, htmlBody, isHtml: true);
+			return mailService.SendEmailAsync(to, subject, htmlBody, isHtml: true, from: from);
 		}
 
 		/// <summary>
-		/// Queues a simple text email.
+		/// Queues a simple text email. <paramref name="from"/> behaves the same
+		/// way as on <see cref="IEmailService.QueueEmailAsync"/>: a non-empty
+		/// value overrides the default From address for this email only and
+		/// is persisted onto the queue row, surviving an app restart.
 		/// </summary>
 		public static Task QueueTextEmailAsync(this IEmailService mailService,
-			string to, string subject, string body)
+			string to, string subject, string body, string? from = null)
 		{
-			return mailService.QueueEmailAsync(to, subject, body, isHtml: false);
+			return mailService.QueueEmailAsync(to, subject, body, isHtml: false, from: from);
 		}
 
 		/// <summary>
-		/// Queues a simple HTML email.
+		/// Queues a simple HTML email. <paramref name="from"/> behaves the same
+		/// way as on <see cref="IEmailService.QueueEmailAsync"/>: a non-empty
+		/// value overrides the default From address for this email only and
+		/// is persisted onto the queue row, surviving an app restart.
 		/// </summary>
 		public static Task QueueHtmlEmailAsync(this IEmailService mailService,
-			string to, string subject, string htmlBody)
+			string to, string subject, string htmlBody, string? from = null)
 		{
-			return mailService.QueueEmailAsync(to, subject, htmlBody, isHtml: true);
+			return mailService.QueueEmailAsync(to, subject, htmlBody, isHtml: true, from: from);
 		}
 
 		/// <summary>

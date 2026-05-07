@@ -784,9 +784,38 @@ public partial class EditGroupViewModel : BaseViewModel
 		ClearNameError();
 
 		if (string.IsNullOrWhiteSpace(EditName))
+		{
 			SetNameError("Name is required.");
-		else if (EditName.Trim().Length > 255)
+			return;
+		}
+
+		var trimmed = EditName.Trim();
+
+		if (trimmed.Length > 255)
+		{
 			SetNameError("Name cannot exceed 255 characters.");
+			return;
+		}
+
+		// Reject a name that matches another active GSR on this group.
+		// ActiveMembers is sourced from DisplayedMembers, which already
+		// excludes members staged for removal — so reusing a name freed
+		// up by a pending removal is allowed (a common case when one GSR
+		// replaces another with the same first name in the same session).
+		// When editing an existing member, that member is filtered out of
+		// the comparison so the field validates against itself cleanly.
+		// Comparison is OrdinalIgnoreCase: matches the codebase's ordinal
+		// preference while treating "alice" and "Alice" as the same name.
+		var editingId = !IsCreatingNew ? SelectedMember?.Id : null;
+		bool clashes = ActiveMembers.Any(m =>
+			m.Id != editingId &&
+			!string.IsNullOrWhiteSpace(m.AnonymousName) &&
+			string.Equals(m.AnonymousName.Trim(), trimmed, StringComparison.OrdinalIgnoreCase));
+
+		if (clashes)
+		{
+			SetNameError("A member with this anonymous name already exists.");
+		}
 	}
 
 	private void ValidatePhone()

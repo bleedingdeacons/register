@@ -68,6 +68,26 @@ public static class MauiProgram
 			}
 		}
 
+		// ── Layer devsettings.json on top, if present ─────────────────
+		// devsettings.json is only embedded when the build was invoked
+		// with UseDevCredentials=true (see csproj). When present it
+		// overrides values from appsettings.json — most notably
+		// App:Environment, which flips from "Production" to
+		// "Development" so log entries are tagged correctly. Production
+		// builds skip this section because the resource doesn't exist
+		// in the assembly.
+		using (var stream = assembly.GetManifestResourceStream(
+			"TheBleedingDeacons.Intergroup.Register.devsettings.json"))
+		{
+			if (stream is not null)
+			{
+				var devConfig = new ConfigurationBuilder()
+					.AddJsonStream(stream)
+					.Build();
+				builder.Configuration.AddConfiguration(devConfig);
+			}
+		}
+
 		builder
 			.UseMauiApp<App>()
 			.UseMauiCommunityToolkit()
@@ -87,12 +107,11 @@ public static class MauiProgram
 		// Ensure Serilog is flushed on unhandled / fatal errors
 		RegisterGlobalExceptionHandlers();
 
-		builder.Services.AddSingleton<RegistrationEventLog>();
-		builder.Services.AddSingleton<ComplianceEventLog>();
-		builder.Services.AddSingleton<ComplianceEventLog>();
-
 		// Add configuration service
 		builder.Services.AddSingleton<IConfigurationService, ConfigurationService>();
+
+		builder.Services.AddSingleton<RegistrationEventLog>();
+		builder.Services.AddSingleton<ComplianceEventLog>();
 
 		builder.Services.AddSingleton<SqlitePragmaInterceptor>();
 

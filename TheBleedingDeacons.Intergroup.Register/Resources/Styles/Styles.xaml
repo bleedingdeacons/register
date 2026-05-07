@@ -719,7 +719,18 @@
         <Setter Property="HeightRequest" Value="56" />
         <Setter Property="MinimumHeightRequest" Value="48" />
         <Setter Property="BorderWidth" Value="0" />
-        <Setter Property="Shadow" Value="{StaticResource M3Elevation2}" />
+        <!--
+            Shadow is applied only on platforms where MAUI's shadow renderer
+            is reliable. On WinUI a shared Shadow resource on a CornerRadius
+            Button can render the visual transparent (the button is still
+            hit-testable but invisible), so we explicitly suppress it.
+        -->
+        <Setter Property="Shadow">
+            <OnPlatform x:TypeArguments="Shadow">
+                <On Platform="Android, iOS, MacCatalyst" Value="{StaticResource M3Elevation2}" />
+                <On Platform="WinUI" Value="{x:Null}" />
+            </OnPlatform>
+        </Setter>
         <Setter Property="VisualStateManager.VisualStateGroups">
             <VisualStateGroupList>
                 <VisualStateGroup x:Name="CommonStates">

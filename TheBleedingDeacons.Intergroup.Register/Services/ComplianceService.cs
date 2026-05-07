@@ -90,13 +90,19 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		{
 			ArgumentNullException.ThrowIfNull(member);
 
-			// version and statement are persisted as-is; the server
-			// validates length (≤ 50 / ≤ 2000) but we mirror the
-			// constraint here rather than wait for the reconcile push
-			// to fail. Empty values are allowed — the operator may
-			// not have a policy version string to hand and recording
-			// "yes they accepted, version unknown" is more useful than
-			// rejecting the tap.
+			// `version` is persisted as-is; the server validates length
+			// (≤ 50) but we mirror the constraint here rather than wait
+			// for the reconcile push to fail. Empty is allowed — the
+			// operator may not have a policy version string to hand and
+			// recording "yes they accepted, version unknown" is more
+			// useful than rejecting the tap.
+			//
+			// `statement` is no longer persisted as-is: see the
+			// interface's parameter doc and ApplyAsync for why. It's
+			// kept on the signature so callers compile unchanged, but
+			// any value passed in is ignored — the wording recorded
+			// against the acceptance comes from the cached active
+			// policy.
 			var ts = acceptedAtUtc ?? DateTime.UtcNow;
 
 			Logger.Information(
@@ -109,7 +115,6 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 				timestampUtc: ts,
 				version: version,
 				method: method,
-				statement: statement,
 				ct: ct);
 		}
 
@@ -132,7 +137,6 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 				timestampUtc: ts,
 				version: null,
 				method: null,
-				statement: null,
 				ct: ct);
 		}
 
@@ -154,9 +158,45 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			DateTime timestampUtc,
 			string? version,
 			string? method,
-			string? statement,
 			CancellationToken ct)
 		{
+			// ── Resolve the wording to persist ──────────────────────
+			//
+			// The acceptance path persists the upstream policy body
+			// from the cache rather than the `statement` argument the
+			// caller passed in. The same cached body is also what the
+			// consent popup displays to the user (the bundled
+			// Terms.txt has been retired), so the DB row, the
+			// durability log entry, the confirmation email, and the
+			// on-screen wording all derive from one source.
+			//
+			// `cached` may be null on a device that has never synced an
+			// active policy — in that case we record an empty statement
+			// rather than blocking the acceptance, on the same principle
+			// as the version field: "yes they accepted, wording unknown"
+			// is more useful than rejecting the tap. (The popup-driving
+			// ViewModels guard this case earlier and don't reach
+			// RecordAcceptance, but the empty fallback here keeps
+			// programmatic callers safe.) The revocation path doesn't
+			// need the cache at all.
+			//
+			// We also pull the policy id off the same cached record so
+			// reconciliation can send `policy_id` to Unity instead of
+			// the statement body. The id and the body must come from
+			// the same cache snapshot or a concurrent cache refresh
+			// could produce a "wrong id for this wording" mismatch —
+			// hence the single GetCached() call feeding both fields.
+			string? statementToPersist = null;
+			int? policyIdToPersist = null;
+			if (accepted)
+			{
+				var cachedForPersistence = _policyCache.GetCached();
+				statementToPersist = cachedForPersistence?.Policy ?? string.Empty;
+				policyIdToPersist = cachedForPersistence?.Id is int cid && cid > 0
+					? cid
+					: null;
+			}
+
 			// ── Primary store: SQLite ────────────────────────────────
 			//
 			// The Member entity reload also gives us back the contact
@@ -182,7 +222,8 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 				{
 					member.GdprAcceptanceVersion = version;
 					member.GdprAcceptanceMethod = method;
-					member.GdprAcceptanceStatement = statement;
+					member.GdprAcceptanceStatement = statementToPersist;
+					member.GdprAcceptancePolicyId = policyIdToPersist;
 				}
 				else
 				{
@@ -191,11 +232,12 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 					// offline state matches what the server will end up
 					// with. ComplianceEventLog.ApplyEntryToMember encodes
 					// the same rule, but we don't share the call here:
-					// duplicating the four assignments is cheaper than
+					// duplicating the assignments is cheaper than
 					// pulling in the entry record purely to delegate.
 					member.GdprAcceptanceVersion = null;
 					member.GdprAcceptanceMethod = null;
 					member.GdprAcceptanceStatement = null;
+					member.GdprAcceptancePolicyId = null;
 				}
 
 				await dbContext.SaveChangesAsync(ct);
@@ -218,7 +260,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 					if (accepted)
 					{
 						await _eventLog.AppendAcceptanceAsync(
-							memberId, timestampUtc, version, method, statement, ct);
+							memberId, timestampUtc, version, method, statementToPersist, policyIdToPersist, ct);
 					}
 					else
 					{
@@ -246,7 +288,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			if (accepted)
 			{
 				await TryQueueAcceptanceEmailAsync(
-					persistedMember!, timestampUtc, version, method, statement);
+					persistedMember!, timestampUtc, version, method);
 			}
 		}
 
@@ -262,8 +304,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			Member member,
 			DateTime timestampUtc,
 			string? version,
-			string? method,
-			string? statement)
+			string? method)
 		{
 			// Feature gate. Off by default — fresh installs don't surprise
 			// anyone with confirmation email until an operator opts in.
@@ -291,17 +332,24 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			{
 				// Audit-trail metadata that doesn't live on the Member
 				// row comes from the cached active policy — id, title,
-				// contact, contact email, last-modified. May be null on
-				// a device that has never synced an active policy; fall
-				// back to empty strings so the template still renders
-				// rather than leaving "{{PolicyTitle}}" placeholders in
-				// the recipient's inbox.
+				// last-modified, and the policy body itself. May be
+				// null on a device that has never synced an active
+				// policy; fall back to empty strings so the template
+				// still renders rather than leaving "{{PolicyTitle}}"
+				// placeholders in the recipient's inbox.
 				var cached = _policyCache.GetCached();
 
 				var displayName = !string.IsNullOrWhiteSpace(member.AnonymousName)
 					? member.AnonymousName!
 					: "there";
 
+				// The body quoted in the email comes from the cached
+				// upstream policy. The `statement` parameter on
+				// RecordAcceptance is no longer used here — see the
+				// IComplianceRegistration param doc. On a device that
+				// has never synced an active policy, `cached` is null
+				// and PolicyStatementHtml is empty; the template
+				// handles that case rather than blocking the email.
 				var model = new ComplianceEmail
 				{
 					AnonymousName = displayName,
@@ -319,11 +367,9 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 					PolicyVersion = !string.IsNullOrWhiteSpace(version)
 						? version!
 						: cached?.Version ?? string.Empty,
-					PolicyContact = cached?.Contact ?? string.Empty,
-					PolicyContactEmail = cached?.ContactEmail ?? string.Empty,
 					PolicyModified = cached?.Modified ?? string.Empty,
 
-					PolicyStatementHtml = FormatPolicyAsHtml(statement),
+					PolicyStatementHtml = FormatPolicyAsHtml(cached?.Policy),
 				};
 
 				var body = await _emailTemplate.RenderTemplateAsync(
@@ -333,7 +379,16 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 					? "Privacy policy acceptance confirmation"
 					: $"Privacy policy acceptance: {model.PolicyTitle} (v{model.PolicyVersion})";
 
-				await _emailService.QueueEmailAsync(to, subject, body, isHtml: true);
+				// Reply-To routes recipient replies to the configured
+				// compliance mailbox without changing From — From stays as
+				// the authenticated SMTP login so SPF/DMARC checks pass and
+				// providers don't rewrite the header. Empty string when no
+				// compliance recipient is configured: in that case nothing
+				// is added and replies fall through to the From address as
+				// per RFC defaults.
+				var replyTo = _configService.ComplianceEmail;
+
+				await _emailService.QueueEmailAsync(to, subject, body, isHtml: true, replyTo: replyTo);
 
 				Logger.Information(
 					"Queued compliance acceptance email for member {MemberId} ({Name}) to {Email} for policy v{Version}",

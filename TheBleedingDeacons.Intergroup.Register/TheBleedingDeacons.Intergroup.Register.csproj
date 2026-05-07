@@ -40,23 +40,23 @@
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net9.0-android|AnyCPU'">
-		<ApplicationDisplayVersion>1.0.10</ApplicationDisplayVersion>
+		<ApplicationDisplayVersion>1.0.13</ApplicationDisplayVersion>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net9.0-ios|AnyCPU'">
-		<ApplicationDisplayVersion>1.0.10</ApplicationDisplayVersion>
+		<ApplicationDisplayVersion>1.0.13</ApplicationDisplayVersion>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net9.0-maccatalyst|AnyCPU'">
-		<ApplicationDisplayVersion>1.0.10</ApplicationDisplayVersion>
+		<ApplicationDisplayVersion>1.0.13</ApplicationDisplayVersion>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net9.0-windows10.0.19041.0|AnyCPU'">
-		<ApplicationDisplayVersion>1.0.10</ApplicationDisplayVersion>
+		<ApplicationDisplayVersion>1.0.13</ApplicationDisplayVersion>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net9.0-android|AnyCPU'">
-		<ApplicationDisplayVersion>1.0.10</ApplicationDisplayVersion>
+		<ApplicationDisplayVersion>1.0.13</ApplicationDisplayVersion>
 		<AndroidPackageFormat>apk</AndroidPackageFormat>
 		<AndroidUseAapt2>True</AndroidUseAapt2>
 		<AndroidCreatePackagePerAbi>False</AndroidCreatePackagePerAbi>
@@ -65,15 +65,15 @@
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net9.0-ios|AnyCPU'">
-		<ApplicationDisplayVersion>1.0.10</ApplicationDisplayVersion>
+		<ApplicationDisplayVersion>1.0.13</ApplicationDisplayVersion>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net9.0-maccatalyst|AnyCPU'">
-		<ApplicationDisplayVersion>1.0.10</ApplicationDisplayVersion>
+		<ApplicationDisplayVersion>1.0.13</ApplicationDisplayVersion>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net9.0-windows10.0.19041.0|AnyCPU'">
-		<ApplicationDisplayVersion>1.0.10</ApplicationDisplayVersion>
+		<ApplicationDisplayVersion>1.0.13</ApplicationDisplayVersion>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -90,9 +90,11 @@
 
 	<ItemGroup>
 		<None Remove="Platforms\Android\Resources\xml\file_paths.xml" />
+		<None Remove="Templates\ComplianceAcceptanceEmail.html" />
 	</ItemGroup>
 
 	<ItemGroup>
+		<EmbeddedResource Include="Templates\ComplianceAcceptanceEmail.html" />
 		<EmbeddedResource Include="Templates\WelcomeEmail.html" />
 		<EmbeddedResource Include="appsettings.json" />
 		<None Remove="appsettings.json" />
@@ -204,6 +206,7 @@
 
 	<ItemGroup>
 		<Folder Include="Data\Configurations\" />
+		<Folder Include="Resources\Raw\" />
 	</ItemGroup>
 
 	<ItemGroup>

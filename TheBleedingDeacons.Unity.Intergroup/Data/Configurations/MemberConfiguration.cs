@@ -38,7 +38,7 @@ public class MemberConfiguration : IEntityTypeConfiguration<Member>
             .HasPrecision(3);
 
         // GDPR compliance fields. Lengths chosen to match the Unity
-        // server's validation (version/method ≤ 50, statement ≤ 2000).
+        // server's validation (version/method ≤ 50, statement ≤ 50 000).
         // GdprAcceptedAt uses the same precision as Updated so timestamp
         // comparisons in the snapshot diff round-trip cleanly.
         builder.Property(m => m.GdprAcceptedAt)
@@ -51,7 +51,13 @@ public class MemberConfiguration : IEntityTypeConfiguration<Member>
             .HasMaxLength(50);
 
         builder.Property(m => m.GdprAcceptanceStatement)
-            .HasMaxLength(2000);
+            .HasMaxLength(50000);
+
+        // PolicyId is the WordPress post ID of the accepted privacy
+        // policy — a plain int, no length to configure. Defined here
+        // for completeness so adding the column is symmetrical with
+        // the other GDPR fields and shows up in EF model snapshots.
+        builder.Property(m => m.GdprAcceptancePolicyId);
 
         // HomeGroup FK is configured from GroupConfiguration (WithOne → HasForeignKey)
 

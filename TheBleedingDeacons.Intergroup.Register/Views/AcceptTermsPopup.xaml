@@ -18,7 +18,7 @@
 
         <Grid
             Padding="24"
-            RowDefinitions="Auto,*,Auto"
+            RowDefinitions="Auto,*,Auto,Auto"
             RowSpacing="24">
 
             <!--  Title  -->
@@ -33,21 +33,92 @@
                 TextColor="{AppThemeBinding Light={StaticResource Gray900},
                                             Dark={StaticResource Gray100}}" />
 
-            <!--  Body (scrollable so longer policy text still fits)  -->
-            <ScrollView Grid.Row="1" VerticalScrollBarVisibility="Default">
+            <!--
+                Body area: scrollable policy text plus an overlay
+                "jump to end" affordance for long policies. The button
+                sits in the bottom-right of the scroll region (it shares
+                the cell, not the ScrollView itself, so it doesn't move
+                with the content). It hides itself once the user has
+                already reached the end — no point offering a shortcut
+                that's no longer useful — by binding IsVisible to the
+                inverse of HasScrolledToEnd via the existing
+                InvertedBoolConverter.
+                
+                Scrollbar is pinned Always-on so the user has a constant
+                visual cue that more policy text exists below the fold —
+                otherwise on platforms with auto-hiding scrollbars they
+                may not realise scrolling is required before the
+                I-Agree button can enable.
+            -->
+            <Grid Grid.Row="1">
+                <ScrollView x:Name="PolicyScrollView" VerticalScrollBarVisibility="Always">
+                    <Label
+                        FontSize="18"
+                        HorizontalOptions="Fill"
+                        HorizontalTextAlignment="Start"
+                        LineBreakMode="WordWrap"
+                        Text="{Binding Message}"
+                        TextColor="{AppThemeBinding Light={StaticResource Gray900},
+                                                    Dark={StaticResource Gray100}}" />
+                </ScrollView>
+
+                <Button
+                    Margin="0,0,0,00"
+                    Padding="0"
+                    BackgroundColor="{AppThemeBinding Light={StaticResource Primary},
+                                                      Dark={StaticResource PrimaryDark}}"
+                    Clicked="OnJumpToEndClicked"
+                    CornerRadius="22"
+                    FontAttributes="Bold"
+                    FontSize="20"
+                    HeightRequest="44"
+                    HorizontalOptions="Center"
+                    IsVisible="{Binding HasScrolledToEnd, Converter={StaticResource InvertedBoolConverter}}"
+                    Shadow="{StaticResource M3Elevation2}"
+                    Text="↓"
+                    TextColor="White"
+                    ToolTipProperties.Text="Jump to end"
+                    VerticalOptions="End"
+                    WidthRequest="44" />
+            </Grid>
+
+            <!--
+                Consent checkbox. Two-way bound to HasAgreed; combined with
+                HasScrolledToEnd in the view model, this gates AcceptCommand.
+                The CheckBox itself handles taps natively. The surrounding
+                Grid carries a TapGestureRecognizer so taps on the label
+                (or the spacing between glyph and label) also toggle the
+                state — children consume their own input first, so the
+                native CheckBox click behaviour is preserved.
+            -->
+            <Grid
+                Grid.Row="2"
+                ColumnDefinitions="Auto,*"
+                ColumnSpacing="8"
+                HorizontalOptions="Start"
+                VerticalOptions="Center">
+                <Grid.GestureRecognizers>
+                    <TapGestureRecognizer Tapped="OnAgreementRowTapped" />
+                </Grid.GestureRecognizers>
+                <CheckBox
+                    x:Name="AgreementCheckBox"
+                    Grid.Column="0"
+                    IsChecked="{Binding HasAgreed, Mode=TwoWay}"
+                    VerticalOptions="Center" />
                 <Label
-                    FontSize="18"
-                    HorizontalOptions="Fill"
-                    HorizontalTextAlignment="Start"
+                    Grid.Column="1"
+                    FontSize="16"
                     LineBreakMode="WordWrap"
-                    Text="{Binding Message}"
+                    Text="I have read and understood the Privacy Policy and agree to its terms."
                     TextColor="{AppThemeBinding Light={StaticResource Gray900},
-                                                Dark={StaticResource Gray100}}" />
-            </ScrollView>
+                                                Dark={StaticResource Gray100}}"
+                    VerticalOptions="Center"
+                    VerticalTextAlignment="Center" />
+            </Grid>
 
             <!--  Decline / Accept buttons  -->
             <Grid
-                Grid.Row="2"
+                Grid.Row="3"
                 ColumnDefinitions="*,*"
                 ColumnSpacing="16">
 

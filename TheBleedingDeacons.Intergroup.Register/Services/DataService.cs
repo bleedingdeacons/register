@@ -86,9 +86,9 @@ public class DataService
 
             Logger.Information(
                 "Unity sync + snapshot complete: {Groups} groups, {Meetings} meetings, {Members} members, {Positions} positions, {Contacts} contacts, {IntergroupMeetings} IG meetings. " +
-                "Snapshot: {SnapGroups} groups, {SnapMembers} members, {SnapPositions} positions",
+                "Snapshot: {SnapGroups} groups, {SnapMembers} members, {SnapPositions} positions, {RegisteredGroups} groups registered, {RegisteredPositions} positions registered, {AcceptedTerms} accepted terms",
                 sync.Groups, sync.Meetings, sync.Members, sync.Positions, sync.Contacts, sync.IntergroupMeetings,
-                snap.Groups, snap.Members, snap.Positions);
+                snap.Groups, snap.Members, snap.Positions, snap.RegisteredGroups, snap.RegisteredPositions, snap.AcceptedTerms);
 
             return (sync.Meetings, sync.Positions, sync.Members, sync.Groups, sync.Contacts, sync.IntergroupMeetings);
         }
@@ -100,10 +100,12 @@ public class DataService
     }
 
     /// <summary>
-    /// Detects local changes, pushes them to the Unity API in the correct
-    /// dependency order, then re-syncs and re-snapshots.
+    /// Detects local changes and pushes them to the Unity API in the correct
+    /// dependency order. Does NOT re-sync or re-snapshot afterwards — Finish
+    /// Meeting is followed by a local DB purge, so pulling fresh state down
+    /// from Unity would be wasted work.
     ///
-    /// Flow: Detect → Push creates → Push updates → Push registrations → Re-sync → Re-snapshot.
+    /// Flow: Detect → Push creates → Push updates → Push registrations → Purge event log.
     ///
     /// <para>
     /// Pass <paramref name="progress"/> to receive per-phase reconciliation
@@ -111,8 +113,8 @@ public class DataService
     /// <see cref="ReconciliationService.ReconcileAsync"/>.
     /// </para>
     /// </summary>
-    public async Task<(int Meetings, int Positions, int Members, int Groups, int Contacts, int IntergroupMeetings,
-                        int Created, int Modified, int Registered, int ApiErrors, int ApiWarnings)> ImportWithReconciliationAsync(
+    public async Task<(int Created, int Modified, int Registered, int ComplianceRecorded,
+                        int ApiErrors, int ApiWarnings)> ImportWithReconciliationAsync(
         CancellationToken cancellationToken = default,
         IProgress<SyncProgress>? progress = null)
     {
@@ -121,31 +123,27 @@ public class DataService
             Logger.Information("Starting Unity reconciliation");
 
             // Same privacy-policy gate as ImportWithSnapshotAsync.
-            // Reconciliation includes a re-sync internally, so any
-            // policy update on the server should be reflected on the
-            // device by the time this method returns. Running the
-            // refresh first means a "no active policy" state aborts
-            // before we push any pending creates/updates — which is
-            // the desired behaviour: if the upstream policy is
-            // missing we want the operator to fix that before
-            // committing anything else through reconciliation.
+            // The reconciliation flow no longer pulls fresh state from
+            // Unity, so this RefreshPrivacyPolicyAsync call is the only
+            // thing that surfaces a "no active policy" condition before
+            // we commit any pending creates/updates — which is the
+            // desired behaviour: if the upstream policy is missing we
+            // want the operator to fix that before pushing anything.
             await RefreshPrivacyPolicyAsync(cancellationToken);
 
             var result = await _reconciliationService.ReconcileAsync(cancellationToken, progress);
-            var sync = result.Resync;
 
             Logger.Information(
                 "Reconciliation complete: {Created} members created, {Modified} modified, " +
-                "{RegGroups} groups registered, {RegPos} positions registered, {Errors} errors, {Warnings} warnings. " +
-                "Re-synced {Groups} groups, {Meetings} meetings, {Members} members, {Positions} positions",
+                "{RegGroups} groups registered, {RegPos} positions registered, {Compliance} compliance recorded, " +
+                "{Errors} errors, {Warnings} warnings",
                 result.CreatedMembers, result.ModifiedMembers,
-                result.RegisteredGroups, result.RegisteredPositions, result.ApiErrors, result.ApiWarnings,
-                sync.Groups, sync.Meetings, sync.Members, sync.Positions);
+                result.RegisteredGroups, result.RegisteredPositions, result.RecordedCompliance,
+                result.ApiErrors, result.ApiWarnings);
 
-            return (sync.Meetings, sync.Positions, sync.Members, sync.Groups,
-                    sync.Contacts, sync.IntergroupMeetings,
-                    result.CreatedMembers, result.ModifiedMembers,
+            return (result.CreatedMembers, result.ModifiedMembers,
                     result.RegisteredGroups + result.RegisteredPositions,
+                    result.RecordedCompliance,
                     result.ApiErrors, result.ApiWarnings);
         }
         catch (Exception ex)

@@ -38,69 +38,47 @@
 
                 <CollectionView.ItemTemplate>
                     <DataTemplate x:DataType="entities:Position">
-                        <Border
-                            Margin="16,0,16,16"
-                            HorizontalOptions="Center"
-                            MaximumWidthRequest="560"
-                            Style="{StaticResource M3ListItemCardStyle}"
-                            WidthRequest="560">
+                        <!--
+                            Strict-button list item to match DaySelectionPage's
+                            tile pattern. The 3-column grid (*,2*,*) constrains
+                            the button to the middle 50% of the row, with the
+                            outer columns acting as flexible side margins, so
+                            tile sizing matches the day picker visually.
 
-                            <Border.GestureRecognizers>
-                                <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type vm:PositionSelectionViewModel}}, Path=SelectPositionCommand}" CommandParameter="{Binding .}" />
-                            </Border.GestureRecognizers>
-
-                            <Grid
-                                ColumnDefinitions="24,*,Auto,Auto"
-                                ColumnSpacing="12"
-                                RowDefinitions="Auto,Auto">
-
-                                <!--  Leading registered tick  -->
-                                <Label
-                                    Grid.Row="0"
-                                    Grid.RowSpan="2"
-                                    Grid.Column="0"
-                                    FontAttributes="Bold"
-                                    FontSize="22"
-                                    HorizontalTextAlignment="Center"
-                                    IsVisible="{Binding Registered}"
-                                    Text="✓"
-                                    TextColor="{AppThemeBinding Light={StaticResource SuccessAccent},
-                                                                Dark={StaticResource SuccessAccentDim}}"
-                                    VerticalOptions="Center" />
-                                <!--  Position name  -->
-                                <Label
-                                    Grid.Row="0"
-                                    Grid.Column="1"
-                                    FontAttributes="Bold"
-                                    FontSize="17"
-                                    LineBreakMode="TailTruncation"
-                                    Text="{Binding LongName}"
-                                    TextColor="{AppThemeBinding Light={StaticResource Gray900},
-                                                                Dark={StaticResource Gray100}}"
-                                    VerticalOptions="Center" />
-
-                                <!--  Registered chip  -->
-                                <Border
-                                    Grid.Row="1"
-                                    Grid.Column="1"
-                                    Margin="0,4,0,0"
-                                    IsVisible="{Binding Registered}"
-                                    Style="{StaticResource M3RegisteredChipStyle}">
-                                    <Label Style="{StaticResource M3RegisteredChipLabelStyle}" Text="Registered" />
-                                </Border>
-
-                                <!--  Trailing chevron  -->
-                                <Label
-                                    Grid.Row="0"
-                                    Grid.RowSpan="2"
-                                    Grid.Column="3"
-                                    FontSize="28"
-                                    Text="›"
-                                    TextColor="{AppThemeBinding Light={StaticResource Gray400},
-                                                                Dark={StaticResource Gray500}}"
-                                    VerticalOptions="Center" />
-                            </Grid>
-                        </Border>
+                            Registered positions switch from the filled primary
+                            tile to a tonal secondary look (Gray100/Gray800 fill,
+                            Primary text, no drop shadow) — the same recessed
+                            treatment M3SecondaryButtonStyle applies to the
+                            primary button. The DataTrigger lives on a Style
+                            local to the DataTemplate rather than via a global
+                            converter so the registered/unregistered look stays
+                            visible at a glance from the markup.
+                        -->
+                        <Grid ColumnDefinitions="*,2*,*">
+                            <Button
+                                Grid.Column="1"
+                                Command="{Binding Source={RelativeSource AncestorType={x:Type vm:PositionSelectionViewModel}}, Path=SelectPositionCommand}"
+                                CommandParameter="{Binding .}"
+                                FontSize="18"
+                                HeightRequest="72"
+                                HorizontalOptions="Fill"
+                                Text="{Binding LongName}">
+                                <Button.Style>
+                                    <Style BasedOn="{StaticResource M3TileButtonStyle}" TargetType="Button">
+                                        <Style.Triggers>
+                                            <DataTrigger
+                                                Binding="{Binding Registered}"
+                                                TargetType="Button"
+                                                Value="True">
+                                                <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray800}}" />
+                                                <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}" />
+                                                <Setter Property="Shadow" Value="{x:Null}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
+                        </Grid>
                     </DataTemplate>
                 </CollectionView.ItemTemplate>
 

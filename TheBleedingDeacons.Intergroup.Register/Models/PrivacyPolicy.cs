@@ -51,19 +51,6 @@ namespace TheBleedingDeacons.Intergroup.Register.Models
         public bool Active { get; set; }
 
         /// <summary>
-        /// The named contact for data-protection enquiries (e.g.
-        /// "Data Protection Officer").
-        /// </summary>
-        [JsonPropertyName("contact")]
-        public string Contact { get; set; } = string.Empty;
-
-        /// <summary>
-        /// The email address for data-protection enquiries.
-        /// </summary>
-        [JsonPropertyName("contact_email")]
-        public string ContactEmail { get; set; } = string.Empty;
-
-        /// <summary>
         /// The full policy body as rendered HTML — already passed
         /// through ACF's default formatting (<c>wpautop</c> and
         /// shortcode resolution) on the server, so it can be dropped

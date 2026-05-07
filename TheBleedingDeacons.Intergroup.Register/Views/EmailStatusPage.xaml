@@ -15,6 +15,26 @@
                                            TrueObject="Green" 
                                            FalseObject="Red" />
 
+            <!--
+                Action label for the offline-toggle button. The button
+                advertises what tapping it will DO, not the current state
+                — so when we're online, the label reads "Go Offline", and
+                vice versa. Mirrors the existing color-converter pattern.
+            -->
+            <toolkit:BoolToObjectConverter x:Key="OnlineToToggleLabelConverter"
+                                           TrueObject="Go Offline"
+                                           FalseObject="Go Online" />
+
+            <!--
+                Action label for the online status text. Reads the current
+                state plainly ("Online" / "Offline") rather than the bool's
+                string form. The original markup bound StringFormat='{0}'
+                directly which printed "True" / "False".
+            -->
+            <toolkit:BoolToObjectConverter x:Key="OnlineToStatusLabelConverter"
+                                           TrueObject="Online"
+                                           FalseObject="Offline" />
+
             <!-- Data templates -->
             <DataTemplate x:Key="EmailItemTemplate" x:DataType="vm:EmailDisplayModel">
                 <SwipeView>
@@ -103,9 +123,17 @@
         </ResourceDictionary>
     </ContentPage.Resources>
 
-    <Grid RowDefinitions="Auto,Auto,*">
+    <!--
+        Two-column layout. The left column holds all status / list /
+        empty-state UI; the right column is a docked action sidebar so
+        the FAB-style overlay no longer sits on top of the email list
+        and the buttons can carry plain-English labels rather than
+        emoji-only tooltips.
+    -->
+    <Grid ColumnDefinitions="*,220" RowDefinitions="Auto,Auto,*">
         <!-- Status Bar -->
         <Border Grid.Row="0"
+                Grid.Column="0"
                 BackgroundColor="{AppThemeBinding Light=#F5F5F5, Dark=#1E1E1E}"
                 Padding="16,12">
             <Border.StrokeShape>
@@ -126,7 +154,7 @@
                              HeightRequest="12" 
                              Fill="{Binding IsOnline, Converter={StaticResource OnlineStatusToColorConverter}}" 
                              VerticalOptions="Center" />
-                    <Label Text="{Binding IsOnline, StringFormat='{0}'}" 
+                    <Label Text="{Binding IsOnline, Converter={StaticResource OnlineToStatusLabelConverter}}" 
                            FontAttributes="Bold"
                            FontSize="14"
                            TextColor="{Binding IsOnline, Converter={StaticResource OnlineStatusToColorConverter}}"
@@ -151,12 +179,14 @@
                         BackgroundColor="Transparent"
                         TextColor="{AppThemeBinding Light=#007ACC, Dark=#4FC3F7}"
                         Command="{Binding RefreshEmailsCommand}"
+                        ToolTipProperties.Text="Refresh"
                         IsEnabled="{Binding IsLoading, Converter={StaticResource InvertedBoolConverter}}" />
             </Grid>
         </Border>
 
         <!-- Statistics Bar -->
         <Border Grid.Row="1"
+                Grid.Column="0"
                 BackgroundColor="{AppThemeBinding Light=White, Dark=#2D2D30}"
                 Padding="16,8">
             <Border.StrokeShape>
@@ -223,6 +253,7 @@
 
         <!-- Email List -->
         <RefreshView Grid.Row="2"
+                     Grid.Column="0"
                      IsRefreshing="{Binding IsRefreshing}"
                      Command="{Binding RefreshEmailsCommand}">
 
@@ -253,8 +284,81 @@
             </CollectionView>
         </RefreshView>
 
+        <!--
+            Action sidebar. Spans all three rows of the left column so the
+            buttons stay reachable regardless of where the email list is
+            scrolled. Each button carries an explicit verb so the function
+            is clear without relying on tooltip hover (which doesn't fire
+            on touch). Clear Sent uses the secondary style as a soft
+            destructive cue, and is gated by a confirmation in the VM.
+        -->
+        <Border Grid.Row="0"
+                Grid.RowSpan="3"
+                Grid.Column="1"
+                BackgroundColor="{AppThemeBinding Light=#F5F5F5, Dark=#1E1E1E}"
+                Padding="12,16">
+            <Border.StrokeShape>
+                <RoundRectangle CornerRadius="0" />
+            </Border.StrokeShape>
+            <Border.Shadow>
+                <Shadow Brush="{AppThemeBinding Light=#E0E0E0, Dark=#404040}"
+                        Offset="-1,0"
+                        Radius="0"
+                        Opacity="1" />
+            </Border.Shadow>
+
+            <ScrollView>
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="Actions"
+                           FontAttributes="Bold"
+                           FontSize="14"
+                           TextColor="{AppThemeBinding Light=#666666, Dark=#CCCCCC}"
+                           Margin="4,0,0,4" />
+
+                    <!--  Send everything in the queue right now.  -->
+                    <Button Text="Send Now"
+                            Style="{StaticResource M3PrimaryButtonStyle}"
+                            Command="{Binding ProcessQueueCommand}" />
+
+                    <!--  Reset attempt counters on every email and re-process.  -->
+                    <Button Text="Retry All"
+                            Style="{StaticResource M3PrimaryButtonStyle}"
+                            Command="{Binding RetryAllEmailsCommand}" />
+
+                    <!--  Reset attempt counters on Failed-status emails only.  -->
+                    <Button Text="Retry Failed"
+                            Style="{StaticResource M3PrimaryButtonStyle}"
+                            Command="{Binding RetryFailedEmailsCommand}" />
+
+                    <!--
+                        Destructive: removes successfully-sent emails from the
+                        local queue. Secondary style softens the visual weight,
+                        and the VM gates the action with a confirmation dialog.
+                    -->
+                    <Button Text="Clear Sent"
+                            Style="{StaticResource M3SecondaryButtonStyle}"
+                            Command="{Binding ClearSentEmailsCommand}" />
+
+                    <!--  Spacer divider before the mode toggle.  -->
+                    <BoxView HeightRequest="1"
+                             Color="{AppThemeBinding Light=#E0E0E0, Dark=#404040}"
+                             Margin="0,8" />
+
+                    <!--
+                        Toggle reads as the action it will perform — when we
+                        are online the label says "Go Offline", and vice versa
+                        — instead of stringifying the IsOnline bool.
+                    -->
+                    <Button Text="{Binding IsOnline, Converter={StaticResource OnlineToToggleLabelConverter}}"
+                            Style="{StaticResource M3SecondaryButtonStyle}"
+                            Command="{Binding ToggleOfflineModeCommand}" />
+                </VerticalStackLayout>
+            </ScrollView>
+        </Border>
+
         <!-- Loading Overlay -->
         <Border Grid.Row="0" Grid.RowSpan="3"
+                Grid.Column="0" Grid.ColumnSpan="2"
                 BackgroundColor="#80000000"
                 IsVisible="{Binding IsLoading}">
             <ActivityIndicator IsRunning="{Binding IsLoading}"
@@ -262,49 +366,6 @@
                                VerticalOptions="Center"
                                Color="{AppThemeBinding Light=#007ACC, Dark=#4FC3F7}" />
         </Border>
-
-        <!-- Floating Action Menu positioned at bottom right -->
-        <StackLayout Grid.Row="2"
-                     VerticalOptions="End" 
-                     HorizontalOptions="End" 
-                     Margin="16,0,16,100"
-                     Spacing="12">
-
-            <!-- Process Queue -->
-            <Button Text="▶"
-                    Style="{StaticResource FabButtonStyle}"
-                    BackgroundColor="#4CAF50"
-                    Command="{Binding ProcessQueueCommand}"
-                    ToolTipProperties.Text="Process Queue" />
-
-            <!-- Clear Sent Emails -->
-            <Button Text="🗑"
-                    Style="{StaticResource FabButtonStyle}"
-                    BackgroundColor="#FF9800"
-                    Command="{Binding ClearSentEmailsCommand}"
-                    ToolTipProperties.Text="Clear Sent Emails" />
-
-            <!-- Retry Failed -->
-            <Button Text="❗"
-                    Style="{StaticResource FabButtonStyle}"
-                    BackgroundColor="#FF5722"
-                    Command="{Binding RetryFailedEmailsCommand}"
-                    ToolTipProperties.Text="Retry Failed Emails" />
-
-            <!-- Retry All -->
-            <Button Text="🔄"
-                    Style="{StaticResource FabButtonStyle}"
-                    BackgroundColor="#2196F3"
-                    Command="{Binding RetryAllEmailsCommand}"
-                    ToolTipProperties.Text="Retry All Emails" />
-
-            <!-- Toggle Offline Mode -->
-            <Button Text="{Binding IsOnline, StringFormat='{0}'}"
-                    Style="{StaticResource FabButtonStyle}"
-                    BackgroundColor="{Binding IsOnline, Converter={StaticResource OnlineStatusToColorConverter}}"
-                    Command="{Binding ToggleOfflineModeCommand}"
-                    ToolTipProperties.Text="Toggle Online/Offline Mode" />
-        </StackLayout>
     </Grid>
 
 </ContentPage>

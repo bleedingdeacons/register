@@ -28,8 +28,8 @@ namespace TheBleedingDeacons.Intergroup.Register.Services;
 ///   3. <b>End of session / refresh</b> — <see cref="ReconcileAsync"/>:
 ///      Replay the event log (if any pending entries) → detect what changed
 ///      locally (by diffing current state against the snapshot) → push those
-///      changes to the Unity API in the correct dependency order → re-sync
-///      and re-snapshot → purge the event log.
+///      changes to the Unity API in the correct dependency order → purge
+///      the event log.
 ///
 /// <b>Dependency ordering</b>: locally-created members (negative temp IDs)
 /// must be created on Unity first so a real ID is returned. That real ID
@@ -37,8 +37,8 @@ namespace TheBleedingDeacons.Intergroup.Register.Services;
 /// the member.
 ///
 /// <b>Durability ordering</b>: the event log is purged only AFTER a clean
-/// reconcile (no API errors) and a fresh snapshot. If anything goes wrong
-/// the log is preserved so the next attempt can replay it.
+/// reconcile (no API errors). If anything goes wrong the log is preserved
+/// so the next attempt can replay it.
 ///
 /// <b>Context lifetime</b>: <see cref="ReconcileAsync"/> owns a single
 /// DbContext for the duration of the call — reconciliation is a unit of
@@ -97,18 +97,17 @@ public class ReconciliationService
 		int UnregisteredPositions,
 		int RecordedCompliance,
 		int ApiErrors,
-		int ApiWarnings,
-		UnitySyncService.SyncResult Resync,
-		SnapshotService.SnapshotResult Snapshot);
+		int ApiWarnings);
 
 	// =====================================================================
-	// Reconcile — detect, push, re-sync
+	// Reconcile — detect and push
 	// =====================================================================
 
 	/// <summary>
-	/// Detects all local changes since the last snapshot, pushes them to
-	/// the Unity API in dependency order, then performs a fresh sync and
-	/// captures a new snapshot.
+	/// Detects all local changes since the last snapshot and pushes them
+	/// to the Unity API in dependency order. Does not re-sync or
+	/// re-snapshot afterwards: callers (Finish Meeting) are expected to
+	/// either purge the local DB or treat the local state as terminal.
 	///
 	/// <para>
 	/// When <paramref name="progress"/> is supplied, emits
@@ -166,9 +165,9 @@ public class ReconciliationService
 		if (!hasSnapshot)
 		{
 			Logger.Warning("ReconcileAsync: no snapshot exists — performing plain sync + snapshot");
-			var sync = await _syncService.SyncAsync(ct, progress);
-			var snap = await _snapshotService.CaptureAsync(ct, progress);
-			return new ReconcileResult(0, 0, 0, 0, 0, 0, 0, 0, 0, sync, snap);
+			await _syncService.SyncAsync(ct, progress);
+			await _snapshotService.CaptureAsync(ct, progress);
+			return new ReconcileResult(0, 0, 0, 0, 0, 0, 0, 0, 0);
 		}
 
 		using var client = await _clientFactory();
@@ -420,7 +419,15 @@ public class ReconciliationService
 					// the server expects.
 					Version = member.GdprAcceptanceVersion,
 					Method = member.GdprAcceptanceMethod,
-					Statement = member.GdprAcceptanceStatement,
+					// PolicyId replaces the statement body on the wire —
+					// the server resolves the body itself via Scrutiny's
+					// PrivacyPolicyRepository. Null when a pre-Scrutiny
+					// log line replayed without an id, or when the device
+					// accepted before ever syncing a policy; the server
+					// treats the omission as "wording unknown" and stores
+					// an empty statement, which is the same fallback
+					// ComplianceService applied locally.
+					PolicyId = member.GdprAcceptancePolicyId,
 				};
 
 				var response = await client.RecordComplianceAsync(member.Id, request, ct);
@@ -632,19 +639,13 @@ public class ReconciliationService
 			Logger.Information("No active intergroup meeting set — skipping registration push");
 		}
 
-		// ── Phase 4: Re-sync from Unity to get authoritative state ───
-		// Forward `progress` so the user gets the per-page fetch updates
-		// from the re-sync as well as the initial sync. Without this the
-		// progress bar would freeze during what is often the longest
-		// step of the whole reconcile.
-		Logger.Information("Reconciliation API calls complete — re-syncing from Unity");
-		progress?.Report(new SyncProgress(
-			SyncStage.Resyncing,
-			"Re-syncing from Unity…"));
-		var syncResult = await _syncService.SyncAsync(ct, progress);
-
-		// ── Phase 5: Capture fresh snapshot ──────────────────────────
-		var snapshotResult = await _snapshotService.CaptureAsync(ct, progress);
+		// Phase 4 (re-sync from Unity) and Phase 5 (snapshot recapture)
+		// have been removed: Finish Meeting is followed by Purge, which
+		// wipes the local DB anyway, so pulling fresh state down from
+		// Unity and snapshotting it would only be discarded seconds
+		// later. The push counts collected above are the only numbers
+		// the caller needs, and the event-log purge below depends only
+		// on apiErrors, not on a successful re-sync.
 
 		// ── Phase 6: Purge the durability log ────────────────────────
 		if (apiErrors == 0)
@@ -696,7 +697,7 @@ public class ReconciliationService
 			registeredGroups, unregisteredGroups,
 			registeredPositions, unregisteredPositions,
 			recordedCompliance,
-			apiErrors, apiWarnings, syncResult, snapshotResult);
+			apiErrors, apiWarnings);
 	}
 
 	// =====================================================================
@@ -738,7 +739,7 @@ public class ReconciliationService
 			if (original.IntergroupPositionId != member.IntergroupPositionId) changed.Add(nameof(Member.IntergroupPositionId));
 			if (original.IntergroupPositionRotation != member.IntergroupPositionRotation) changed.Add(nameof(Member.IntergroupPositionRotation));
 
-			// Treat the five GDPR fields as a single unit: any field
+			// Treat the GDPR fields as a single unit: any field
 			// difference flags the synthetic key "GdprCompliance",
 			// because they're pushed via the dedicated compliance
 			// endpoint as one atomic action rather than via the general
@@ -746,11 +747,20 @@ public class ReconciliationService
 			// nameof key the push phase would have to OR them together
 			// anyway, and getting that wrong would silently drop
 			// changes — better to centralise the union here.
+			//
+			// GdprAcceptancePolicyId is included even though it isn't
+			// returned in server responses (the server only echoes the
+			// resolved statement back, not the id it resolved). It can
+			// still differ between snapshot and current state when a
+			// local acceptance has just been recorded against a freshly
+			// synced policy id, and that delta is exactly what triggers
+			// the push that informs the server.
 			if (original.GdprAccepted != member.GdprAccepted
 				|| original.GdprAcceptedAt != member.GdprAcceptedAt
 				|| original.GdprAcceptanceVersion != member.GdprAcceptanceVersion
 				|| original.GdprAcceptanceMethod != member.GdprAcceptanceMethod
-				|| original.GdprAcceptanceStatement != member.GdprAcceptanceStatement)
+				|| original.GdprAcceptanceStatement != member.GdprAcceptanceStatement
+				|| original.GdprAcceptancePolicyId != member.GdprAcceptancePolicyId)
 			{
 				changed.Add(GdprComplianceKey);
 			}
