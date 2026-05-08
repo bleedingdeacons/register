@@ -34,6 +34,7 @@ public partial class VerifyGroupViewModel : BaseViewModel
 
 	private readonly IAttendanceRegistration<Group> _attendanceRegistration;
 	private readonly IGroupRepository _groupRepository;
+	private readonly IPositionRepository _positionRepository;
 	private readonly IPopupNotification _popupService;
 	private readonly IConfigurationService _configService;
 	private readonly IComplianceRegistration _complianceRegistration;
@@ -109,6 +110,7 @@ public partial class VerifyGroupViewModel : BaseViewModel
 	public VerifyGroupViewModel(
 		IAttendanceRegistration<Group> attendanceRegistration,
 		IGroupRepository groupRepository,
+		IPositionRepository positionRepository,
 		IPopupNotification popupService,
 		IConfigurationService configService,
 		IComplianceRegistration complianceRegistration,
@@ -116,6 +118,7 @@ public partial class VerifyGroupViewModel : BaseViewModel
 	{
 		_attendanceRegistration = attendanceRegistration;
 		_groupRepository = groupRepository;
+		_positionRepository = positionRepository;
 		_popupService = popupService;
 		_configService = configService;
 		_complianceRegistration = complianceRegistration;
@@ -309,6 +312,60 @@ public partial class VerifyGroupViewModel : BaseViewModel
 						"Group {GroupName} registration aborted: GDPR consent declined by at least one of {Count} unaccepted GSR(s)",
 						Group.Name, unaccepted.Count);
 					return;
+				}
+			}
+
+			// When positions are auto-registered on group registration, their
+			// holders from other groups are never surfaced in ActiveGsrs and
+			// so never reach the GDPR gate above. Prompt them here, before
+			// the group is committed, so consent is captured in the same
+			// interaction that triggers their position registration.
+			//
+			// Only runs when the feature is enabled — if auto-register is off,
+			// positions are registered independently via the overview page and
+			// the verify-position flow captures consent there instead.
+			if (_configService.IsAutoRegisterPositionsOnGroupEnabled)
+			{
+				var gsrIds = ActiveGsrs.Select(m => m.Id).ToHashSet();
+
+				// Collect all unique position IDs held by this group's members,
+				// then load each position with its full holder list.
+				var positionIds = ActiveGsrs
+					.Where(m => m.IntergroupPositionId.HasValue)
+					.Select(m => m.IntergroupPositionId!.Value)
+					.Distinct()
+					.ToList();
+
+				var otherHoldersNeedingConsent = new List<Member>();
+				foreach (var positionId in positionIds)
+				{
+					var position = await _positionRepository.GetByIdWithHoldersAsync(positionId);
+					if (position?.Holders == null) continue;
+
+					foreach (var holder in position.Holders)
+					{
+						// Skip members already covered by the GSR gate above,
+						// and members who have already accepted the current version.
+						if (gsrIds.Contains(holder.Id)) continue;
+						if (holder.GdprAccepted == true
+							&& (string.IsNullOrWhiteSpace(cachedVersion)
+								|| string.Equals(holder.GdprAcceptanceVersion, cachedVersion, StringComparison.Ordinal)))
+							continue;
+
+						otherHoldersNeedingConsent.Add(holder);
+					}
+				}
+
+				if (otherHoldersNeedingConsent.Count > 0)
+				{
+					var consentGiven = await PromptForComplianceAsync(otherHoldersNeedingConsent);
+					if (!consentGiven)
+					{
+						Logger.Information(
+							"Group {GroupName} registration aborted: GDPR consent declined by at least one of {Count} position holder(s)",
+							Group.Name, otherHoldersNeedingConsent.Count);
+						return;
+					}
 				}
 			}
 
