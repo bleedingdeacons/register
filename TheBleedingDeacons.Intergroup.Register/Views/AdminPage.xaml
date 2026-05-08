@@ -155,16 +155,16 @@
                             Margin="0,40,0,0"
                             HorizontalOptions="Center"
                             Style="{StaticResource M3EmptyStateTitleStyle}"
-                            Text="Syncing…" />
+                            Text="{Binding ProgressMessage}" />
 
-                        <Label
+                        <!--<Label
                             Margin="20,0"
                             HorizontalOptions="Center"
                             HorizontalTextAlignment="Center"
                             IsVisible="{Binding ProgressMessage, Converter={toolkit:IsStringNotNullOrEmptyConverter}}"
                             LineBreakMode="WordWrap"
                             Style="{StaticResource SecondaryTextStyle}"
-                            Text="{Binding ProgressMessage}" />
+                            Text="{Binding ProgressMessage}" />-->
 
                         <!--  Determinate: thin bar + count.  -->
                         <VerticalStackLayout
@@ -295,41 +295,28 @@
                     -->
                     <VerticalStackLayout IsVisible="{Binding IsInProgress}" Spacing="16">
 
-                        <!--  Active meeting banner — uses success palette tokens  -->
-                        <Border Style="{StaticResource SuccessBannerStyle}">
-                            <Grid
-                                ColumnDefinitions="Auto,*"
-                                ColumnSpacing="12"
-                                VerticalOptions="Center">
+                        <!--  Active meeting banner — uses info palette tokens  -->
+                        <Border Style="{StaticResource InfoBannerStyle}">
+                            <VerticalStackLayout Spacing="2" VerticalOptions="Center">
                                 <Label
-                                    Grid.Column="0"
-                                    FontSize="28"
-                                    Text="✅"
-                                    VerticalOptions="Center" />
-                                <VerticalStackLayout
-                                    Grid.Column="1"
-                                    Spacing="2"
-                                    VerticalOptions="Center">
-                                    <Label
-                                        Margin="0"
-                                        Style="{StaticResource FieldLabelStyle}"
-                                        Text="Meeting In Progress"
-                                        TextColor="{AppThemeBinding Light={StaticResource SuccessText},
-                                                                    Dark={StaticResource SuccessTextDim}}" />
-                                    <Label
-                                        FontAttributes="Bold"
-                                        FontSize="16"
-                                        IsVisible="{Binding ActiveMeetingTitle, Converter={toolkit:IsNotNullConverter}}"
-                                        Text="{Binding ActiveMeetingTitle}"
-                                        TextColor="{AppThemeBinding Light={StaticResource SuccessText},
-                                                                    Dark={StaticResource SuccessTextDim}}" />
-                                    <Label
-                                        Style="{StaticResource ValueLabelStyle}"
-                                        Text="{Binding ActiveMeetingDate}"
-                                        TextColor="{AppThemeBinding Light={StaticResource SuccessText},
-                                                                    Dark={StaticResource SuccessTextDim}}" />
-                                </VerticalStackLayout>
-                            </Grid>
+                                    Margin="0"
+                                    Style="{StaticResource FieldLabelStyle}"
+                                    Text="Meeting In Progress"
+                                    TextColor="{AppThemeBinding Light={StaticResource TextBody},
+                                                                Dark={StaticResource TextBodyDim}}" />
+                                <Label
+                                    FontAttributes="Bold"
+                                    FontSize="16"
+                                    IsVisible="{Binding ActiveMeetingTitle, Converter={toolkit:IsNotNullConverter}}"
+                                    Text="{Binding ActiveMeetingTitle}"
+                                    TextColor="{AppThemeBinding Light={StaticResource TextBody},
+                                                                Dark={StaticResource TextBodyDim}}" />
+                                <Label
+                                    Style="{StaticResource ValueLabelStyle}"
+                                    Text="{Binding ActiveMeetingDate}"
+                                    TextColor="{AppThemeBinding Light={StaticResource TextBody},
+                                                                Dark={StaticResource TextBodyDim}}" />
+                            </VerticalStackLayout>
                         </Border>
 
                         <Label

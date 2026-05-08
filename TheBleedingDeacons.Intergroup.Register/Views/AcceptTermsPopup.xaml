@@ -14,7 +14,7 @@
         x:DataType="vm:AcceptTermsPopupViewModel"
         HeightRequest="560"
         Style="{StaticResource M3CardStyle}"
-        WidthRequest="640">
+        WidthRequest="896">
 
         <Grid
             Padding="24"
@@ -51,16 +51,36 @@
                 I-Agree button can enable.
             -->
             <Grid Grid.Row="1">
-                <ScrollView x:Name="PolicyScrollView" VerticalScrollBarVisibility="Always">
-                    <Label
-                        FontSize="18"
-                        HorizontalOptions="Fill"
-                        HorizontalTextAlignment="Start"
-                        LineBreakMode="WordWrap"
-                        Text="{Binding Message}"
-                        TextColor="{AppThemeBinding Light={StaticResource Gray900},
-                                                    Dark={StaticResource Gray100}}" />
-                </ScrollView>
+                <!--
+                    The ScrollView sits inside a Border so the policy
+                    region has a visible frame distinct from the rest of
+                    the dialog body. Padding lives on the Border (not the
+                    ScrollView) so the stroke wraps the scrollbar too;
+                    inner Label margin keeps the text off the stroke
+                    while the scrollbar still rides flush against the
+                    right edge as users expect. StrokeShape's corner
+                    radius matches the M3 card aesthetic of the outer
+                    dialog without copying its full elevation.
+                -->
+                <Border
+                    Padding="12"
+                    Stroke="{AppThemeBinding Light={StaticResource Gray300},
+                                             Dark={StaticResource Gray600}}"
+                    StrokeThickness="1">
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="8" />
+                    </Border.StrokeShape>
+                    <ScrollView x:Name="PolicyScrollView" VerticalScrollBarVisibility="Always">
+                        <Label
+                            FontSize="18"
+                            HorizontalOptions="Fill"
+                            HorizontalTextAlignment="Start"
+                            LineBreakMode="WordWrap"
+                            Text="{Binding Message}"
+                            TextColor="{AppThemeBinding Light={StaticResource Gray900},
+                                                        Dark={StaticResource Gray100}}" />
+                    </ScrollView>
+                </Border>
 
                 <Button
                     Margin="0,0,0,00"
@@ -90,12 +110,20 @@
                 (or the spacing between glyph and label) also toggle the
                 state — children consume their own input first, so the
                 native CheckBox click behaviour is preserved.
+
+                The whole row is disabled until HasScrolledToEnd flips
+                true, so the user cannot tick the box before they've
+                reached the bottom of the policy. IsEnabled propagates to
+                child controls in MAUI, so binding it on the row covers
+                the CheckBox, the Label, and the row's TapGestureRecognizer
+                in a single binding.
             -->
             <Grid
                 Grid.Row="2"
                 ColumnDefinitions="Auto,*"
                 ColumnSpacing="8"
                 HorizontalOptions="Start"
+                IsEnabled="{Binding HasScrolledToEnd}"
                 VerticalOptions="Center">
                 <Grid.GestureRecognizers>
                     <TapGestureRecognizer Tapped="OnAgreementRowTapped" />
