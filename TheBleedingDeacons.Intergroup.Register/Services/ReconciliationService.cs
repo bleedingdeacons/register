@@ -350,6 +350,15 @@ public class ReconciliationService
 		// same session (e.g. an officer corrects a phone number AND
 		// records an acceptance); each pushes to its own endpoint.
 
+		// New members with compliance recorded this session: not in the
+		// snapshot so DetectModifiedMembersAsync never returns them, and
+		// the loop below guards on Id < 0. Collect them separately now
+		// that tempIdToRealId is fully populated; only include those
+		// whose create succeeded (i.e. have a resolved real ID).
+		var newMembersWithCompliance = newMembers
+			.Where(m => m.GdprAccepted is not null && tempIdToRealId.ContainsKey(m.Id))
+			.ToList();
+
 		// Pre-count compliance pushes for the same reason as Phase 2:
 		// the determinate progress bar needs a stable total, and a
 		// member with only-GDPR changes on a temp ID (Id < 0) is a
@@ -357,7 +366,8 @@ public class ReconciliationService
 		int complianceTotal = modifiedMemberChanges.Count(c =>
 			c.Member.Id >= 0 &&
 			c.ChangedProperties.Contains(GdprComplianceKey) &&
-			c.Member.GdprAccepted is not null);
+			c.Member.GdprAccepted is not null)
+			+ newMembersWithCompliance.Count;
 
 		if (complianceTotal > 0)
 		{
@@ -373,7 +383,7 @@ public class ReconciliationService
 		int complianceIndex = 0;
 		foreach (var (member, changedProps) in modifiedMemberChanges)
 		{
-			if (member.Id < 0) continue; // temp members handled above
+			if (member.Id < 0) continue; // temp members handled below
 			if (!changedProps.Contains(GdprComplianceKey)) continue;
 
 			// Skip "noise" changes where the snapshot had no value
@@ -450,6 +460,51 @@ public class ReconciliationService
 			{
 				apiErrors++;
 				Logger.Error(ex, "Exception recording compliance for member {Id} on Unity", member.Id);
+			}
+		}
+
+		foreach (var member in newMembersWithCompliance)
+		{
+			var realId = tempIdToRealId[member.Id];
+
+			complianceIndex++;
+			progress?.Report(new SyncProgress(
+				SyncStage.PushCompliance,
+				$"Recording compliance: {member.AnonymousName}",
+				Current: complianceIndex,
+				Total: complianceTotal));
+
+			try
+			{
+				var request = new RecordComplianceRequest
+				{
+					Accepted = member.GdprAccepted!.Value,
+					AcceptedAt = member.GdprAcceptedAt?.ToUniversalTime().ToString("o"),
+					Version = member.GdprAcceptanceVersion,
+					Method = member.GdprAcceptanceMethod,
+					PolicyId = member.GdprAcceptancePolicyId,
+				};
+
+				var response = await client.RecordComplianceAsync(realId, request, ct);
+				if (response.Success)
+				{
+					recordedCompliance++;
+					Logger.Information(
+						"Recorded compliance for new member {Name} (ID={Id}, accepted={Accepted}) on Unity",
+						member.AnonymousName, realId, member.GdprAccepted);
+				}
+				else
+				{
+					apiWarnings++;
+					Logger.Warning(
+						"Failed to record compliance for new member {Id} on Unity: {Error}",
+						realId, response.Error?.Message);
+				}
+			}
+			catch (Exception ex)
+			{
+				apiErrors++;
+				Logger.Error(ex, "Exception recording compliance for new member {Id} on Unity", realId);
 			}
 		}
 
