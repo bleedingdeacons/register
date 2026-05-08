@@ -326,10 +326,14 @@ public partial class VerifyGroupViewModel : BaseViewModel
 			// the verify-position flow captures consent there instead.
 			if (_configService.IsAutoRegisterPositionsOnGroupEnabled)
 			{
-				var gsrIds = ActiveGsrs.Select(m => m.Id).ToHashSet();
-
-				// Collect all unique position IDs held by this group's members,
-				// then load each position with its full holder list.
+				// Collect position IDs held by the registering GSRs. If a GSR
+				// also holds an intergroup position, that position is
+				// auto-registered as a cascade. Any co-holders of those
+				// positions who haven't yet accepted the current policy must be
+				// prompted before the registration is committed.
+				// GSRs who accepted in the gate above already have their
+				// acceptance written to the DB, so they will be naturally
+				// excluded by the version check when loaded fresh here.
 				var positionIds = ActiveGsrs
 					.Where(m => m.IntergroupPositionId.HasValue)
 					.Select(m => m.IntergroupPositionId!.Value)
@@ -344,9 +348,7 @@ public partial class VerifyGroupViewModel : BaseViewModel
 
 					foreach (var holder in position.Holders)
 					{
-						// Skip members already covered by the GSR gate above,
-						// and members who have already accepted the current version.
-						if (gsrIds.Contains(holder.Id)) continue;
+						// Skip members who have already accepted the current version.
 						if (holder.GdprAccepted == true
 							&& (string.IsNullOrWhiteSpace(cachedVersion)
 								|| string.Equals(holder.GdprAcceptanceVersion, cachedVersion, StringComparison.Ordinal)))
