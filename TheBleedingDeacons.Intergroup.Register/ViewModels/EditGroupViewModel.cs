@@ -36,6 +36,7 @@ public partial class EditGroupViewModel : BaseViewModel
 	private readonly IPopupNotification _popupService;
 	private readonly IPhoneNumberService _phoneService;
 	private readonly IConfigurationService _configService;
+	private readonly IAttendanceRegistration<Group> _groupAttendance;
 
 	// The group whose GSRs are being managed
 	private Group? _group;
@@ -157,12 +158,14 @@ public partial class EditGroupViewModel : BaseViewModel
 		IDbContextFactory<UnityDbContext> contextFactory,
 		IPopupNotification popupService,
 		IPhoneNumberService phoneService,
-		IConfigurationService configService)
+		IConfigurationService configService,
+		IAttendanceRegistration<Group> groupAttendance)
 	{
 		_contextFactory = contextFactory;
 		_popupService = popupService;
 		_phoneService = phoneService;
 		_configService = configService;
+		_groupAttendance = groupAttendance;
 
 		ValidateForm();
 	}
@@ -619,6 +622,26 @@ public partial class EditGroupViewModel : BaseViewModel
 		{
 			Logger.Error(ex, "Failed to commit pending removals");
 			await Shell.Current.DisplayAlert("Error", $"Failed to save changes: {ex.Message}", "OK");
+			return;
+		}
+
+		// If all members have been removed, unregister the group and return
+		// to the main page — there is nothing left to verify or register.
+		if (!HasActiveMembers && _group is { Registered: true })
+		{
+			try
+			{
+				await _groupAttendance.Unregister(_group);
+				Logger.Information(
+					"All members removed from group {Name} — unregistered and returning to main page",
+					_group.Name);
+			}
+			catch (Exception ex)
+			{
+				Logger.Error(ex, "Failed to unregister empty group {Name}", _group.Name);
+			}
+
+			await Shell.Current.GoToAsync("//MainPage");
 			return;
 		}
 
