@@ -3,7 +3,6 @@ using CommunityToolkit.Mvvm.Input;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using System.Collections.ObjectModel;
-using System.ComponentModel.DataAnnotations;
 using TheBleedingDeacons.Intergroup.Register.Services;
 using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Support;
@@ -972,11 +971,7 @@ public partial class EditGroupViewModel : BaseViewModel
 	private void SetEmailError(string error) { EmailError = error; HasEmailError = true; }
 	private void ClearEmailError() { EmailError = null; HasEmailError = false; }
 
-	private static bool IsValidEmail(string email)
-	{
-		try { return new EmailAddressAttribute().IsValid(email); }
-		catch { return false; }
-	}
+	private static bool IsValidEmail(string email) => EmailValidator.IsValid(email);
 
 	private bool IsValidPhoneFormat(string phone)
 	{

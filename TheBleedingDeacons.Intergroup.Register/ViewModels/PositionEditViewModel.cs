@@ -3,7 +3,6 @@ using CommunityToolkit.Mvvm.Input;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using System.Collections.ObjectModel;
-using System.ComponentModel.DataAnnotations;
 using TheBleedingDeacons.Intergroup.Register.Services;
 using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Support;
@@ -980,11 +979,7 @@ public partial class PositionEditViewModel : BaseViewModel
 			SetRotationDateError("Rotation date is required.");
 	}
 
-	private static bool IsValidEmail(string email)
-	{
-		try { return new EmailAddressAttribute().IsValid(email); }
-		catch { return false; }
-	}
+	private static bool IsValidEmail(string email) => EmailValidator.IsValid(email);
 
 	private static bool IsValidPhoneFormat(string phone)
 	{
