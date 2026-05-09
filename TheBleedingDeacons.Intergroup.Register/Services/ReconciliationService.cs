@@ -182,6 +182,15 @@ public class ReconciliationService
 		// Maps old temporary (negative) member ID → real Unity ID
 		var tempIdToRealId = new Dictionary<int, int>();
 
+		// Temporary (negative) member IDs whose CreateMemberAsync call failed
+		// during Phase 1. Phase 3 (group/officer registrations) consults this
+		// set to skip any registration that depends on a member whose creation
+		// failed, rather than blindly sending the negative temp ID to Unity
+		// (which the API rejects with HTTP 400). The temp member is preserved
+		// in the local DB so the next ReconcileAsync run will retry the
+		// create automatically — and the dependent registration along with it.
+		var failedCreates = new HashSet<int>();
+
 		// ── Phase 1: Create new members on Unity ─────────────────────
 		// These have negative temporary IDs assigned by TemporaryIdGenerator.
 		var newMembers = await db.Members
@@ -239,16 +248,32 @@ public class ReconciliationService
 				}
 				else
 				{
-					apiWarnings++;
-					Logger.Warning(
-						"Failed to create member {Name} on Unity: {Error}",
-						member.AnonymousName, response.Error?.Message);
+					// Create-failure is an error, not a warning: it both fails
+					// to push the new member AND blocks every dependent
+					// registration in Phase 3. Bumping apiErrors keeps the
+					// registration event log alive so the next ReconcileAsync
+					// run can retry the create (member is still in the local
+					// DB with a negative ID) plus its dependent registrations.
+					apiErrors++;
+					failedCreates.Add(member.Id);
+					Logger.Error(
+						"Failed to create member {Name} on Unity (temp ID {TempId}): {ApiFailure}. StatusCode={StatusCode}, ErrorCode={ErrorCode}, Error={Error}. Dependent registrations in Phase 3 will be skipped and retried on the next sync.",
+						member.AnonymousName,
+						member.Id,
+						FormatApiFailure(response),
+						response.StatusCode,
+						response.Error?.Code,
+						response.Error?.Message);
 				}
 			}
 			catch (Exception ex)
 			{
+				// Same reasoning as above: an exception here also leaves the
+				// member uncreated, so register it as a failed-create so
+				// Phase 3 doesn't try to use the negative ID.
 				apiErrors++;
-				Logger.Error(ex, "Exception creating member {Name} on Unity", member.AnonymousName);
+				failedCreates.Add(member.Id);
+				Logger.Error(ex, "Exception creating member {Name} on Unity (temp ID {TempId}). Dependent registrations in Phase 3 will be skipped and retried on the next sync.", member.AnonymousName, member.Id);
 			}
 		}
 
@@ -321,7 +346,13 @@ public class ReconciliationService
 				else
 				{
 					apiWarnings++;
-					Logger.Warning("Failed to update member {Id} on Unity: {Error}", member.Id, response.Error?.Message);
+					Logger.Warning(
+						"Failed to update member {Id} on Unity: {ApiFailure}. StatusCode={StatusCode}, ErrorCode={ErrorCode}, Error={Error}",
+						member.Id,
+						FormatApiFailure(response),
+						response.StatusCode,
+						response.Error?.Code,
+						response.Error?.Message);
 				}
 			}
 			catch (Exception ex)
@@ -452,8 +483,12 @@ public class ReconciliationService
 				{
 					apiWarnings++;
 					Logger.Warning(
-						"Failed to record compliance for member {Id} on Unity: {Error}",
-						member.Id, response.Error?.Message);
+						"Failed to record compliance for member {Id} on Unity: {ApiFailure}. StatusCode={StatusCode}, ErrorCode={ErrorCode}, Error={Error}",
+						member.Id,
+						FormatApiFailure(response),
+						response.StatusCode,
+						response.Error?.Code,
+						response.Error?.Message);
 				}
 			}
 			catch (Exception ex)
@@ -497,8 +532,12 @@ public class ReconciliationService
 				{
 					apiWarnings++;
 					Logger.Warning(
-						"Failed to record compliance for new member {Id} on Unity: {Error}",
-						realId, response.Error?.Message);
+						"Failed to record compliance for new member {Id} on Unity: {ApiFailure}. StatusCode={StatusCode}, ErrorCode={ErrorCode}, Error={Error}",
+						realId,
+						FormatApiFailure(response),
+						response.StatusCode,
+						response.Error?.Code,
+						response.Error?.Message);
 				}
 			}
 			catch (Exception ex)
@@ -577,6 +616,24 @@ public class ReconciliationService
 							}
 						}
 
+						// If this GSR is a still-uncreated temp member whose
+						// CreateMemberAsync failed in Phase 1, sending the
+						// negative temp ID to Unity would just produce a
+						// follow-on HTTP 400. Skip the registration and
+						// preserve apiErrors from the create failure so the
+						// event log survives — both the create AND this
+						// registration will be retried on the next sync.
+						// We do NOT increment apiErrors here: the underlying
+						// error was already counted in Phase 1, and counting
+						// it twice would inflate the failure metric.
+						if (gsr != null && failedCreates.Contains(gsr.Id))
+						{
+							Logger.Information(
+								"Skipping group registration for {Name} (ID={Id}): GSR {GsrName} (temp ID {GsrTempId}) failed to create on Unity in Phase 1. Will retry on next sync.",
+								group.Name, group.Id, gsrName, gsrTempId);
+							continue;
+						}
+
 						Logger.Debug(
 							"Registering group on Unity — POST params: " +
 							"MeetingId={MeetingId}, GroupId={GroupId}, GroupName={GroupName}, " +
@@ -595,7 +652,7 @@ public class ReconciliationService
 							registeredGroups++;
 							Logger.Information("Registered group {Name} (ID={Id}) on Unity", group.Name, group.Id);
 						}
-						else if (IsAlreadyRegisteredError(response.Error))
+						else if (IsAlreadyRegisteredError(response))
 						{
 							registeredGroups++;
 							Logger.Information("Group {Name} (ID={Id}) was already registered on Unity — treating as success",
@@ -605,11 +662,16 @@ public class ReconciliationService
 						{
 							apiErrors++;
 							Logger.Error(
-								"Failed to register group {Id} ({Name}): {Error}. " +
+								"Failed to register group {Id} ({Name}): {ApiFailure}. " +
+								"StatusCode={StatusCode}, ErrorCode={ErrorCode}, Error={Error}. " +
 								"POST params: MeetingId={MeetingId}, GroupId={GroupId}, MemberId={MemberId}, " +
 								"GsrName={GsrName}, GsrProxy={GsrProxy}, GsrProxyName={GsrProxyName}, " +
 								"GsrFound={GsrFound}, GsrTempId={GsrTempId}, MemberIdResolvedFromTempId={MemberIdResolvedFromTempId}",
-								group.Id, group.Name, response.Error?.Message,
+								group.Id, group.Name,
+								FormatApiFailure(response),
+								response.StatusCode,
+								response.Error?.Code,
+								response.Error?.Message,
 								meetingId, group.Id, memberId,
 								gsrName, group.GsrProxy, group.GsrProxyName ?? string.Empty,
 								gsrFound, gsrTempId, memberIdResolvedFromTempId);
@@ -626,7 +688,13 @@ public class ReconciliationService
 						else
 						{
 							apiErrors++;
-							Logger.Error("Failed to unregister group {Id}: {Error}", group.Id, response.Error?.Message);
+							Logger.Error(
+								"Failed to unregister group {Id}: {ApiFailure}. StatusCode={StatusCode}, ErrorCode={ErrorCode}, Error={Error}",
+								group.Id,
+								FormatApiFailure(response),
+								response.StatusCode,
+								response.Error?.Code,
+								response.Error?.Message);
 						}
 					}
 				}
@@ -666,6 +734,21 @@ public class ReconciliationService
 							continue;
 						}
 
+						// If the holder is a still-uncreated temp member whose
+						// CreateMemberAsync failed in Phase 1, sending the
+						// negative temp ID to Unity would just produce a
+						// follow-on HTTP 400. Skip the registration; both
+						// the create AND this registration will be retried
+						// on the next sync. Same rationale as the group
+						// case — apiErrors is NOT incremented here.
+						if (failedCreates.Contains(holder.Id))
+						{
+							Logger.Information(
+								"Skipping officer registration for position {Position}: holder {HolderName} (temp ID {HolderTempId}) failed to create on Unity in Phase 1. Will retry on next sync.",
+								positionLabel, holder.AnonymousName, holder.Id);
+							continue;
+						}
+
 						var officerId = tempIdToRealId.TryGetValue(holder.Id, out var realId) ? realId : holder.Id;
 						var officerName = holder.AnonymousName;
 						var positionName = position.ShortDescription ?? position.LongName ?? string.Empty;
@@ -679,7 +762,7 @@ public class ReconciliationService
 							Logger.Information("Registered officer {Name} for position {Position} on Unity",
 								officerName, positionName);
 						}
-						else if (IsAlreadyRegisteredError(response.Error))
+						else if (IsAlreadyRegisteredError(response))
 						{
 							registeredPositions++;
 							Logger.Information("Officer {Name} for position {Position} was already registered on Unity — treating as success",
@@ -688,8 +771,13 @@ public class ReconciliationService
 						else
 						{
 							apiErrors++;
-							Logger.Error("Failed to register officer for position {Id}: {Error}",
-								position.Id, response.Error?.Message);
+							Logger.Error(
+								"Failed to register officer for position {Id}: {ApiFailure}. StatusCode={StatusCode}, ErrorCode={ErrorCode}, Error={Error}",
+								position.Id,
+								FormatApiFailure(response),
+								response.StatusCode,
+								response.Error?.Code,
+								response.Error?.Message);
 						}
 					}
 					else
@@ -707,8 +795,13 @@ public class ReconciliationService
 						else
 						{
 							apiErrors++;
-							Logger.Error("Failed to unregister officer {Id}: {Error}",
-								officerId, response.Error?.Message);
+							Logger.Error(
+								"Failed to unregister officer {Id}: {ApiFailure}. StatusCode={StatusCode}, ErrorCode={ErrorCode}, Error={Error}",
+								officerId,
+								FormatApiFailure(response),
+								response.StatusCode,
+								response.Error?.Code,
+								response.Error?.Message);
 						}
 					}
 				}
@@ -910,12 +1003,31 @@ public class ReconciliationService
 	}
 
 	/// <summary>
-	/// Returns true when the API error indicates the group/position is already
-	/// registered for this meeting. Treated as success on register-calls so the
-	/// user can still proceed to Completed and purge the database.
+	/// Returns true when the API response indicates the group/position is
+	/// already registered for this meeting. Treated as success on register-calls
+	/// so the user can still proceed to Completed and purge the database.
+	///
+	/// <para>
+	/// Two recognition paths, either of which is sufficient:
+	/// </para>
+	/// <list type="number">
+	/// <item><b>HTTP 409 Conflict</b> — the REST-correct status for a duplicate
+	///       resource. The WordPress plugin returns this for repeat register-*
+	///       calls regardless of the JSON body shape, so we treat 409 from a
+	///       register endpoint as "already registered" without inspecting the
+	///       body. This handles bodies that say "conflict" / "duplicate entry"
+	///       / arrive non-JSON / arrive empty.</item>
+	/// <item><b>Keyword match</b> — kept as a backstop for any non-409 path
+	///       that surfaces the same condition (e.g. a 200 with success=false,
+	///       or a 400 with a "duplicate" code).</item>
+	/// </list>
 	/// </summary>
-	private static bool IsAlreadyRegisteredError(ApiError? error)
+	private static bool IsAlreadyRegisteredError<T>(ApiResponse<T> response) where T : class
 	{
+		// Status-based: a register-* POST returning 409 is "already registered".
+		if (response.StatusCode == 409) return true;
+
+		var error = response.Error;
 		if (error is null) return false;
 
 		var code = error.Code?.ToLowerInvariant() ?? string.Empty;
@@ -923,5 +1035,27 @@ public class ReconciliationService
 
 		return code.Contains("already") || code.Contains("duplicate") || code.Contains("exists")
 			|| msg.Contains("already registered") || msg.Contains("already exists");
+	}
+
+	/// <summary>
+	/// Formats every diagnostic field on an <see cref="ApiResponse{T}"/> into a
+	/// single string for inclusion in a failure log line. Surfaces the HTTP
+	/// status, error code, error message, and rate-limit headers — everything
+	/// the client returned. Pair this with the Warning-level dump that
+	/// <see cref="UnityRestSharp"/> writes for 400/401/403 (which includes
+	/// request/response headers and bodies) to get full forensic detail.
+	/// </summary>
+	private static string FormatApiFailure<T>(ApiResponse<T> response) where T : class
+	{
+		var status = response.StatusCode;
+		var code = response.Error?.Code ?? "(no code)";
+		var message = response.Error?.Message ?? "(no message)";
+
+		var rl = response.RateLimit;
+		var rateLimit = rl is null
+			? "(no rate-limit headers)"
+			: $"limit={rl.Limit}, remaining={rl.Remaining}, reset={rl.Reset} ({rl.ResetDateTime:O})";
+
+		return $"HTTP {status}, code={code}, message=\"{message}\", rate-limit: {rateLimit}";
 	}
 }
