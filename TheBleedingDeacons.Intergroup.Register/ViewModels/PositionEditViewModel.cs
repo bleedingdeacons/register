@@ -39,9 +39,23 @@ public partial class PositionEditViewModel : BaseViewModel
 	private readonly IPositionRepository _positionRepository;
 	private readonly IDbContextFactory<UnityDbContext> _contextFactory;
 	private readonly IPopupNotification _popupService;
+	private readonly IConfigurationService _configService;
 
 	// The position whose holders are being managed
 	private Position? _position;
+
+	/// <summary>
+	/// Snapshot of every (Id, AnonymousName) pair in the database, loaded
+	/// once when a position is opened. Used by <see cref="ValidateName"/>
+	/// to enforce uniqueness of AnonymousName across ALL members (not just
+	/// holders of the current position), without hitting the DB on every
+	/// keystroke.
+	///
+	/// Null until the snapshot has loaded. While null, ValidateName falls
+	/// back to checking only the in-memory holder list — a possibly-missed
+	/// clash that the next keystroke (after the snapshot lands) will catch.
+	/// </summary>
+	private List<(int Id, string Name)>? _allMemberNamesSnapshot;
 
 	/// <summary>
 	/// The currently selected member being edited (null when not editing).
@@ -171,13 +185,35 @@ public partial class PositionEditViewModel : BaseViewModel
 	public PositionEditViewModel(
 		IPositionRepository positionRepository,
 		IDbContextFactory<UnityDbContext> contextFactory,
-		IPopupNotification popupService)
+		IPopupNotification popupService,
+		IConfigurationService configService)
 	{
 		_positionRepository = positionRepository ?? throw new ArgumentNullException(nameof(positionRepository));
 		_contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
 		_popupService = popupService;
+		_configService = configService ?? throw new ArgumentNullException(nameof(configService));
 
 		ValidateForm();
+	}
+
+	/// <summary>
+	/// Whether the "+ Add" button on the Edit Position page is shown.
+	/// Reads <see cref="IConfigurationService.IsAddPositionHolderEnabled"/>
+	/// per call so flipping the toggle in Settings takes effect on the next
+	/// page entry without an app restart. The view's OnAppearing raises a
+	/// PropertyChanged for this name to refresh the binding when the user
+	/// returns from Settings without re-navigating.
+	/// </summary>
+	public bool IsAddPositionHolderEnabled => _configService.IsAddPositionHolderEnabled;
+
+	/// <summary>
+	/// Re-evaluates <see cref="IsAddPositionHolderEnabled"/> bindings.
+	/// Called from the page's OnAppearing so a Settings-toggle flip while
+	/// this page is on the back stack takes effect without re-navigation.
+	/// </summary>
+	public void RefreshAddPositionHolderToggle()
+	{
+		OnPropertyChanged(nameof(IsAddPositionHolderEnabled));
 	}
 
 	#region Query Attributes Handling
@@ -197,6 +233,7 @@ public partial class PositionEditViewModel : BaseViewModel
 			UpdateHasPendingRemovals();
 			PopulateHolderList();
 			UpdateTitle();
+			LoadAllMemberNamesSnapshotAsync().SafeFireAndForget("LoadAllMemberNamesSnapshot");
 		}
 		else if (query.TryGetValue("positionId", out var positionIdObj) &&
 				 positionIdObj is string positionIdStr &&
@@ -223,6 +260,7 @@ public partial class PositionEditViewModel : BaseViewModel
 				UpdateHasPendingRemovals();
 				PopulateHolderList();
 				UpdateTitle();
+				await LoadAllMemberNamesSnapshotAsync();
 			}
 			else
 			{
@@ -235,6 +273,39 @@ public partial class PositionEditViewModel : BaseViewModel
 			Logger.Error(ex, "Failed to load position {PositionId}", positionId);
 			await Shell.Current.DisplayAlert("Error", $"Failed to load position: {ex.Message}", "OK");
 			await Shell.Current.GoToAsync("//MainPage");
+		}
+	}
+
+	/// <summary>
+	/// Loads a snapshot of every member's (Id, AnonymousName) for use by
+	/// <see cref="ValidateName"/>'s uniqueness check. AsNoTracking + a
+	/// projected select keeps this cheap; we don't need tracked entities.
+	/// Failures are logged and swallowed: the validator falls back to
+	/// checking just this position's active holders, which is still useful
+	/// (and the current per-position behaviour pre-this-change).
+	/// </summary>
+	private async Task LoadAllMemberNamesSnapshotAsync()
+	{
+		try
+		{
+			using var context = _contextFactory.CreateDbContext();
+			var rows = await context.Members
+				.AsNoTracking()
+				.Where(m => !string.IsNullOrWhiteSpace(m.AnonymousName))
+				.Select(m => new { m.Id, m.AnonymousName })
+				.ToListAsync();
+
+			_allMemberNamesSnapshot = rows
+				.Select(r => (r.Id, Name: r.AnonymousName!))
+				.ToList();
+
+			Logger.Information("Loaded {Count} member names for uniqueness check",
+				_allMemberNamesSnapshot.Count);
+		}
+		catch (Exception ex)
+		{
+			Logger.Error(ex, "Failed to load member-name snapshot for uniqueness check");
+			// Leave _allMemberNamesSnapshot null; ValidateName degrades gracefully.
 		}
 	}
 
@@ -768,9 +839,58 @@ public partial class PositionEditViewModel : BaseViewModel
 		ClearNameError();
 
 		if (string.IsNullOrWhiteSpace(EditName))
+		{
 			SetNameError("Name is required.");
-		else if (EditName.Trim().Length > 255)
-			SetNameError("Name cannot exceed 255 characters.");
+			return;
+		}
+
+		var trimmed = EditName.Trim();
+
+		if (trimmed.Length > 215)
+		{
+			SetNameError("Name cannot exceed 215 characters.");
+			return;
+		}
+
+		// Reject a name that matches ANY other member's AnonymousName, not
+		// just other holders of this position. We compare against:
+		//
+		//   1. _allMemberNamesSnapshot — every member in the DB at the time
+		//      this page opened. Excludes the currently-edited holder (so
+		//      it validates against itself cleanly) and any holders staged
+		//      for removal in this session (so reusing a name freed by a
+		//      pending removal is allowed, matching EditGroupViewModel).
+		//
+		//   2. ActiveHolders — covers locally-added new holders that don't
+		//      yet exist in the DB (their Id is negative until SaveMember
+		//      persists them) and any in-session renames not yet flushed.
+		//
+		// If the snapshot hasn't loaded yet (very early keystroke after
+		// page open), we degrade to (2)-only — the next keystroke after
+		// the snapshot lands will catch any cross-position clash.
+		//
+		// Comparison is OrdinalIgnoreCase: matches the codebase's ordinal
+		// preference while treating "alice" and "Alice" as the same name.
+		var editingId = !IsCreatingNew ? SelectedMember?.Id : null;
+		var pendingRemovalIds = PendingRemovals.Select(m => m.Id).ToHashSet();
+
+		bool clashes = ActiveHolders.Any(m =>
+			m.Id != editingId &&
+			!string.IsNullOrWhiteSpace(m.AnonymousName) &&
+			string.Equals(m.AnonymousName.Trim(), trimmed, StringComparison.OrdinalIgnoreCase));
+
+		if (!clashes && _allMemberNamesSnapshot != null)
+		{
+			clashes = _allMemberNamesSnapshot.Any(t =>
+				t.Id != editingId &&
+				!pendingRemovalIds.Contains(t.Id) &&
+				string.Equals(t.Name.Trim(), trimmed, StringComparison.OrdinalIgnoreCase));
+		}
+
+		if (clashes)
+		{
+			SetNameError("A member with this anonymous name already exists.");
+		}
 	}
 
 	private void ValidatePhone()

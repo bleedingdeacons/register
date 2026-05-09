@@ -560,9 +560,31 @@ public class ReconciliationService
 							.FirstOrDefaultAsync(ct);
 
 						var gsrName = gsr?.AnonymousName ?? string.Empty;
-						var memberId = gsr != null
-							? (tempIdToRealId.TryGetValue(gsr.Id, out var realId) ? realId : gsr.Id)
-							: 0;
+						var gsrFound = gsr != null;
+						var gsrTempId = gsr?.Id ?? 0;
+						var memberIdResolvedFromTempId = false;
+						var memberId = 0;
+						if (gsr != null)
+						{
+							if (tempIdToRealId.TryGetValue(gsr.Id, out var realId))
+							{
+								memberId = realId;
+								memberIdResolvedFromTempId = true;
+							}
+							else
+							{
+								memberId = gsr.Id;
+							}
+						}
+
+						Logger.Debug(
+							"Registering group on Unity — POST params: " +
+							"MeetingId={MeetingId}, GroupId={GroupId}, GroupName={GroupName}, " +
+							"MemberId={MemberId}, GsrName={GsrName}, GsrProxy={GsrProxy}, GsrProxyName={GsrProxyName}, " +
+							"GsrFound={GsrFound}, GsrTempId={GsrTempId}, MemberIdResolvedFromTempId={MemberIdResolvedFromTempId}",
+							meetingId, group.Id, group.Name,
+							memberId, gsrName, group.GsrProxy, group.GsrProxyName ?? string.Empty,
+							gsrFound, gsrTempId, memberIdResolvedFromTempId);
 
 						var response = await client.RegisterGroupAsync(
 							meetingId, group.Id, memberId, gsrName,
@@ -582,7 +604,15 @@ public class ReconciliationService
 						else
 						{
 							apiErrors++;
-							Logger.Error("Failed to register group {Id}: {Error}", group.Id, response.Error?.Message);
+							Logger.Error(
+								"Failed to register group {Id} ({Name}): {Error}. " +
+								"POST params: MeetingId={MeetingId}, GroupId={GroupId}, MemberId={MemberId}, " +
+								"GsrName={GsrName}, GsrProxy={GsrProxy}, GsrProxyName={GsrProxyName}, " +
+								"GsrFound={GsrFound}, GsrTempId={GsrTempId}, MemberIdResolvedFromTempId={MemberIdResolvedFromTempId}",
+								group.Id, group.Name, response.Error?.Message,
+								meetingId, group.Id, memberId,
+								gsrName, group.GsrProxy, group.GsrProxyName ?? string.Empty,
+								gsrFound, gsrTempId, memberIdResolvedFromTempId);
 						}
 					}
 					else

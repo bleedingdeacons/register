@@ -223,10 +223,11 @@ public partial class VerifyPositionViewModel : BaseViewModel
 			// the privacy policy — OR whose recorded acceptance is for an
 			// earlier version than the currently cached active policy —
 			// must do so now before their data is committed as a registered
-			// attendance. Show the popup once for the whole batch —
-			// declining aborts the registration silently, accepting records
-			// (or refreshes) acceptance for every holder who didn't already
-			// have it on file at the current version.
+			// attendance. The popup is shown once per holder with that
+			// holder's name in the title (mirrors VerifyGroupViewModel) —
+			// declining for any holder aborts the registration silently;
+			// accepting records (or refreshes) that holder's acceptance at
+			// the current version before moving on to the next.
 			//
 			// The cached version comparison is intentionally an inequality
 			// check, not a "less than" check: PrivacyPolicy.Version is
@@ -287,13 +288,20 @@ public partial class VerifyPositionViewModel : BaseViewModel
 	#region Private Methods
 
 	/// <summary>
-	/// Shows the compliance popup with the policy text from
-	/// <c>Resources/Raw/Compliance.txt</c>, and on Accept records
-	/// acceptance for every supplied member via
-	/// <see cref="IComplianceRegistration.RecordAcceptance"/>. Returns
-	/// <c>true</c> when consent was given (and recorded), <c>false</c>
-	/// when the user declined or the popup was dismissed without an
-	/// explicit choice.
+	/// Shows the compliance popup once per supplied position holder, with
+	/// that holder's name in the title so it's unambiguous whose consent
+	/// is being captured. Each acceptance is recorded individually via
+	/// <see cref="IComplianceRegistration.RecordAcceptance"/> as soon as
+	/// it's given. Returns <c>true</c> only when every holder accepted;
+	/// returns <c>false</c> as soon as any holder declines (or the popup
+	/// is dismissed without an explicit choice), without prompting the
+	/// remaining holders — the overall registration cannot proceed.
+	///
+	/// Per-holder acceptance timestamps are captured at the moment the
+	/// user clicks Accept for that holder, rather than sharing a single
+	/// batch timestamp, so the audit trail reflects the actual sequence
+	/// of consent events. Mirrors the per-member pattern in
+	/// <see cref="VerifyGroupViewModel"/>.
 	/// </summary>
 	private async Task<bool> PromptForComplianceAsync(IEnumerable<Member> members)
 	{
@@ -340,26 +348,41 @@ public partial class VerifyPositionViewModel : BaseViewModel
 
 		var policyBody = cachedPolicy.Policy;
 
-		// Title and body both come from the cached Scrutiny record.
-		// The popup is shown once for the whole batch — the position-
-		// holder confirms consent for themselves, not per-member like
-		// the GSR flow.
-		bool accepted = await _popupService.ShowTerms(cachedPolicy.Title, policyBody);
-		if (!accepted)
-			return false;
-
-		// Record acceptance for every member that didn't already have it.
-		// One timestamp per call so the batch reads as a single coordinated
-		// event in the audit log.
-		//
-		// Version is the cached Scrutiny version. The `statement`
-		// parameter is no longer used by ComplianceService (it sources
-		// the wording from the cache itself) but is kept on the call
-		// for ABI continuity. See the equivalent block in
-		// VerifyGroupViewModel for the full rationale.
-		var ts = DateTime.UtcNow;
 		foreach (var member in members)
 		{
+			// Compose a per-holder title so the user can see which
+			// holder's consent the popup is asking for. Both the title
+			// and the body come from the cached Scrutiny record —
+			// Scrutiny is the single source of truth for everything the
+			// user sees, the audit trail records, and the confirmation
+			// email quotes. Mirrors the per-member title pattern in
+			// VerifyGroupViewModel so the position flow is consistent
+			// with the group flow.
+			string memberName = !string.IsNullOrWhiteSpace(member.AnonymousName)
+				? member.AnonymousName!
+				: "this position holder";
+			string perMemberTitle = $"{cachedPolicy.Title} — {memberName}";
+
+			bool accepted = await _popupService.ShowTerms(perMemberTitle, policyBody);
+			if (!accepted)
+			{
+				Logger.Information(
+					"GDPR consent declined for holder {MemberId} ({Name}); aborting position registration",
+					member.Id, member.AnonymousName);
+				return false;
+			}
+
+			// Record this holder's acceptance immediately. Per-holder
+			// timestamps mean each row in the audit log carries the
+			// real moment the user clicked Accept for that holder,
+			// rather than a single shared batch timestamp.
+			//
+			// Version is the cached Scrutiny version. The `statement`
+			// parameter is no longer used by ComplianceService (it
+			// sources the wording from the cache itself) but is kept
+			// on the call for ABI continuity. See the equivalent block
+			// in VerifyGroupViewModel for the full rationale.
+			var ts = DateTime.UtcNow;
 			try
 			{
 				await _complianceRegistration.RecordAcceptance(
@@ -377,13 +400,13 @@ public partial class VerifyPositionViewModel : BaseViewModel
 			}
 			catch (Exception ex)
 			{
-				// Per-member failure is logged but doesn't abort the batch
-				// — the DB write inside ComplianceService already swallows
-				// its own errors, so a throw here would be unusual. If it
-				// does happen, the registration still proceeds because the
-				// user did consent in the UI.
+				// Per-holder persistence failure is logged but doesn't
+				// abort the loop — the DB write inside ComplianceService
+				// already swallows its own errors, so a throw here would
+				// be unusual. The user did consent in the UI, so we still
+				// honour that and continue prompting the remaining holders.
 				Logger.Warning(ex,
-					"Failed to record GDPR acceptance for member {MemberId} ({Name})",
+					"Failed to record GDPR acceptance for holder {MemberId} ({Name})",
 					member.Id, member.AnonymousName);
 			}
 		}

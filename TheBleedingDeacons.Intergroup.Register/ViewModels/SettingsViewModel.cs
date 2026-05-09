@@ -553,6 +553,27 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 		}
 
 		/// <summary>
+		/// Two-way bound to a Switch on SettingsPage. When on, the Edit
+		/// Position page shows an "+ Add" button that lets operators create
+		/// new holders for the position directly. When off, the button is
+		/// hidden — holders can only be created via the Unity API. See
+		/// <see cref="IConfigurationService.IsAddPositionHolderEnabled"/>.
+		/// Defaults to off — fresh installs hide the button.
+		/// Same "no local backing field" approach as the other toggles:
+		/// Preferences is the source of truth.
+		/// </summary>
+		public bool IsAddPositionHolderEnabled
+		{
+			get => _configService.IsAddPositionHolderEnabled;
+			set
+			{
+				if (_configService.IsAddPositionHolderEnabled == value) return;
+				_configService.SetAddPositionHolderEnabled(value);
+				OnPropertyChanged();
+			}
+		}
+
+		/// <summary>
 		/// Two-way bound to a Switch on SettingsPage. When on, every
 		/// successful registration (group or position) queues a welcome /
 		/// confirmation email to each affected member who has a

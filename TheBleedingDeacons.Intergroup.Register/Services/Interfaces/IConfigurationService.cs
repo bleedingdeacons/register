@@ -87,6 +87,24 @@ namespace TheBleedingDeacons.Intergroup.Register.Services.Interfaces
 		void SetSingleGsrShortcutEnabled(bool enabled);
 
 		/// <summary>
+		/// When true, the Edit Position page shows an "+ Add" button that
+		/// lets operators create new holders for the position directly from
+		/// the device. When false, the button is hidden — holders can only
+		/// be created via the Unity API (the typical case, since position
+		/// records are managed centrally).
+		/// Defaults to <c>false</c>; callers should treat a missing value
+		/// as false. Read per-call so flipping the toggle in Settings takes
+		/// effect on the next page entry without an app restart.
+		/// </summary>
+		bool IsAddPositionHolderEnabled { get; }
+
+		/// <summary>
+		/// Persists the add-position-holder toggle. Takes effect on the next
+		/// Edit Position page entry; no restart required.
+		/// </summary>
+		void SetAddPositionHolderEnabled(bool enabled);
+
+		/// <summary>
 		/// When true, a welcome / confirmation email is queued for each
 		/// recipient as part of every successful registration:
 		/// <list type="bullet">

@@ -24,6 +24,13 @@ public partial class EditPositionPage : ContentPage, IQueryAttributable
 		base.OnAppearing();
 		EditNameEntry.Keyboard = Keyboard.Create(KeyboardFlags.CapitalizeWord);
 
+		// The IsAddPositionHolderEnabled property delegates to
+		// IConfigurationService per call, so its value can change while
+		// this page is in memory if the user pops to Settings, flips the
+		// toggle, and pops back. Raise PropertyChanged so the Add button
+		// and empty-state subtitle re-evaluate their bindings.
+		_viewModel.RefreshAddPositionHolderToggle();
+
 		// The Scrolled event only fires during scroll, so it won't prime the
 		// chevron visibility on first layout when the content already overflows.
 		// Listen for collection changes and refresh manually.

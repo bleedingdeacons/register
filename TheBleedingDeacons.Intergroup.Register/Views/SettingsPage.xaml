@@ -148,7 +148,7 @@
                 TextColor="{AppThemeBinding Light={StaticResource Gray600},
                                             Dark={StaticResource Gray300}}" />
 
-            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="12">
+            <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="12">
 
                 <Border
                     Grid.Column="0"
@@ -175,7 +175,6 @@
 
                         <Switch
                             Grid.Row="0"
-                            Grid.RowSpan="2"
                             Grid.Column="1"
                             IsToggled="{Binding IsAutoRegisterPositionsOnGroupEnabled, Mode=TwoWay}"
                             VerticalOptions="Center" />
@@ -183,6 +182,7 @@
                         <Label
                             Grid.Row="1"
                             Grid.Column="0"
+                            Grid.ColumnSpan="2"
                             FontSize="13"
                             LineBreakMode="WordWrap"
                             Text="When a group is registered, also register any intergroup position held by a member of that group. Saves tapping twice when an officer is also their group's GSR."
@@ -216,7 +216,6 @@
 
                         <Switch
                             Grid.Row="0"
-                            Grid.RowSpan="2"
                             Grid.Column="1"
                             IsToggled="{Binding IsSingleGsrShortcutEnabled, Mode=TwoWay}"
                             VerticalOptions="Center" />
@@ -224,6 +223,7 @@
                         <Label
                             Grid.Row="1"
                             Grid.Column="0"
+                            Grid.ColumnSpan="2"
                             FontSize="13"
                             LineBreakMode="WordWrap"
                             Text="When a group has only one Group Service Representative, tapping No skips the picker and opens that record's edit form directly. Tapping Finished returns straight to registration without an extra Yes tap."
@@ -257,7 +257,6 @@
 
                         <Switch
                             Grid.Row="0"
-                            Grid.RowSpan="2"
                             Grid.Column="1"
                             IsToggled="{Binding IsWelcomeEmailOnRegistrationEnabled, Mode=TwoWay}"
                             VerticalOptions="Center" />
@@ -265,9 +264,51 @@
                         <Label
                             Grid.Row="1"
                             Grid.Column="0"
+                            Grid.ColumnSpan="2"
                             FontSize="13"
                             LineBreakMode="WordWrap"
                             Text="When on, each successful registration queues a confirmation email to every affected member who has a personal email on file, including a copy of the privacy statement they accepted. Off by default — turn on only after SMTP is configured and tested."
+                            TextColor="{AppThemeBinding Light={StaticResource Gray600},
+                                                        Dark={StaticResource Gray300}}" />
+                    </Grid>
+                </Border>
+
+                <Border
+                    Grid.Column="3"
+                    Padding="15,12"
+                    BackgroundColor="{AppThemeBinding Light=White,
+                                                      Dark=#2D2D30}"
+                    Stroke="{AppThemeBinding Light=#E0E0E0,
+                                             Dark=#424242}"
+                    StrokeShape="RoundRectangle 10"
+                    StrokeThickness="1">
+                    <Grid
+                        ColumnDefinitions="*,Auto"
+                        ColumnSpacing="12"
+                        RowDefinitions="Auto,Auto"
+                        RowSpacing="4">
+
+                        <Label
+                            Grid.Row="0"
+                            Grid.Column="0"
+                            FontAttributes="Bold"
+                            FontSize="16"
+                            Text="Add Position Holder Button"
+                            VerticalOptions="Center" />
+
+                        <Switch
+                            Grid.Row="0"
+                            Grid.Column="1"
+                            IsToggled="{Binding IsAddPositionHolderEnabled, Mode=TwoWay}"
+                            VerticalOptions="Center" />
+
+                        <Label
+                            Grid.Row="1"
+                            Grid.Column="0"
+                            Grid.ColumnSpan="2"
+                            FontSize="13"
+                            LineBreakMode="WordWrap"
+                            Text="When on, the Edit Position page shows an + Add button for creating new holders directly on the device. Off by default — holders are normally managed centrally via the Unity API."
                             TextColor="{AppThemeBinding Light={StaticResource Gray600},
                                                         Dark={StaticResource Gray300}}" />
                     </Grid>

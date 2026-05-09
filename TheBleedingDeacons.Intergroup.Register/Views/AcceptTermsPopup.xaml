@@ -110,7 +110,7 @@
                 (or the spacing between glyph and label) also toggle the
                 state — children consume their own input first, so the
                 native CheckBox click behaviour is preserved.
-
+                
                 The whole row is disabled until HasScrolledToEnd flips
                 true, so the user cannot tick the box before they've
                 reached the bottom of the policy. IsEnabled propagates to

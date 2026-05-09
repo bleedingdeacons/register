@@ -22,6 +22,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		private const string REGISTRATION_LOG_ENABLED_KEY = "registration_log_enabled";
 		private const string AUTO_REGISTER_POSITIONS_KEY = "auto_register_positions_on_group";
 		private const string SINGLE_GSR_SHORTCUT_KEY = "single_gsr_shortcut_enabled";
+		private const string ADD_POSITION_HOLDER_ENABLED_KEY = "add_position_holder_enabled";
 		private const string COMPLIANCE_LOG_ENABLED_KEY = "compliance_log_enabled";
 		private const string WELCOME_EMAIL_ENABLED_KEY = "welcome_email_on_registration_enabled";
 		private const string DEVICE_LABEL_KEY = "device_label";
@@ -447,6 +448,51 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			catch (Exception ex)
 			{
 				Logger.Warning(ex, "Failed to save single-GSR shortcut toggle");
+			}
+		}
+
+		// =================================================================
+		// Add-position-holder Toggle
+		// =================================================================
+
+		/// <summary>
+		/// Reads the toggle from Preferences. Defaults to <c>false</c> when the
+		/// preference has never been written — fresh installs hide the "+ Add"
+		/// button on the Edit Position page, matching the typical setup where
+		/// holders are managed centrally via the Unity API. Operators who want
+		/// to create holders directly on a device can turn this on in Settings.
+		/// </summary>
+		public bool IsAddPositionHolderEnabled
+		{
+			get
+			{
+				try
+				{
+					var raw = Preferences.Get(ADD_POSITION_HOLDER_ENABLED_KEY, string.Empty);
+					if (string.IsNullOrEmpty(raw)) return false;
+					return bool.TryParse(raw, out var value) ? value : false;
+				}
+				catch (Exception ex)
+				{
+					// If Preferences is unavailable, fail safe by hiding the
+					// button — matches the default for fresh installs and
+					// keeps behaviour consistent across a broken-prefs edge case.
+					Logger.Warning(ex, "Failed to read add-position-holder toggle — defaulting to disabled");
+					return false;
+				}
+			}
+		}
+
+		public void SetAddPositionHolderEnabled(bool enabled)
+		{
+			try
+			{
+				Preferences.Set(ADD_POSITION_HOLDER_ENABLED_KEY, enabled ? "true" : "false");
+				Logger.Information("Add-position-holder button {State}", enabled ? "ENABLED" : "DISABLED");
+			}
+			catch (Exception ex)
+			{
+				Logger.Warning(ex, "Failed to save add-position-holder toggle");
 			}
 		}
 
@@ -921,7 +967,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			{
 #if USE_DEV_CREDENTIALS 
 				return "compliance@aa-bristol.org";
-#endif
+#else
 				try
 				{
 					return Preferences.Get(COMPLIANCE_EMAIL_KEY, string.Empty);
@@ -934,7 +980,10 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 					Logger.Warning(ex, "Failed to read compliance email — treating as unconfigured");
 					return string.Empty;
 				}
+			
+#endif
 			}
+
 		}
 
 		public void SetComplianceEmail(string? email)

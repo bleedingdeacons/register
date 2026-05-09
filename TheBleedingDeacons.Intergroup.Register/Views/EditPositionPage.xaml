@@ -189,13 +189,16 @@
                         </Grid>
 
                         <!--
-                            Add button — sits below the card list, 2/3 card width,
-                            always visible whether the list has holders or not.
+                            Add button — sits below the card list, 2/3 card width.
+                            Visibility is gated on the IsAddPositionHolderEnabled
+                            feature toggle; off by default since holders are
+                            normally managed centrally via the Unity API.
                         -->
                         <Button
                             Command="{Binding AddNewMemberCommand}"
                             HeightRequest="44"
                             HorizontalOptions="Center"
+                            IsVisible="{Binding IsAddPositionHolderEnabled}"
                             Style="{StaticResource M3SecondaryButtonStyle}"
                             Text="+ Add"
                             WidthRequest="373" />
@@ -212,7 +215,14 @@
                                 HorizontalOptions="Center"
                                 Spacing="6">
                                 <Label Style="{StaticResource M3EmptyStateTitleStyle}" Text="No Position Holders" />
-                                <Label Style="{StaticResource M3EmptyStateSubtitleStyle}" Text="Tap '+ Add' above to create a new position holder." />
+                                <Label
+                                    IsVisible="{Binding IsAddPositionHolderEnabled}"
+                                    Style="{StaticResource M3EmptyStateSubtitleStyle}"
+                                    Text="Tap '+ Add' above to create a new position holder." />
+                                <Label
+                                    IsVisible="{Binding IsAddPositionHolderEnabled, Converter={StaticResource InvertedBoolConverter}}"
+                                    Style="{StaticResource M3EmptyStateSubtitleStyle}"
+                                    Text="Holders for this position are managed centrally." />
                             </VerticalStackLayout>
                         </Border>
 

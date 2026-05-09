@@ -41,6 +41,19 @@ public partial class EditGroupViewModel : BaseViewModel
 	// The group whose GSRs are being managed
 	private Group? _group;
 
+	/// <summary>
+	/// Snapshot of every (Id, AnonymousName) pair in the database, loaded
+	/// once when a group is opened. Used by <see cref="ValidateName"/>
+	/// to enforce uniqueness of AnonymousName across ALL members (not just
+	/// members of the current group), without hitting the DB on every
+	/// keystroke.
+	///
+	/// Null until the snapshot has loaded. While null, ValidateName falls
+	/// back to checking only the in-memory member list — a possibly-missed
+	/// clash that the next keystroke (after the snapshot lands) will catch.
+	/// </summary>
+	private List<(int Id, string Name)>? _allMemberNamesSnapshot;
+
 	// True when this page was opened via the single-GSR shortcut from the
 	// verify flow (editMember param). On Done we forward an autoRegister
 	// flag back to the verify page so the user doesn't have to tap Yes
@@ -191,6 +204,7 @@ public partial class EditGroupViewModel : BaseViewModel
 			UpdateHasPendingRemovals();
 			PopulateMemberLists();
 			UpdateTitle();
+			LoadAllMemberNamesSnapshotAsync().SafeFireAndForget("LoadAllMemberNamesSnapshot");
 		}
 
 		if (query.TryGetValue("addMember", out var addObj) &&
@@ -771,6 +785,39 @@ public partial class EditGroupViewModel : BaseViewModel
 		RefreshMemberCountText();
 	}
 
+	/// <summary>
+	/// Loads a snapshot of every member's (Id, AnonymousName) for use by
+	/// <see cref="ValidateName"/>'s uniqueness check. AsNoTracking + a
+	/// projected select keeps this cheap; we don't need tracked entities.
+	/// Failures are logged and swallowed: the validator falls back to
+	/// checking just this group's active members, which is still useful
+	/// (and the per-group behaviour pre-this-change).
+	/// </summary>
+	private async Task LoadAllMemberNamesSnapshotAsync()
+	{
+		try
+		{
+			using var context = _contextFactory.CreateDbContext();
+			var rows = await context.Members
+				.AsNoTracking()
+				.Where(m => !string.IsNullOrWhiteSpace(m.AnonymousName))
+				.Select(m => new { m.Id, m.AnonymousName })
+				.ToListAsync();
+
+			_allMemberNamesSnapshot = rows
+				.Select(r => (r.Id, Name: r.AnonymousName!))
+				.ToList();
+
+			Logger.Information("Loaded {Count} member names for uniqueness check",
+				_allMemberNamesSnapshot.Count);
+		}
+		catch (Exception ex)
+		{
+			Logger.Error(ex, "Failed to load member-name snapshot for uniqueness check");
+			// Leave _allMemberNamesSnapshot null; ValidateName degrades gracefully.
+		}
+	}
+
 	private void UpdateHasActiveMembers()
 	{
 		HasActiveMembers = DisplayedMembers.Any(i => !i.IsPending);
@@ -814,26 +861,46 @@ public partial class EditGroupViewModel : BaseViewModel
 
 		var trimmed = EditName.Trim();
 
-		if (trimmed.Length > 255)
+		if (trimmed.Length > 215)
 		{
-			SetNameError("Name cannot exceed 255 characters.");
+			SetNameError("Name cannot exceed 215 characters.");
 			return;
 		}
 
-		// Reject a name that matches another active GSR on this group.
-		// ActiveMembers is sourced from DisplayedMembers, which already
-		// excludes members staged for removal — so reusing a name freed
-		// up by a pending removal is allowed (a common case when one GSR
-		// replaces another with the same first name in the same session).
-		// When editing an existing member, that member is filtered out of
-		// the comparison so the field validates against itself cleanly.
+		// Reject a name that matches ANY other member's AnonymousName, not
+		// just other GSRs of this group. We compare against:
+		//
+		//   1. _allMemberNamesSnapshot — every member in the DB at the time
+		//      this page opened. Excludes the currently-edited member (so
+		//      it validates against itself cleanly) and any members staged
+		//      for removal in this session (so reusing a name freed by a
+		//      pending removal is allowed).
+		//
+		//   2. ActiveMembers — covers locally-added new GSRs that don't
+		//      yet exist in the DB (their Id is negative until SaveMember
+		//      persists them) and any in-session renames not yet flushed.
+		//
+		// If the snapshot hasn't loaded yet (very early keystroke after
+		// page open), we degrade to (2)-only — the next keystroke after
+		// the snapshot lands will catch any cross-group clash.
+		//
 		// Comparison is OrdinalIgnoreCase: matches the codebase's ordinal
 		// preference while treating "alice" and "Alice" as the same name.
 		var editingId = !IsCreatingNew ? SelectedMember?.Id : null;
+		var pendingRemovalIds = PendingRemovals.Select(m => m.Id).ToHashSet();
+
 		bool clashes = ActiveMembers.Any(m =>
 			m.Id != editingId &&
 			!string.IsNullOrWhiteSpace(m.AnonymousName) &&
 			string.Equals(m.AnonymousName.Trim(), trimmed, StringComparison.OrdinalIgnoreCase));
+
+		if (!clashes && _allMemberNamesSnapshot != null)
+		{
+			clashes = _allMemberNamesSnapshot.Any(t =>
+				t.Id != editingId &&
+				!pendingRemovalIds.Contains(t.Id) &&
+				string.Equals(t.Name.Trim(), trimmed, StringComparison.OrdinalIgnoreCase));
+		}
 
 		if (clashes)
 		{
