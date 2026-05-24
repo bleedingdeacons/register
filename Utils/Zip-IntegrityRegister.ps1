@@ -6,7 +6,8 @@ $projectPaths = @(
     "C:\Users\David\Local Sites\unity-dev\app\public\wp-content\plugins\integrity\client\sharp\TheBleedingDeacons.Unity.Models",
     "C:\Users\David\Local Sites\unity-dev\app\public\wp-content\plugins\integrity\client\sharp\TheBleedingDeacons.Unity.Client",
 	"C:\Data\dev\Register\TheBleedingDeacons.Unity.Intergroup",
-    "C:\Data\dev\Register\TheBleedingDeacons.Intergroup.Register"
+    "C:\Data\dev\Register\TheBleedingDeacons.Intergroup.Register",
+	"C:\Data\dev\HandOfAA"
 )
 
 # Output directory for zip files (defaults to current directory)
