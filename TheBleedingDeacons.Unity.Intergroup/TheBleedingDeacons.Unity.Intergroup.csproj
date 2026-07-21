@@ -39,12 +39,12 @@
         dotnet build ... -p:IntegritySharpDir=../integrity/client/sharp/
   -->
   <PropertyGroup>
-    <IntegritySharpDir Condition="'$(IntegritySharpDir)' == ''">..\..\..\..\Users\David\Local Sites\unity-dev\app\public\wp-content\plugins\integrity\client\sharp\</IntegritySharpDir>
+    <IntegritySharpDir Condition="'$(IntegritySharpDir)' == ''">..\..\integrity-sharp</IntegritySharpDir>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="$(IntegritySharpDir)TheBleedingDeacons.Unity.Client\TheBleedingDeacons.Unity.Client.csproj" />
-    <ProjectReference Include="$(IntegritySharpDir)TheBleedingDeacons.Unity.Models\TheBleedingDeacons.Unity.Models.csproj" />
+    <ProjectReference Include="$(IntegritySharpDir)\TheBleedingDeacons.Unity.Client\TheBleedingDeacons.Unity.Client.csproj" />
+    <ProjectReference Include="$(IntegritySharpDir)\TheBleedingDeacons.Unity.Models\TheBleedingDeacons.Unity.Models.csproj" />
   </ItemGroup>
 
   <ItemGroup>
