@@ -48,6 +48,17 @@ jobs:
         with:
           global-json-file: global.json
 
+      - name: Debug — workspace layout
+        run: |
+          echo "PWD=$(pwd)"
+          echo "GITHUB_WORKSPACE=$GITHUB_WORKSPACE"
+          echo "--- workspace root ---"
+          ls -la "$GITHUB_WORKSPACE"
+          echo "--- integrity/client/sharp ---"
+          ls -la "$GITHUB_WORKSPACE/integrity/client/sharp" || echo "MISSING"
+          echo "--- locate Unity.Client.csproj ---"
+          find "$GITHUB_WORKSPACE" -maxdepth 6 -name "TheBleedingDeacons.Unity.Client.csproj" 2>/dev/null || echo "not found"
+
       - name: Install MAUI Android workload
         run: dotnet workload install maui-android
 
