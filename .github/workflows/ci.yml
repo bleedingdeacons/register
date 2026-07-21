@@ -5,7 +5,7 @@ name: CI
 #              Meziantou analyzers (rules escalated to "error" in .editorconfig
 #              fail the build, so this is a real quality gate).
 #  * test    — run the xUnit v3 test suite (on Microsoft.Testing.Platform) with
-#              Coverlet coverage and upload the report to Codecov.
+#              Coverlet coverage and upload the report to Coveralls.
 
 on:
   push:
@@ -127,9 +127,12 @@ jobs:
           --output coverage/coverage.cobertura.xml
           --include "[TheBleedingDeacons.Unity.Intergroup]*"
 
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+      - name: Upload coverage to Coveralls
+        uses: coverallsapp/github-action@v2
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage/coverage.cobertura.xml
-          fail_ci_if_error: false
+          # Public repo: the built-in GITHUB_TOKEN authenticates the upload,
+          # so no separate Coveralls token/secret is required.
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          file: coverage/coverage.cobertura.xml
+          format: cobertura
+          fail-on-error: false
