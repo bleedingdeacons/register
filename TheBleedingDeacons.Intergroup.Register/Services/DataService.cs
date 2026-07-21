@@ -262,7 +262,7 @@ public class DataService
                     return dayOfWeek == DayOfWeek.Sunday ? 6 : (int)dayOfWeek - 1;
                 else
                     return int.MaxValue;
-            }).ThenBy(m => m.Name).ToList();
+            }).ThenBy(m => m.Name, StringComparer.CurrentCulture).ToList();
 
             if (meetings.Count > 0)
             {

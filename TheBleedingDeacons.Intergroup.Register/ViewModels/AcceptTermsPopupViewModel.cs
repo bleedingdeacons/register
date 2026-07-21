@@ -30,18 +30,21 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
     {
         private static readonly ILogger Logger = AppLogger.ForContext<AcceptTermsPopupViewModel>();
 
+        // Guards the HTML-flattening regexes against pathological (ReDoS) input.
+        private static readonly TimeSpan RegexTimeout = TimeSpan.FromSeconds(2);
+
         // Block-level tags whose boundaries should become a paragraph break
         // when flattened to plain text. Anchored on opening or closing form
         // so </p> and <p ...> both match. Compiled once because the popup
         // can be opened many times during a meeting.
         private static readonly Regex BlockBoundary = new(
             @"</?(p|div|h[1-6]|li|tr|br\s*/?)\b[^>]*>",
-            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+            RegexOptions.IgnoreCase | RegexOptions.Compiled, RegexTimeout);
 
         // Anything else that looks like a tag — strip silently.
         private static readonly Regex AnyTag = new(
             @"<[^>]+>",
-            RegexOptions.Compiled);
+            RegexOptions.Compiled, RegexTimeout);
 
         // Collapse 3+ consecutive newlines down to a paragraph break.
         // wpautop tends to emit double-blank-line runs around block
@@ -49,7 +52,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
         // of those, so without this the popup ends up with great gaps.
         private static readonly Regex BlankLineRun = new(
             @"(\r?\n\s*){3,}",
-            RegexOptions.Compiled);
+            RegexOptions.Compiled, RegexTimeout);
 
         private readonly Popup _popup;
         private readonly TaskCompletionSource<bool> _resultTcs;

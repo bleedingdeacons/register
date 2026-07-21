@@ -31,9 +31,20 @@
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.9" />
   </ItemGroup>
 
+  <!--
+    The Integrity client/model projects live in a separate repository
+    (github.com/bleedingdeacons/integrity). IntegritySharpDir points at the
+    'client/sharp' folder of a local checkout and defaults to the developer
+    machine layout. CI overrides it, e.g.:
+        dotnet build ... -p:IntegritySharpDir=../integrity/client/sharp/
+  -->
+  <PropertyGroup>
+    <IntegritySharpDir Condition="'$(IntegritySharpDir)' == ''">..\..\integrity-sharp</IntegritySharpDir>
+  </PropertyGroup>
+
   <ItemGroup>
-    <ProjectReference Include="..\..\..\..\Users\David\Local Sites\unity-dev\app\public\wp-content\plugins\integrity\client\sharp\TheBleedingDeacons.Unity.Client\TheBleedingDeacons.Unity.Client.csproj" />
-    <ProjectReference Include="..\..\..\..\Users\David\Local Sites\unity-dev\app\public\wp-content\plugins\integrity\client\sharp\TheBleedingDeacons.Unity.Models\TheBleedingDeacons.Unity.Models.csproj" />
+    <ProjectReference Include="$(IntegritySharpDir)\TheBleedingDeacons.Unity.Client\TheBleedingDeacons.Unity.Client.csproj" />
+    <ProjectReference Include="$(IntegritySharpDir)\TheBleedingDeacons.Unity.Models\TheBleedingDeacons.Unity.Models.csproj" />
   </ItemGroup>
 
   <ItemGroup>

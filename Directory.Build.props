@@ -1,0 +1,37 @@
+<Project>
+
+  <!--
+    Repo-wide build settings for the register-owned projects
+    (Register, Unity.Intergroup, Unity.Data). The Integrity client/model
+    projects live in a separate repository and are NOT affected by this file.
+
+    StyleCop.Analyzers + Meziantou.Analyzer are wired in here so every
+    project in this tree is linted identically in local builds and CI.
+    Rule severities are tuned in .editorconfig at the repo root.
+  -->
+
+  <PropertyGroup>
+    <!-- Analyzers rely on the C# language version; keep it explicit. -->
+    <AnalysisLevel>latest</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <!-- StyleCop reads this for namespace/company checks it can't infer. -->
+    <StyleCopConfigFile>$(MSBuildThisFileDirectory)stylecop.json</StyleCopConfigFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="StyleCop.Analyzers" Version="1.2.0-beta.556">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Meziantou.Analyzer" Version="3.0.124">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <!-- Make the StyleCop config discoverable as an AdditionalFile. -->
+  <ItemGroup>
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)stylecop.json" Link="stylecop.json" Condition="Exists('$(MSBuildThisFileDirectory)stylecop.json')" />
+  </ItemGroup>
+
+</Project>

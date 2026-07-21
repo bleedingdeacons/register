@@ -16,10 +16,10 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 		private readonly IPositionRepository _positionRepository;
 
 		[ObservableProperty]
-		bool isLoading = false;
+		private bool isLoading = false;
 
 		[ObservableProperty]
-		bool isDataLoaded = false;
+		private bool isDataLoaded = false;
 
 		public ObservableCollection<Position> Positions { get; } = new();
 
@@ -65,11 +65,11 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 		}
 
 		[RelayCommand]
-		async Task SelectPosition(Position position)
+		private async Task SelectPosition(Position position)
 		{
 			if (position == null) return;
 
-			var parameters = new Dictionary<string, object> {
+			var parameters = new Dictionary<string, object>(StringComparer.Ordinal) {
 		{"positionId", position.Id.ToString()} };
 
 			await Shell.Current.GoToAsync(nameof(VerifyPositionPage), parameters);

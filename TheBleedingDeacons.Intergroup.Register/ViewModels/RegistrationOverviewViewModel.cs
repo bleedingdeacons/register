@@ -116,7 +116,7 @@ public partial class RegistrationOverviewViewModel : BaseViewModel
 			// Eager-load holders so we can show who's assigned to each
 			// position without a second round-trip per row.
 			var positionsWithHolders = new List<Position>();
-			foreach (var p in positions.OrderBy(p => p.ShortDescription))
+			foreach (var p in positions.OrderBy(p => p.ShortDescription, StringComparer.CurrentCulture))
 			{
 				var full = await _positionRepository.GetByIdWithHoldersAsync(p.Id, Token) ?? p;
 				positionsWithHolders.Add(full);
@@ -124,7 +124,7 @@ public partial class RegistrationOverviewViewModel : BaseViewModel
 
 			// Eager-load members for groups so we can show the GSR name.
 			var groupsWithMembers = new List<Group>();
-			foreach (var g in groups.OrderBy(g => g.Name))
+			foreach (var g in groups.OrderBy(g => g.Name, StringComparer.CurrentCulture))
 			{
 				var full = await _groupRepository.GetByIdWithMembersAsync(g.Id, Token) ?? g;
 				groupsWithMembers.Add(full);
@@ -286,7 +286,7 @@ public partial class RegistrationOverviewViewModel : BaseViewModel
 
 	private static Task NavigateToGroupVerify(int groupId)
 	{
-		var parameters = new Dictionary<string, object>
+		var parameters = new Dictionary<string, object>(StringComparer.Ordinal)
 		{
 			{ "groupId", groupId.ToString() },
 			{ "entrySource", "overview" }
@@ -296,7 +296,7 @@ public partial class RegistrationOverviewViewModel : BaseViewModel
 
 	private static Task NavigateToPositionVerify(int positionId)
 	{
-		var parameters = new Dictionary<string, object>
+		var parameters = new Dictionary<string, object>(StringComparer.Ordinal)
 		{
 			{ "positionId", positionId.ToString() },
 			{ "entrySource", "overview" }

@@ -126,7 +126,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services.Interfaces
 		/// <summary>
 		/// Additional metadata about the send operation.
 		/// </summary>
-		public Dictionary<string, object> Metadata { get; set; } = new();
+		public Dictionary<string, object> Metadata { get; set; } = new(StringComparer.Ordinal);
 	}
 
 	/// <summary>
@@ -433,7 +433,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services.Interfaces
 		/// <summary>
 		/// List of failed email addresses with error messages.
 		/// </summary>
-		public Dictionary<string, string> FailedEmails { get; set; } = new();
+		public Dictionary<string, string> FailedEmails { get; set; } = new(StringComparer.Ordinal);
 
 		/// <summary>
 		/// Success rate (0.0 to 1.0).
@@ -480,7 +480,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services.Interfaces
 		/// <summary>
 		/// Most common failure reasons.
 		/// </summary>
-		public Dictionary<string, int> FailureReasons { get; set; } = new();
+		public Dictionary<string, int> FailureReasons { get; set; } = new(StringComparer.Ordinal);
 
 		/// <summary>
 		/// Daily breakdown of email counts.
@@ -548,7 +548,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services.Interfaces
 		/// <summary>
 		/// Additional diagnostic information.
 		/// </summary>
-		public Dictionary<string, object> DiagnosticInfo { get; set; } = new();
+		public Dictionary<string, object> DiagnosticInfo { get; set; } = new(StringComparer.Ordinal);
 	}
 
 	/// <summary>

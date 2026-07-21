@@ -29,21 +29,21 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 			await SelectType(false);
 		}
 
-		async Task SelectType(bool isOnline)
+		private async Task SelectType(bool isOnline)
 		{
 
 			await ShowFeedback();
 
 			var meetingType = isOnline ? "Online" : "Face 2 Face";
 
-			var parameters = new Dictionary<string, object> { { "meetingType", meetingType } };
+			var parameters = new Dictionary<string, object>(StringComparer.Ordinal) { { "meetingType", meetingType } };
 
 			// Navigate to the day selection page
 			await Shell.Current.GoToAsync(nameof(DaySelectionPage), parameters);
 		}
 
 		[RelayCommand]
-		async Task GoBack()
+		private async Task GoBack()
 		{
 			// Navigate back to the previous page
 			await Shell.Current.GoToAsync("..");

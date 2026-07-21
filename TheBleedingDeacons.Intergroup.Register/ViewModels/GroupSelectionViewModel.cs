@@ -21,16 +21,16 @@ public partial class GroupSelectionViewModel : BaseViewModel
     public ObservableCollection<Group> Groups { get; } = new();
 
     [ObservableProperty]
-    MeetingCriteria criteria;
+    private MeetingCriteria criteria;
 
     [ObservableProperty]
-    string header = string.Empty;
+    private string header = string.Empty;
 
     [ObservableProperty]
-    bool isLoading = false;
+    private bool isLoading = false;
 
     [ObservableProperty]
-    bool isDataLoaded = false;
+    private bool isDataLoaded = false;
 
     public GroupSelectionViewModel(
         IGroupRepository groupRepository,
@@ -96,7 +96,7 @@ public partial class GroupSelectionViewModel : BaseViewModel
             }
 
             // Sort by group name
-            groups = groups.OrderBy(g => g.Name).ToList();
+            groups = groups.OrderBy(g => g.Name, StringComparer.CurrentCulture).ToList();
 
             MainThread.BeginInvokeOnMainThread(() =>
             {
@@ -119,11 +119,11 @@ public partial class GroupSelectionViewModel : BaseViewModel
     }
 
     [RelayCommand]
-    async Task SelectGroup(Group group)
+    private async Task SelectGroup(Group group)
     {
         if (group == null) return;
 
-        var parameters = new Dictionary<string, object> {
+        var parameters = new Dictionary<string, object>(StringComparer.Ordinal) {
             {"groupId", group.Id.ToString()} };
 
         await Shell.Current.GoToAsync(nameof(VerifyGroupPage), parameters);

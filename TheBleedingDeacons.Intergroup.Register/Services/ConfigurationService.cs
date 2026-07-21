@@ -716,7 +716,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		/// </summary>
 		private static async Task SaveJsonSettingsAsync(string filePath, string sectionName, object settings)
 		{
-			var wrapper = new Dictionary<string, object> { [sectionName] = settings };
+			var wrapper = new Dictionary<string, object>(StringComparer.Ordinal) { [sectionName] = settings };
 			var json = JsonSerializer.Serialize(wrapper, WriteOptions);
 			await File.WriteAllTextAsync(filePath, json);
 		}

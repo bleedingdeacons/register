@@ -3,6 +3,11 @@
 	<PropertyGroup>
 		<TargetFrameworks>net9.0-android;net9.0-ios;net9.0-maccatalyst</TargetFrameworks>
 		<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net9.0-windows10.0.19041.0</TargetFrameworks>
+		<!-- CI builds only the Android head so it doesn't need the iOS/MacCatalyst
+		     workloads. Pass -p:RegisterAndroidOnly=true (see .github/workflows/ci.yml).
+		     This override is last so it wins when the flag is set; local builds
+		     without the flag keep the full framework set above. -->
+		<TargetFrameworks Condition="'$(RegisterAndroidOnly)' == 'true'">net9.0-android</TargetFrameworks>
 
 		<OutputType>Exe</OutputType>
 		<RootNamespace>TheBleedingDeacons.Intergroup.Register</RootNamespace>

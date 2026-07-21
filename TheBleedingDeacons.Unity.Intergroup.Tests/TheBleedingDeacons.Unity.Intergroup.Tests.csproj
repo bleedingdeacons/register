@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- xUnit v3 test projects are executables that host Microsoft.Testing.Platform. -->
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <!-- Run through Microsoft.Testing.Platform (not VSTest) under `dotnet test`. -->
+    <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
+    <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
+    <!-- Test project: exempt from the repo's strict analyzer gate. -->
+    <RunAnalyzers>false</RunAnalyzers>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" Version="3.2.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <!--
+      Coverage is collected in CI with the coverlet.console tool (see
+      .config/dotnet-tools.json), which wraps the Microsoft.Testing.Platform
+      test executable. coverlet's collector/msbuild integrations hook VSTest,
+      which MTP does not use, so they are intentionally not referenced here.
+    -->
+    <!-- Needed to build an in-memory SQLite database for the repository tests. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.9" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TheBleedingDeacons.Unity.Intergroup\TheBleedingDeacons.Unity.Intergroup.csproj" />
+  </ItemGroup>
+
+</Project>

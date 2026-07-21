@@ -12,6 +12,9 @@ namespace TheBleedingDeacons.Intergroup.Register.Utilities;
 /// </summary>
 public static class BasicMarkdownConverter
 {
+    // Guards against pathological (ReDoS) input on the untrusted markdown.
+    private static readonly TimeSpan RegexTimeout = TimeSpan.FromSeconds(2);
+
     public static string Convert(string markdown)
     {
         if (string.IsNullOrWhiteSpace(markdown))
@@ -33,7 +36,7 @@ public static class BasicMarkdownConverter
             }
 
             // Horizontal rule
-            if (Regex.IsMatch(line, @"^-{3,}$"))
+            if (Regex.IsMatch(line, @"^-{3,}$", RegexOptions.None, RegexTimeout))
             {
                 html.AppendLine("<hr>");
                 i++;
@@ -41,7 +44,7 @@ public static class BasicMarkdownConverter
             }
 
             // ATX headings: # H1, ## H2, ### H3 …
-            var headingMatch = Regex.Match(line, @"^(#{1,6})\s+(.+)$");
+            var headingMatch = Regex.Match(line, @"^(#{1,6})\s+(.+)$", RegexOptions.None, RegexTimeout);
             if (headingMatch.Success)
             {
                 int level = headingMatch.Groups[1].Length;
@@ -57,7 +60,7 @@ public static class BasicMarkdownConverter
                 html.AppendLine("<ul>");
                 while (i < lines.Length && IsBulletLine(lines[i].TrimEnd()))
                 {
-                    var item = Regex.Match(lines[i].TrimEnd(), @"^[-*+]\s+(.+)$").Groups[1].Value;
+                    var item = Regex.Match(lines[i].TrimEnd(), @"^[-*+]\s+(.+)$", RegexOptions.None, RegexTimeout).Groups[1].Value;
                     html.AppendLine($"  <li>{FormatInline(item)}</li>");
                     i++;
                 }
@@ -71,8 +74,8 @@ public static class BasicMarkdownConverter
             {
                 var current = lines[i].TrimEnd();
                 if (string.IsNullOrWhiteSpace(current)
-                    || Regex.IsMatch(current, @"^#{1,6}\s")
-                    || Regex.IsMatch(current, @"^-{3,}$")
+                    || Regex.IsMatch(current, @"^#{1,6}\s", RegexOptions.None, RegexTimeout)
+                    || Regex.IsMatch(current, @"^-{3,}$", RegexOptions.None, RegexTimeout)
                     || IsBulletLine(current))
                     break;
 
@@ -88,7 +91,7 @@ public static class BasicMarkdownConverter
     }
 
     private static bool IsBulletLine(string line) =>
-        Regex.IsMatch(line.TrimStart(), @"^[-*+]\s+\S");
+        Regex.IsMatch(line.TrimStart(), @"^[-*+]\s+\S", RegexOptions.None, RegexTimeout);
 
     /// <summary>
     /// Converts inline markdown to HTML:
@@ -101,17 +104,17 @@ public static class BasicMarkdownConverter
 
         // Markdown links: [text](url)
         text = Regex.Replace(text, @"\[(.+?)\]\((.+?)\)",
-            m => $"<a href=\"{m.Groups[2].Value}\">{m.Groups[1].Value}</a>");
+            m => $"<a href=\"{m.Groups[2].Value}\">{m.Groups[1].Value}</a>", RegexOptions.None, RegexTimeout);
 
         // Bare URLs (not already inside href="")
         text = Regex.Replace(text, @"(?<!href="")https?://[^\s<]+",
-            m => $"<a href=\"{m.Value}\">{m.Value}</a>");
+            m => $"<a href=\"{m.Value}\">{m.Value}</a>", RegexOptions.None, RegexTimeout);
 
         // **bold**
-        text = Regex.Replace(text, @"\*\*(.+?)\*\*", "<strong>$1</strong>");
+        text = Regex.Replace(text, @"\*\*(.+?)\*\*", "<strong>$1</strong>", RegexOptions.None, RegexTimeout);
 
         // *italic* (single asterisk, not part of a pair)
-        text = Regex.Replace(text, @"\*(.+?)\*", "<em>$1</em>");
+        text = Regex.Replace(text, @"\*(.+?)\*", "<em>$1</em>", RegexOptions.None, RegexTimeout);
 
         return text;
     }
