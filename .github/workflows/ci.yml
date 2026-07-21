@@ -1,8 +1,11 @@
 name: CI
 
-# Build the Android head of the MAUI app and run the StyleCop / Meziantou
-# analyzers. Analyzer rules escalated to "error" in .editorconfig fail the
-# build, so this workflow is a real quality gate.
+# Two jobs:
+#  * build   — compile the Android head of the MAUI app and run the StyleCop /
+#              Meziantou analyzers (rules escalated to "error" in .editorconfig
+#              fail the build, so this is a real quality gate).
+#  * test    — run the xUnit v3 test suite (on Microsoft.Testing.Platform) with
+#              Coverlet coverage and upload the report to Codecov.
 
 on:
   push:
@@ -81,3 +84,52 @@ jobs:
           -p:IntegritySharpDir=../integrity-sharp
           -p:UseDevCredentials=false
           -p:ContinuousIntegrationBuild=true
+
+  test:
+    name: Test & coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout register
+        uses: actions/checkout@v4
+
+      - name: Checkout integrity-sharp (cross-repo project references)
+        uses: actions/checkout@v4
+        with:
+          repository: bleedingdeacons/integrity-sharp
+          path: integrity-sharp
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore local tools (coverlet.console)
+        run: dotnet tool restore
+
+      # Unity.Intergroup and its tests are net9.0 — no MAUI workload needed.
+      - name: Build tests
+        run: >
+          dotnet build TheBleedingDeacons.Unity.Intergroup.Tests/TheBleedingDeacons.Unity.Intergroup.Tests.csproj
+          -c Debug
+          -p:IntegritySharpDir=../integrity-sharp
+
+      # xUnit v3 runs on Microsoft.Testing.Platform, so the test project is an
+      # executable. coverlet.console instruments the register-owned assembly and
+      # runs the test host, producing a Cobertura report. (coverlet's collector /
+      # msbuild integrations hook VSTest, which MTP doesn't use — hence the tool.)
+      - name: Test with coverage
+        run: >
+          dotnet coverlet TheBleedingDeacons.Unity.Intergroup.Tests/bin/Debug/net9.0/TheBleedingDeacons.Unity.Intergroup.Tests.dll
+          --target dotnet
+          --targetargs "TheBleedingDeacons.Unity.Intergroup.Tests/bin/Debug/net9.0/TheBleedingDeacons.Unity.Intergroup.Tests.dll"
+          --format cobertura
+          --output coverage/coverage.cobertura.xml
+          --include "[TheBleedingDeacons.Unity.Intergroup]*"
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage/coverage.cobertura.xml
+          fail_ci_if_error: false
