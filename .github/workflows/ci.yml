@@ -1,0 +1,71 @@
+name: CI
+
+# Build the Android head of the MAUI app and run the StyleCop / Meziantou
+# analyzers. Analyzer rules escalated to "error" in .editorconfig fail the
+# build, so this workflow is a real quality gate.
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+# Cancel superseded runs on the same ref to save runner minutes.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build & analyze (net9.0-android)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout register
+        uses: actions/checkout@v4
+
+      # The Register app transitively references the Integrity client/model
+      # projects, which live in a separate public repository. Check it out
+      # next to the register sources so the project references resolve.
+      - name: Checkout integrity (cross-repo project references)
+        uses: actions/checkout@v4
+        with:
+          repository: bleedingdeacons/integrity
+          path: integrity
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Install MAUI Android workload
+        run: dotnet workload install maui-android
+
+      - name: Restore
+        run: >
+          dotnet restore TheBleedingDeacons.Intergroup.Register/TheBleedingDeacons.Intergroup.Register.csproj
+          -p:TargetFramework=net9.0-android
+          -p:IntegritySharpDir=../integrity/client/sharp/
+
+      # Debug config: no code signing (keystore is not in the repo) and no
+      # dev credentials baked in. Analyzer errors from .editorconfig break
+      # the build here.
+      - name: Build & analyze
+        run: >
+          dotnet build TheBleedingDeacons.Intergroup.Register/TheBleedingDeacons.Intergroup.Register.csproj
+          -c Debug
+          -f net9.0-android
+          --no-restore
+          -p:IntegritySharpDir=../integrity/client/sharp/
+          -p:UseDevCredentials=false
+          -p:ContinuousIntegrationBuild=true

@@ -11,6 +11,9 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 	{
 		private static readonly ILogger Logger = AppLogger.ForContext<EmailTemplateService>();
 
+		// Guards the template regexes against pathological (ReDoS) input.
+		private static readonly TimeSpan RegexTimeout = TimeSpan.FromSeconds(2);
+
 		private readonly string _templateDirectory;
 		private readonly Dictionary<string, string> _templateCache;
 		private readonly Assembly _assembly;
@@ -18,14 +21,14 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		public EmailTemplateService(string templateDirectory = "Templates")
 		{
 			_templateDirectory = templateDirectory;
-			_templateCache = new Dictionary<string, string>();
+			_templateCache = new Dictionary<string, string>(StringComparer.Ordinal);
 			_assembly = Assembly.GetExecutingAssembly();
 		}
 
 		public EmailTemplateService(Assembly assembly, string templateDirectory = "Templates")
 		{
 			_templateDirectory = templateDirectory;
-			_templateCache = new Dictionary<string, string>();
+			_templateCache = new Dictionary<string, string>(StringComparer.Ordinal);
 			_assembly = assembly;
 		}
 
@@ -166,7 +169,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		{
 			// Match patterns like {{Property.SubProperty}} or {{Property.Method()}}
 			var pattern = @"\{\{([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*(?:\(\))?)\}\}";
-			var regex = new Regex(pattern);
+			var regex = new Regex(pattern, RegexOptions.None, RegexTimeout);
 
 			return regex.Replace(template, match =>
 			{
@@ -214,7 +217,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		{
 			// Handle {{#if PropertyName}}...{{/if}} blocks
 			var pattern = @"\{\{#if\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)\}\}(.*?)\{\{/if\}\}";
-			var regex = new Regex(pattern, RegexOptions.Singleline);
+			var regex = new Regex(pattern, RegexOptions.Singleline, RegexTimeout);
 
 			return regex.Replace(template, match =>
 			{
@@ -248,7 +251,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			while (iteration++ < maxIterations)
 			{
 				// Find {{#each PropertyName}}
-				var eachMatch = Regex.Match(result, @"\{\{#each\s+([a-zA-Z_][a-zA-Z0-9_]*)\}\}");
+				var eachMatch = Regex.Match(result, @"\{\{#each\s+([a-zA-Z_][a-zA-Z0-9_]*)\}\}", RegexOptions.None, RegexTimeout);
 				if (!eachMatch.Success) break;
 
 				var propertyName = eachMatch.Groups[1].Value;
@@ -256,7 +259,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 				var contentStart = eachMatch.Index + eachMatch.Length;
 
 				// Find {{/each}} manually (not with regex to avoid bracket issues)
-				var endEachIndex = result.IndexOf("{{/each}}", contentStart);
+				var endEachIndex = result.IndexOf("{{/each}}", contentStart, StringComparison.Ordinal);
 				if (endEachIndex == -1) break;
 
 				// Extract the item template between {{#each}} and {{/each}}
@@ -327,7 +330,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 					var placeholder = $"{{{{{prop.Name}}}}}";
 					var value = prop.GetValue(item)?.ToString() ?? string.Empty;
 
-					if (result.Contains(placeholder))
+					if (result.Contains(placeholder, StringComparison.Ordinal))
 					{
 						result = result.Replace(placeholder, value);
 

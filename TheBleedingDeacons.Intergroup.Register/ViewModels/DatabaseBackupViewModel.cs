@@ -94,7 +94,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
                     // Update UI on main thread
                     MainThread.BeginInvokeOnMainThread(() =>
                     {
-                        foreach (var dbFile in dbFiles.OrderBy(f => f.FileName))
+                        foreach (var dbFile in dbFiles.OrderBy(f => f.FileName, StringComparer.CurrentCulture))
                         {
                             DatabaseFiles.Add(dbFile);
                         }

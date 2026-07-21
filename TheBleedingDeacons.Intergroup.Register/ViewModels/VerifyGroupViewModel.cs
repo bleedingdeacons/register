@@ -234,7 +234,7 @@ public partial class VerifyGroupViewModel : BaseViewModel
 			return;
 		}
 
-		var parameters = new Dictionary<string, object>
+		var parameters = new Dictionary<string, object>(StringComparer.Ordinal)
 		{
 			["group"] = Group
 		};

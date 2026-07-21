@@ -14,7 +14,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Extensions
 
             return meeting.IsOnline ||
                    (!string.IsNullOrEmpty(meeting.Types) &&
-                    meeting.Types.ToLowerInvariant().Contains(ONLINE_TAG));
+                    meeting.Types.ToLowerInvariant().Contains(ONLINE_TAG, StringComparison.Ordinal));
         }
     }
 }

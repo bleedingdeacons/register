@@ -197,7 +197,7 @@ public partial class VerifyPositionViewModel : BaseViewModel
 			return;
 		}
 
-		var parameters = new Dictionary<string, object>
+		var parameters = new Dictionary<string, object>(StringComparer.Ordinal)
 		{
 			["position"] = Position
 		};

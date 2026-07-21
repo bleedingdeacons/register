@@ -42,13 +42,13 @@ public partial class DaySelectionViewModel : BaseViewModel
 	}
 
 	[RelayCommand]
-	async Task SelectDay(DayItem day)
+	private async Task SelectDay(DayItem day)
 	{
 		await ShowFeedback();
 
 		var criteria = new MeetingCriteria() { MeetingType = MeetingType, Day = day.Name };
 
-		var parameters = new Dictionary<string, object> { { "criteria", criteria } };
+		var parameters = new Dictionary<string, object>(StringComparer.Ordinal) { { "criteria", criteria } };
 
 		await Shell.Current.GoToAsync(nameof(GroupSelectionPage), parameters);
 

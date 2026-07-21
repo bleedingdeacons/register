@@ -905,7 +905,7 @@ public class ReconciliationService
 			if (!snapshotMap.TryGetValue(member.Id, out var original) || original == null)
 				continue;
 
-			var changed = new HashSet<string>();
+			var changed = new HashSet<string>(StringComparer.Ordinal);
 
 			if (original.AnonymousName != member.AnonymousName) changed.Add(nameof(Member.AnonymousName));
 			if (original.PrivateName != member.PrivateName) changed.Add(nameof(Member.PrivateName));
@@ -1033,8 +1033,8 @@ public class ReconciliationService
 		var code = error.Code?.ToLowerInvariant() ?? string.Empty;
 		var msg = error.Message?.ToLowerInvariant() ?? string.Empty;
 
-		return code.Contains("already") || code.Contains("duplicate") || code.Contains("exists")
-			|| msg.Contains("already registered") || msg.Contains("already exists");
+		return code.Contains("already", StringComparison.Ordinal) || code.Contains("duplicate", StringComparison.Ordinal) || code.Contains("exists", StringComparison.Ordinal)
+			|| msg.Contains("already registered", StringComparison.Ordinal) || msg.Contains("already exists", StringComparison.Ordinal);
 	}
 
 	/// <summary>

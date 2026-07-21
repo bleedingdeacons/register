@@ -50,19 +50,19 @@ public partial class MainPageViewModel : BaseViewModel
 	}
 
 	[RelayCommand]
-	async Task GoToAdmin()
+	private async Task GoToAdmin()
 	{
 		await Shell.Current.GoToAsync("//AdminPage");
 	}
 
 	[RelayCommand]
-	async Task SelectType()
+	private async Task SelectType()
 	{
 		await Shell.Current.GoToAsync(nameof(TypeSelectionPage));
 	}
 
 	[RelayCommand]
-	async Task SelectPosition()
+	private async Task SelectPosition()
 	{
 		await Shell.Current.GoToAsync(nameof(PositionSelectionPage));
 	}

@@ -5,10 +5,10 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels;
 public partial class BaseViewModel : ObservableObject, IQueryAttributable, IDisposable
 {
 	[ObservableProperty]
-	bool isBusy;
+	private bool isBusy;
 
 	[ObservableProperty]
-	string title = string.Empty;
+	private string title = string.Empty;
 
 	/// <summary>
 	/// Cancellation source for async operations scoped to this ViewModel's lifetime.
