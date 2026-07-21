@@ -51,12 +51,14 @@ jobs:
       - name: Install MAUI Android workload
         run: dotnet workload install maui-android
 
-      - name: Restore
-        run: >
-          dotnet restore TheBleedingDeacons.Intergroup.Register/TheBleedingDeacons.Intergroup.Register.csproj
-          -p:TargetFramework=net9.0-android
-          -p:IntegritySharpDir=../integrity/client/sharp/
-
+      # Single build with implicit restore. Building with -f net9.0-android
+      # pins the app to the Android head and lets MSBuild negotiate each
+      # project reference to its compatible TFM (Unity.Intergroup -> net9.0),
+      # so we only restore/build the Android graph — no iOS/MacCatalyst
+      # workloads needed. Do NOT split this into a `dotnet restore
+      # -p:TargetFramework=...` step: that forces the TFM as a global
+      # property onto the referenced net9.0 libraries and breaks their restore.
+      #
       # Debug config: no code signing (keystore is not in the repo) and no
       # dev credentials baked in. Analyzer errors from .editorconfig break
       # the build here.
@@ -65,7 +67,6 @@ jobs:
           dotnet build TheBleedingDeacons.Intergroup.Register/TheBleedingDeacons.Intergroup.Register.csproj
           -c Debug
           -f net9.0-android
-          --no-restore
           -p:IntegritySharpDir=../integrity/client/sharp/
           -p:UseDevCredentials=false
           -p:ContinuousIntegrationBuild=true
