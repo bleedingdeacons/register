@@ -3,7 +3,7 @@ using TheBleedingDeacons.Unity.Intergroup.Entities;
 
 namespace TheBleedingDeacons.Intergroup.Register.Extensions
 {
-    public static class Extensions
+    public static class MeetingExtensions
     {
         private const string ONLINE_TAG = "online";
 

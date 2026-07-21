@@ -67,6 +67,7 @@ jobs:
           dotnet build TheBleedingDeacons.Intergroup.Register/TheBleedingDeacons.Intergroup.Register.csproj
           -c Debug
           -f net9.0-android
+          -p:RegisterAndroidOnly=true
           -p:IntegritySharpDir=../integrity/client/sharp/
           -p:UseDevCredentials=false
           -p:ContinuousIntegrationBuild=true
