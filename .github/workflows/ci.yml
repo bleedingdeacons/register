@@ -52,6 +52,15 @@ jobs:
       - name: Install MAUI Android workload
         run: dotnet workload install maui-android
 
+      # appsettings.json is git-ignored (it can hold environment-specific
+      # config) but is embedded unconditionally by the app. CI only needs the
+      # file to exist for the compile/analyze gate — its contents are
+      # irrelevant here — so write a placeholder when it's absent.
+      - name: Ensure git-ignored appsettings.json exists
+        run: |
+          f=TheBleedingDeacons.Intergroup.Register/appsettings.json
+          if [ ! -f "$f" ]; then printf '{}\n' > "$f"; echo "wrote placeholder $f"; else echo "$f already present"; fi
+
       # Single build with implicit restore. RegisterAndroidOnly=true trims the
       # app to just the net9.0-android head, so we restore/build only the
       # Android graph — no iOS/MacCatalyst workloads needed. Crucially we do
