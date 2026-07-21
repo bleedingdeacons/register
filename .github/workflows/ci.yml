@@ -28,20 +28,15 @@ jobs:
       - name: Checkout register
         uses: actions/checkout@v4
 
-      # The Register app transitively references the Integrity client/model
-      # projects, which live in a separate public repository. Check it out
-      # next to the register sources so the project references resolve.
-      # NOTE: the C# client/model projects (client/sharp/**) were removed from
-      # integrity's main branch. They still exist at commit a8a3da2, which is
-      # what local development builds against, so pin CI to that commit. If the
-      # Integrity client is ever republished (e.g. as a NuGet package — see the
-      # TODO in the Register .csproj) this pin and the project reference can go.
-      - name: Checkout integrity (cross-repo project references)
+      # The Register app transitively references the Integrity C# client/model
+      # projects, which live in their own public repo (integrity-sharp). Check
+      # it out next to the register sources; IntegritySharpDir (below) points
+      # the project references at it.
+      - name: Checkout integrity-sharp (cross-repo project references)
         uses: actions/checkout@v4
         with:
-          repository: bleedingdeacons/integrity
-          ref: a8a3da2069990677bd238d9bfa08299834d67d8b
-          path: integrity
+          repository: bleedingdeacons/integrity-sharp
+          path: integrity-sharp
 
       - name: Setup JDK 17
         uses: actions/setup-java@v4
@@ -57,13 +52,14 @@ jobs:
       - name: Install MAUI Android workload
         run: dotnet workload install maui-android
 
-      # Single build with implicit restore. Building with -f net9.0-android
-      # pins the app to the Android head and lets MSBuild negotiate each
-      # project reference to its compatible TFM (Unity.Intergroup -> net9.0),
-      # so we only restore/build the Android graph — no iOS/MacCatalyst
-      # workloads needed. Do NOT split this into a `dotnet restore
-      # -p:TargetFramework=...` step: that forces the TFM as a global
-      # property onto the referenced net9.0 libraries and breaks their restore.
+      # Single build with implicit restore. RegisterAndroidOnly=true trims the
+      # app to just the net9.0-android head, so we restore/build only the
+      # Android graph — no iOS/MacCatalyst workloads needed. Crucially we do
+      # NOT pass -f net9.0-android: that sets TargetFramework as a global
+      # property, which forces net9.0-android onto the referenced net9.0-only
+      # integrity-sharp projects and breaks their restore (NU1105).
+      # RegisterAndroidOnly instead narrows only the Register project's
+      # TargetFrameworks, letting each project reference resolve its own TFM.
       #
       # Debug config: no code signing (keystore is not in the repo) and no
       # dev credentials baked in. Analyzer errors from .editorconfig break
@@ -72,8 +68,7 @@ jobs:
         run: >
           dotnet build TheBleedingDeacons.Intergroup.Register/TheBleedingDeacons.Intergroup.Register.csproj
           -c Debug
-          -f net9.0-android
           -p:RegisterAndroidOnly=true
-          -p:IntegritySharpDir=../integrity/client/sharp/
+          -p:IntegritySharpDir=../integrity-sharp
           -p:UseDevCredentials=false
           -p:ContinuousIntegrationBuild=true
