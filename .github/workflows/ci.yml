@@ -31,10 +31,16 @@ jobs:
       # The Register app transitively references the Integrity client/model
       # projects, which live in a separate public repository. Check it out
       # next to the register sources so the project references resolve.
+      # NOTE: the C# client/model projects (client/sharp/**) were removed from
+      # integrity's main branch. They still exist at commit a8a3da2, which is
+      # what local development builds against, so pin CI to that commit. If the
+      # Integrity client is ever republished (e.g. as a NuGet package — see the
+      # TODO in the Register .csproj) this pin and the project reference can go.
       - name: Checkout integrity (cross-repo project references)
         uses: actions/checkout@v4
         with:
           repository: bleedingdeacons/integrity
+          ref: a8a3da2069990677bd238d9bfa08299834d67d8b
           path: integrity
 
       - name: Setup JDK 17
@@ -47,17 +53,6 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
-
-      - name: Debug — workspace layout
-        run: |
-          echo "PWD=$(pwd)"
-          echo "GITHUB_WORKSPACE=$GITHUB_WORKSPACE"
-          echo "--- workspace root ---"
-          ls -la "$GITHUB_WORKSPACE"
-          echo "--- integrity/client/sharp ---"
-          ls -la "$GITHUB_WORKSPACE/integrity/client/sharp" || echo "MISSING"
-          echo "--- locate Unity.Client.csproj ---"
-          find "$GITHUB_WORKSPACE" -maxdepth 6 -name "TheBleedingDeacons.Unity.Client.csproj" 2>/dev/null || echo "not found"
 
       - name: Install MAUI Android workload
         run: dotnet workload install maui-android
