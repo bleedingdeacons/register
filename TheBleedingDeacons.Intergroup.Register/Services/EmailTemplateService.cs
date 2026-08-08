@@ -36,7 +36,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		{
 			try
 			{
-				string template;
+				string? template;
 
 				// Check cache first
 				if (_templateCache.ContainsKey(templateName))
@@ -191,7 +191,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			if (obj == null) return null;
 
 			var parts = propertyPath.Split('.');
-			object current = obj;
+			object? current = obj;
 
 			foreach (var part in parts)
 			{

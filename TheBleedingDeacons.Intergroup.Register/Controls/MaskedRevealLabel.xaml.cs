@@ -1,4 +1,4 @@
-using System.Linq;
+﻿using System.Linq;
 using Microsoft.Maui.Controls;
 
 namespace TheBleedingDeacons.Intergroup.Register.Controls;
@@ -192,8 +192,8 @@ public partial class MaskedRevealLabel : ContentView
 	}
 
 	// Events
-	public event EventHandler Revealed;
-	public event EventHandler Hidden;
+	public event EventHandler? Revealed;
+	public event EventHandler? Hidden;
 
 	private static void OnValueOrMaskChanged(BindableObject bindable, object oldValue, object newValue)
 	{

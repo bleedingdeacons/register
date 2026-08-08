@@ -19,7 +19,7 @@ public partial class GroupSelectionViewModel : BaseViewModel
     public ObservableCollection<Group> Groups { get; } = new();
 
     [ObservableProperty]
-    private MeetingCriteria criteria;
+    private MeetingCriteria? criteria;
 
     [ObservableProperty]
     private string header = string.Empty;
@@ -45,7 +45,7 @@ public partial class GroupSelectionViewModel : BaseViewModel
         Criteria = (MeetingCriteria)query["criteria"];
     }
 
-    partial void OnCriteriaChanged(MeetingCriteria value)
+    partial void OnCriteriaChanged(MeetingCriteria? value)
     {
         MainThread.BeginInvokeOnMainThread(async () =>
         {
@@ -57,6 +57,13 @@ public partial class GroupSelectionViewModel : BaseViewModel
     public async Task LoadDataAsync()
     {
         if (IsBusy) return;
+
+        // Criteria arrives via ApplyQueryAttributes and is what this load
+        // filters on, so there is nothing to do until it is set. Captured into
+        // a local both to narrow it for the compiler and to keep the filter
+        // predicate below off the observable property.
+        var activeCriteria = Criteria;
+        if (activeCriteria is null) return;
 
         try
         {
@@ -74,8 +81,8 @@ public partial class GroupSelectionViewModel : BaseViewModel
             var filteredMeetings = allMeetings
                 .Where(m =>
                 {
-                    return string.Equals(m.DayOfWeek, Criteria.Day, StringComparison.OrdinalIgnoreCase)
-                        && m.IsOnline() == (Criteria.MeetingType == "Online");
+                    return string.Equals(m.DayOfWeek, activeCriteria.Day, StringComparison.OrdinalIgnoreCase)
+                        && m.IsOnline() == (activeCriteria.MeetingType == "Online");
                 }).ToList();
 
             // Get the distinct groups from those meetings
@@ -107,7 +114,7 @@ public partial class GroupSelectionViewModel : BaseViewModel
                 IsLoading = false;
             });
 
-            Header = $"{Criteria.Day} {Criteria.MeetingType} Groups";
+            Header = $"{activeCriteria.Day} {activeCriteria.MeetingType} Groups";
         }
         finally
         {

@@ -10,16 +10,16 @@ namespace TheBleedingDeacons.Intergroup.Register.Models
         public int Id { get; set; }
 
         [Required, MaxLength(500)]
-        public string To { get; set; }
+        public string To { get; set; } = string.Empty;
 
         [Required, MaxLength(200)]
-        public string Subject { get; set; }
+        public string Subject { get; set; } = string.Empty;
 
         [Required]
-        public string Body { get; set; }
+        public string Body { get; set; } = string.Empty;
 
         [Required, MaxLength(200)]
-        public string From { get; set; }
+        public string From { get; set; } = string.Empty;
 
         // Optional Reply-To address. Set when the queueing caller wants
         // replies to land somewhere other than the From address — e.g.

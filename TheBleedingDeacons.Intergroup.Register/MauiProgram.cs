@@ -357,8 +357,13 @@ public static class MauiProgram
 		var logPath = Path.Combine(FileSystem.AppDataDirectory, "logs");
 		Directory.CreateDirectory(logPath);
 
-		var appName = builder.Configuration["App:Name"];
-		var environment = builder.Configuration["App:Environment"];
+		// Both feed Serilog enrichers, and appName also forms the log filename,
+		// so neither may be null. appsettings.json is git-ignored and CI writes a
+		// `{}` placeholder, so a build without a populated config is a real
+		// possibility rather than a theoretical one. These fallbacks are the
+		// defaults this file previously carried as commented-out constants.
+		var appName = builder.Configuration["App:Name"] ?? "Badi";
+		var environment = builder.Configuration["App:Environment"] ?? "Development";
 
 		// Capture the base-logger factory so the Better Stack controller can
 		// rebuild a fresh pipeline on demand. We capture `builder.Configuration`

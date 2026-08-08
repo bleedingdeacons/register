@@ -60,7 +60,10 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
         private async Task NavigateAndClose()
         {
             _timer?.Stop();
-            await _popup?.CloseAsync();
+            if (_popup is not null)
+            {
+                await _popup.CloseAsync();
+            }
             await _navigateAction.Invoke();
         }
 

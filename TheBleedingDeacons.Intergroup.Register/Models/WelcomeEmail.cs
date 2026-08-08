@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -9,17 +9,17 @@ namespace TheBleedingDeacons.Intergroup.Register.Models
     public class WelcomeEmail
     {
         
-        public string FirstName { get; set; }
+        public required string FirstName { get; set; }
 
-        public string Location { get; set; }
+        public required string Location { get; set; }
 
-        public string Address { get; set; }
+        public required string Address { get; set; }
 
-        public string StartTime { get; set; }
-        public string Email { get; set; }
-        public string Mobile { get; set; }
-        public string MeetingName { get; set; }
-        public List<MeetingContact> MeetingContacts { get; set; }
+        public required string StartTime { get; set; }
+        public required string Email { get; set; }
+        public required string Mobile { get; set; }
+        public required string MeetingName { get; set; }
+        public required List<MeetingContact> MeetingContacts { get; set; }
 
         /// <summary>
         /// The privacy / GDPR statement the recipient accepted at
@@ -37,7 +37,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Models
         /// HTML mail clients; statements that already contain HTML are
         /// passed through untouched.
         /// </summary>
-        public string Policy { get; set; }
+        public required string Policy { get; set; }
 
     }
 }

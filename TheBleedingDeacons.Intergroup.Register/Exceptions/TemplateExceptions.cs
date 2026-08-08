@@ -8,7 +8,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Exceptions
 {
     public class TemplateRenderingException : Exception
     {
-        public string TemplateName { get; }
+        public string? TemplateName { get; }
 
         public TemplateRenderingException(string message) : base(message)
         {
@@ -31,7 +31,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Exceptions
 
     public class TemplateNotFoundException : Exception
     {
-        public string TemplateName { get; }
+        public string? TemplateName { get; }
 
         public TemplateNotFoundException(string templateName) : base($"Template '{templateName}' was not found.")
         {

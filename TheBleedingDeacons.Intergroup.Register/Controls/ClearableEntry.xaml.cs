@@ -1,4 +1,4 @@
-using Microsoft.Maui.Controls;
+﻿using Microsoft.Maui.Controls;
 
 namespace TheBleedingDeacons.Intergroup.Register.Controls;
 
@@ -163,8 +163,8 @@ public partial class ClearableEntry : ContentView
 	}
 
 	// Events
-	public event EventHandler<TextChangedEventArgs> TextChanged;
-	public event EventHandler TextCleared;
+	public event EventHandler<TextChangedEventArgs>? TextChanged;
+	public event EventHandler? TextCleared;
 
 	private void OnTextChanged(object sender, TextChangedEventArgs e)
 	{

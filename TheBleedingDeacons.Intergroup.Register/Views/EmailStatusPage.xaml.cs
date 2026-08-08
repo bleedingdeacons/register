@@ -1,11 +1,11 @@
-using TheBleedingDeacons.Intergroup.Register.Support;
+﻿using TheBleedingDeacons.Intergroup.Register.Support;
 using TheBleedingDeacons.Intergroup.Register.ViewModels;
 
 namespace TheBleedingDeacons.Intergroup.Register.Views;
 
 public partial class EmailStatusPage : ContentPage
 {
-	private readonly EmailStatusViewModel _viewModel;
+	private readonly EmailStatusViewModel? _viewModel;
 
 	public EmailStatusPage(EmailStatusViewModel viewModel)
 	{

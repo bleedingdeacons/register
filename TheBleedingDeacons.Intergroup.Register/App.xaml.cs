@@ -55,7 +55,7 @@ public partial class App : Application
 		base.CleanUp();
 	}
 
-	public static Window MainWindow => Current?.Windows?.FirstOrDefault();
+	public static Window? MainWindow => Current?.Windows?.FirstOrDefault();
 
 	// Update the root page in the single window (replaces deprecated MainPage setter)
 	public static void SetRootPage(Page page)
@@ -67,5 +67,5 @@ public partial class App : Application
 	}
 
 	// Get the current page from the single window
-	public static Page CurrentPage => MainWindow?.Page;
+	public static Page? CurrentPage => MainWindow?.Page;
 }

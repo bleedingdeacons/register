@@ -86,9 +86,9 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 
 		#region Events
 
-		public event EventHandler<EmailSentEventArgs> EmailSent;
-		public event EventHandler<EmailFailedEventArgs> EmailFailed;
-		public event EventHandler<QueueProcessedEventArgs> QueueProcessed;
+		public event EventHandler<EmailSentEventArgs>? EmailSent;
+		public event EventHandler<EmailFailedEventArgs>? EmailFailed;
+		public event EventHandler<QueueProcessedEventArgs>? QueueProcessed;
 		public event EventHandler<CircuitStateChangedEventArgs>? CircuitStateChanged;
 
 		#endregion
