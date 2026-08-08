@@ -30,6 +30,12 @@ public class MainActivity : MauiAppCompatActivity
 
 		var controller = WindowCompat.GetInsetsController(Window, Window.DecorView);
 		controller.Hide(WindowInsetsCompat.Type.NavigationBars());
-		controller.SystemBarsBehavior = (int)WindowInsetsControllerBehavior.ShowTransientBarsBySwipe;
+
+		// Use the AndroidX compat constant rather than the platform
+		// WindowInsetsControllerBehavior enum: the latter is API 30+, and this
+		// app supports API 21, so referencing it directly trips CA1416 and would
+		// throw on pre-30 devices. WindowInsetsControllerCompat has the same
+		// value and handles the older code path internally.
+		controller.SystemBarsBehavior = WindowInsetsControllerCompat.BehaviorShowTransientBarsBySwipe;
 	}
 }

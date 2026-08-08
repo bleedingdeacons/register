@@ -76,7 +76,7 @@ public class IsNullConverter : IValueConverter
 
 public class CountdownToProgressConverter : IValueConverter
 {
-	public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+	public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
 	{
 		if (value is int countdown)
 		{
@@ -91,7 +91,7 @@ public class CountdownToProgressConverter : IValueConverter
 		return 1.0;
 	}
 
-	public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+	public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
 	{
 		throw new NotImplementedException();
 	}
@@ -99,14 +99,14 @@ public class CountdownToProgressConverter : IValueConverter
 
 public class BoolToYesSaveConverter : IValueConverter
 {
-	public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+	public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
 	{
 		if (value is bool isEditing)
 			return isEditing ? "Save" : "Yes";
 		return "Yes";
 	}
 
-	public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+	public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
 	{
 		throw new NotImplementedException();
 	}
@@ -114,14 +114,14 @@ public class BoolToYesSaveConverter : IValueConverter
 
 public class BoolToCancelBackConverter : IValueConverter
 {
-	public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+	public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
 	{
 		if (value is bool isEditing)
 			return isEditing ? "Cancel" : "Back";
 		return "Back";
 	}
 
-	public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+	public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
 	{
 		throw new NotImplementedException();
 	}
@@ -305,7 +305,7 @@ public class UsingGenericUnifiedVisibilityConverter : IMultiValueConverter
 /// </summary>
 public class BoolToYesNoConverter : IValueConverter
 {
-	public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+	public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
 	{
 		if (value is bool boolValue)
 		{
@@ -314,7 +314,7 @@ public class BoolToYesNoConverter : IValueConverter
 		return "No";
 	}
 
-	public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+	public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
 	{
 		if (value is string stringValue)
 		{
@@ -392,7 +392,7 @@ public class CountToBoolConverter : BaseConverterOneWay<int, bool>
 
 public class DatabaseFileToPathConverter : IValueConverter
 {
-	public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+	public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
 	{
 		// This converts from DatabaseFileInfo to string path for selection
 		if (value is DatabaseFileInfo dbFile)
@@ -402,7 +402,7 @@ public class DatabaseFileToPathConverter : IValueConverter
 		return value;
 	}
 
-	public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+	public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
 	{
 		// This converts from selected path back to DatabaseFileInfo
 		return value;
@@ -411,7 +411,7 @@ public class DatabaseFileToPathConverter : IValueConverter
 
 public class OnlineStatusToColorConverter : IValueConverter
 {
-	public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+	public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
 	{
 		if (value is bool isOnline)
 		{
@@ -420,7 +420,7 @@ public class OnlineStatusToColorConverter : IValueConverter
 		return Colors.Gray;
 	}
 
-	public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+	public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
 	{
 		throw new NotImplementedException();
 	}
@@ -429,7 +429,7 @@ public class OnlineStatusToColorConverter : IValueConverter
 // Converter for email status to color
 public class EmailStatusToColorConverter : IValueConverter
 {
-	public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+	public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
 	{
 		if (value is EmailStatus status)
 		{
@@ -445,7 +445,7 @@ public class EmailStatusToColorConverter : IValueConverter
 		return Colors.Gray;
 	}
 
-	public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+	public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
 	{
 		throw new NotImplementedException();
 	}
@@ -454,7 +454,7 @@ public class EmailStatusToColorConverter : IValueConverter
 // Converter for online status to text
 public class OnlineStatusToTextConverter : IValueConverter
 {
-	public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+	public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
 	{
 		if (value is bool isOnline)
 		{
@@ -463,7 +463,7 @@ public class OnlineStatusToTextConverter : IValueConverter
 		return "Unknown";
 	}
 
-	public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+	public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
 	{
 		throw new NotImplementedException();
 	}
@@ -472,7 +472,7 @@ public class OnlineStatusToTextConverter : IValueConverter
 // Converter for online status to icon
 public class OnlineStatusToIconConverter : IValueConverter
 {
-	public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+	public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
 	{
 		if (value is bool isOnline)
 		{
@@ -481,7 +481,7 @@ public class OnlineStatusToIconConverter : IValueConverter
 		return "❓";
 	}
 
-	public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+	public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
 	{
 		throw new NotImplementedException();
 	}
@@ -493,7 +493,7 @@ public class OnlineStatusToIconConverter : IValueConverter
 /// </summary>
 public class HasGsrToColorConverter : IValueConverter
 {
-	public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+	public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
 	{
 		if (value is IEnumerable<TheBleedingDeacons.Unity.Intergroup.Entities.Member> members)
 		{
@@ -507,7 +507,7 @@ public class HasGsrToColorConverter : IValueConverter
 		return Application.Current!.Resources["Gray400"];
 	}
 
-	public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+	public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
 	{
 		throw new NotImplementedException();
 	}
