@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:controls="clr-namespace:TheBleedingDeacons.Intergroup.Register.Controls"
              x:Class="TheBleedingDeacons.Intergroup.Register.Controls.CloseableEntry"
              x:Name="RootView">
 
@@ -16,7 +17,13 @@
     It does NOT clear the text — use ClearableEntry for that behaviour.
     -->
 
-    <Border BackgroundColor="{Binding BackgroundColor, Source={x:Reference RootView}}"
+    <!--
+        x:DataType here matches the {x:Reference RootView} Source used by every
+        binding below, so XamlC can compile them instead of falling back to
+        reflection. See ClearableEntry.xaml for the fuller note.
+    -->
+    <Border x:DataType="controls:CloseableEntry"
+            BackgroundColor="{Binding BackgroundColor, Source={x:Reference RootView}}"
             Stroke="{Binding BorderColor, Source={x:Reference RootView}}"
             StrokeThickness="{Binding BorderThickness, Source={x:Reference RootView}}">
         <Border.StrokeShape>

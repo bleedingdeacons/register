@@ -16,6 +16,29 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 
+		<!--
+			Compile XAML bindings that set Source (mostly {x:Reference} bindings
+			in Controls/*.xaml). Off by default in MAUI 9 so it doesn't silently
+			change existing apps; each such binding needs an x:DataType matching
+			the *Source's* type rather than the surrounding BindingContext.
+			A mismatch is not fatal — XamlC warns and falls back to a reflection
+			binding — but compiled bindings stop being optional once iOS release
+			builds turn on full trimming / NativeAOT, so keep this clean.
+		-->
+		<MauiEnableXamlCBindingWithSourceCompilation>true</MauiEnableXamlCBindingWithSourceCompilation>
+
+		<!--
+			All XAML bindings compile as of the change that introduced this, so
+			hold that line: a binding that silently drops back to reflection is
+			both slower and unsafe under the full trimming that iOS release
+			builds use. XC0045 (property not found on the x:DataType) is the one
+			that catches actual typos.
+
+			XC0103 is deliberately absent: it fires on markup extensions, which
+			can arrive from a package update rather than from this repo.
+		-->
+		<WarningsAsErrors>$(WarningsAsErrors);XC0022;XC0023;XC0024;XC0025;XC0045</WarningsAsErrors>
+
 		<!-- Display name -->
 		<ApplicationTitle>Intergroup Register</ApplicationTitle>
 

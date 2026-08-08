@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
+﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage
     x:Class="TheBleedingDeacons.Intergroup.Register.Views.AdminPage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
@@ -219,7 +219,7 @@
                                     <Label Style="{StaticResource M3EmptyStateSubtitleStyle}" Text="No meetings were found in the synced data. Check that intergroup meetings exist in Unity, then try again." />
                                     <Button
                                         Margin="0,20,0,0"
-                                        Command="{Binding Source={RelativeSource AncestorType={x:Type vm:AdminViewModel}}, Path=LoadUnityCommand}"
+                                        Command="{Binding Source={RelativeSource AncestorType={x:Type vm:AdminViewModel}}, Path=LoadUnityCommand, x:DataType=vm:AdminViewModel}"
                                         Style="{StaticResource M3PrimaryButtonStyle}"
                                         Text="Load Unity" />
                                 </VerticalStackLayout>
@@ -232,7 +232,7 @@
                                     <Border Padding="0" Style="{StaticResource M3ListItemCardStyle}">
                                         <Border.GestureRecognizers>
                                             <!--  Tapping the card body toggles selection — same code path as tapping the checkbox.  -->
-                                            <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type vm:AdminViewModel}}, Path=ToggleSelectMeetingCommand}" CommandParameter="{Binding .}" />
+                                            <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type vm:AdminViewModel}}, Path=ToggleSelectMeetingCommand, x:DataType=vm:AdminViewModel}" CommandParameter="{Binding .}" />
                                         </Border.GestureRecognizers>
 
                                         <Grid

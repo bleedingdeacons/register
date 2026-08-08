@@ -1,10 +1,19 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:controls="clr-namespace:TheBleedingDeacons.Intergroup.Register.Controls"
              x:Class="TheBleedingDeacons.Intergroup.Register.Controls.ClearableEntry"
              x:Name="RootView">
 
-    <Border BackgroundColor="{Binding BackgroundColor, Source={x:Reference RootView}}"
+    <!--
+        Every binding below reads a bindable property off RootView (this
+        control), so declaring x:DataType once here matches the Source type
+        for all of them and lets XamlC compile them. Without it they fall
+        back to reflection — see MauiEnableXamlCBindingWithSourceCompilation
+        in the csproj.
+    -->
+    <Border x:DataType="controls:ClearableEntry"
+            BackgroundColor="{Binding BackgroundColor, Source={x:Reference RootView}}"
             Stroke="{Binding BorderColor, Source={x:Reference RootView}}"
             StrokeThickness="{Binding BorderThickness, Source={x:Reference RootView}}"
             >

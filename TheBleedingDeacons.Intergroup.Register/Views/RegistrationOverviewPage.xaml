@@ -173,7 +173,7 @@
                                                     Text="Details"
                                                     Style="{StaticResource M3TextButtonStyle}"
                                                     VerticalOptions="Center"
-                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type vm:RegistrationOverviewViewModel}}, Path=OpenGroupDetailsCommand}"
+                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type vm:RegistrationOverviewViewModel}}, Path=OpenGroupDetailsCommand, x:DataType=vm:RegistrationOverviewViewModel}"
                                                     CommandParameter="{Binding .}"/>
                                         </Grid>
                                     </Border>
@@ -258,7 +258,7 @@
                                                     Text="Details"
                                                     Style="{StaticResource M3TextButtonStyle}"
                                                     VerticalOptions="Center"
-                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type vm:RegistrationOverviewViewModel}}, Path=OpenPositionDetailsCommand}"
+                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type vm:RegistrationOverviewViewModel}}, Path=OpenPositionDetailsCommand, x:DataType=vm:RegistrationOverviewViewModel}"
                                                     CommandParameter="{Binding .}"/>
                                         </Grid>
                                     </Border>

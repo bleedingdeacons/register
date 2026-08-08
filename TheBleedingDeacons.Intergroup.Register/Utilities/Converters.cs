@@ -370,6 +370,11 @@ public class StringNotEmptyAndEditingConverter : IMultiValueConverter
 	}
 }
 
+// Neither of these converters reads anything off the IServiceProvider handed to
+// ProvideValue, so tell XamlC it can pass an empty one (XC0103). Without the
+// attribute the XAML compiler has to assume the service provider is needed and
+// falls back to building a full one at runtime for every resource lookup.
+[AcceptEmptyServiceProvider]
 public class StringToBoolConverter : BaseConverterOneWay<string, bool>
 {
 	public override bool DefaultConvertReturnValue { get; set; } = false;
@@ -380,6 +385,7 @@ public class StringToBoolConverter : BaseConverterOneWay<string, bool>
 	}
 }
 
+[AcceptEmptyServiceProvider]
 public class CountToBoolConverter : BaseConverterOneWay<int, bool>
 {
 	public override bool DefaultConvertReturnValue { get; set; } = false;
