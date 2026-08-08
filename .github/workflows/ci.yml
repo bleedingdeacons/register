@@ -21,6 +21,18 @@ concurrency:
 
 permissions:
   contents: read
+  packages: read # restore Integrity.Client from GitHub Packages
+
+# The Register app transitively depends on the Integrity C# client, consumed as
+# the Integrity.Client package from GitHub Packages (see nuget.config). That
+# registry requires authentication even for packages from public repos.
+#
+# GITHUB_TOKEN works only if this repository has been granted access to the
+# package (package page -> Package settings -> Manage Actions access). If restore
+# fails with 403, add a PACKAGES_READ_TOKEN secret holding a PAT with the
+# read:packages scope and it will be used in preference.
+env:
+  GITHUB_PACKAGES_TOKEN: ${{ secrets.PACKAGES_READ_TOKEN || secrets.GITHUB_TOKEN }}
 
 jobs:
   build:
@@ -30,16 +42,6 @@ jobs:
     steps:
       - name: Checkout register
         uses: actions/checkout@v4
-
-      # The Register app transitively references the Integrity C# client/model
-      # projects, which live in their own public repo (integrity-sharp). Check
-      # it out next to the register sources; IntegritySharpDir (below) points
-      # the project references at it.
-      - name: Checkout integrity-sharp (cross-repo project references)
-        uses: actions/checkout@v4
-        with:
-          repository: bleedingdeacons/integrity-sharp
-          path: integrity-sharp
 
       - name: Setup JDK 17
         uses: actions/setup-java@v4
@@ -66,12 +68,12 @@ jobs:
 
       # Single build with implicit restore. RegisterAndroidOnly=true trims the
       # app to just the net9.0-android head, so we restore/build only the
-      # Android graph — no iOS/MacCatalyst workloads needed. Crucially we do
-      # NOT pass -f net9.0-android: that sets TargetFramework as a global
-      # property, which forces net9.0-android onto the referenced net9.0-only
-      # integrity-sharp projects and breaks their restore (NU1105).
-      # RegisterAndroidOnly instead narrows only the Register project's
-      # TargetFrameworks, letting each project reference resolve its own TFM.
+      # Android graph — no iOS/MacCatalyst workloads needed. Still do NOT pass
+      # -f net9.0-android: that sets TargetFramework as a global property, which
+      # forces net9.0-android onto the net9.0-only projects in this repo and
+      # breaks their restore (NU1105). RegisterAndroidOnly instead narrows only
+      # the Register project's TargetFrameworks, letting each project reference
+      # resolve its own TFM.
       #
       # Debug config: no code signing (keystore is not in the repo) and no
       # dev credentials baked in. Analyzer errors from .editorconfig break
@@ -81,7 +83,6 @@ jobs:
           dotnet build TheBleedingDeacons.Intergroup.Register/TheBleedingDeacons.Intergroup.Register.csproj
           -c Debug
           -p:RegisterAndroidOnly=true
-          -p:IntegritySharpDir=../integrity-sharp
           -p:UseDevCredentials=false
           -p:ContinuousIntegrationBuild=true
 
@@ -92,12 +93,6 @@ jobs:
     steps:
       - name: Checkout register
         uses: actions/checkout@v4
-
-      - name: Checkout integrity-sharp (cross-repo project references)
-        uses: actions/checkout@v4
-        with:
-          repository: bleedingdeacons/integrity-sharp
-          path: integrity-sharp
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -112,7 +107,6 @@ jobs:
         run: >
           dotnet build TheBleedingDeacons.Unity.Intergroup.Tests/TheBleedingDeacons.Unity.Intergroup.Tests.csproj
           -c Debug
-          -p:IntegritySharpDir=../integrity-sharp
 
       # xUnit v3 runs on Microsoft.Testing.Platform, so the test project is an
       # executable. coverlet.console instruments the register-owned assembly and

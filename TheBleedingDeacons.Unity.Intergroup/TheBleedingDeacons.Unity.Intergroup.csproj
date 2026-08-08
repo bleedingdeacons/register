@@ -32,17 +32,32 @@
   </ItemGroup>
 
   <!--
-    The Integrity client/model projects live in a separate repository
-    (github.com/bleedingdeacons/integrity). IntegritySharpDir points at the
-    'client/sharp' folder of a local checkout and defaults to the developer
-    machine layout. CI overrides it, e.g.:
-        dotnet build ... -p:IntegritySharpDir=../integrity/client/sharp/
+    The Integrity client lives in a separate repository
+    (github.com/bleedingdeacons/integrity-sharp) and is consumed as the
+    Integrity.Client NuGet package, published to GitHub Packages. See
+    nuget.config at the repo root for the feed and its credentials.
+
+    Set UseLocalIntegritySharp=true to build against a local checkout instead —
+    for working across both repos without cutting a release for every change:
+        dotnet build ... -p:UseLocalIntegritySharp=true
+    IntegritySharpDir points at that checkout and defaults to the sibling layout
+    on a developer machine.
   -->
   <PropertyGroup>
+    <UseLocalIntegritySharp Condition="'$(UseLocalIntegritySharp)' == ''">false</UseLocalIntegritySharp>
     <IntegritySharpDir Condition="'$(IntegritySharpDir)' == ''">..\..\integrity-sharp</IntegritySharpDir>
   </PropertyGroup>
 
-  <ItemGroup>
+  <!-- One reference covers both assemblies: the Models types ship bundled
+       inside Integrity.Client rather than as a package of their own. -->
+  <ItemGroup Condition="'$(UseLocalIntegritySharp)' != 'true'">
+    <PackageReference Include="Integrity.Client" Version="1.10.3" />
+  </ItemGroup>
+
+  <!-- Both projects must be referenced in local mode. The client marks its own
+       Models reference PrivateAssets="all" (so packing doesn't emit a dependency
+       on an unpublished package), which stops Models flowing transitively. -->
+  <ItemGroup Condition="'$(UseLocalIntegritySharp)' == 'true'">
     <ProjectReference Include="$(IntegritySharpDir)\TheBleedingDeacons.Unity.Client\TheBleedingDeacons.Unity.Client.csproj" />
     <ProjectReference Include="$(IntegritySharpDir)\TheBleedingDeacons.Unity.Models\TheBleedingDeacons.Unity.Models.csproj" />
   </ItemGroup>
