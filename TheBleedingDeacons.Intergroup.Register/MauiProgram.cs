@@ -373,8 +373,12 @@ public static class MauiProgram
 
 		Log.Logger = _baseLoggerFactory().CreateLogger();
 
-		Log.Information("Application {AppName} v{Version} starting on {Platform}",
-			appName, AppInfo.VersionString, DeviceInfo.Platform);
+		// Framework is logged as its own property rather than folded into the
+		// message so Better Stack can filter on it directly — the quickest way
+		// to tell a .NET 9 device from a .NET 10 one across a fleet of tablets.
+		Log.Information(
+			"Application {AppName} v{Version} (build {Build}) starting on {Platform} under {Framework}",
+			appName, BuildInfo.Version, BuildInfo.Build, DeviceInfo.Platform, BuildInfo.Framework);
 	}
 
 	/// <summary>

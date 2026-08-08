@@ -15,12 +15,27 @@
             Spacing="20"
             VerticalOptions="Start">
 
-            <Label
-                Margin="0,0,0,30"
-                FontAttributes="Bold"
-                FontSize="32"
-                HorizontalOptions="Center"
-                Text="Settings" />
+            <!--
+                Title + build identity. Grouped in their own layout with tight
+                spacing so the version reads as a subtitle rather than as the
+                first item of the page, and placed at the very top rather than
+                in an About section at the bottom: the whole point is to answer
+                "which build is on this tablet?" without a long scroll.
+            -->
+            <VerticalStackLayout Margin="0,0,0,30" Spacing="2">
+                <Label
+                    FontAttributes="Bold"
+                    FontSize="32"
+                    HorizontalOptions="Center"
+                    Text="Settings" />
+
+                <Label
+                    FontSize="12"
+                    HorizontalOptions="Center"
+                    Text="{Binding BuildSummary}"
+                    TextColor="{AppThemeBinding Light={StaticResource Gray600},
+                                                Dark={StaticResource Gray300}}" />
+            </VerticalStackLayout>
 
             <Grid ColumnDefinitions="*,*" ColumnSpacing="20">
                 <Button

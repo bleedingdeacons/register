@@ -143,6 +143,22 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 		[ObservableProperty]
 		private bool isPrivacyPolicyStatusError;
 
+		// =================================================================
+		// Build identity
+		// =================================================================
+
+		/// <summary>
+		/// Version, build number and .NET runtime of the running app — e.g.
+		/// "1.0.26 (build 1) — .NET 10.0.10". A plain get-only property rather
+		/// than an <c>[ObservableProperty]</c> because none of it can change
+		/// while the process is alive, so there is nothing to notify about.
+		/// Shared with the startup log banner via <see cref="BuildInfo"/> so
+		/// the screen and the logs can never disagree. Kept as an instance
+		/// member (despite reading only static state) so the Settings page can
+		/// bind it through its <c>x:DataType</c> like every other value there.
+		/// </summary>
+		public string BuildSummary => BuildInfo.Summary;
+
 		public SettingsViewModel(
 			IConfigurationService configService,
 			IDbContextFactory<UnityDbContext> dbContextFactory,
