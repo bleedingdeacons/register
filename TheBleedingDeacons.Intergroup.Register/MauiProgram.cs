@@ -101,26 +101,8 @@ public static class MauiProgram
 		// Ensure Serilog is flushed on unhandled / fatal errors
 		RegisterGlobalExceptionHandlers();
 
-		// ── MAUI platform services ────────────────────────────────────
-		// Registered explicitly so the services that consume them
-		// (ConfigurationService, PrivacyPolicyCache, TemporaryIdGenerator)
-		// can take them as constructor parameters instead of reaching for
-		// the Preferences / FileSystem / SecureStorage / DeviceInfo statics.
-		// Those statics throw outside a MAUI host, which is what made the
-		// consuming services impossible to unit test. These are the very
-		// instances the statics delegate to, so runtime behaviour is
-		// identical.
-		builder.Services.AddSingleton(Preferences.Default);
-		builder.Services.AddSingleton(FileSystem.Current);
-		builder.Services.AddSingleton(SecureStorage.Default);
-		builder.Services.AddSingleton(DeviceInfo.Current);
-
 		// Add configuration service
 		builder.Services.AddSingleton<IConfigurationService, ConfigurationService>();
-
-		// Singleton: one temp-ID counter per device, as the negative-ID
-		// uniqueness guarantee requires.
-		builder.Services.AddSingleton<ITemporaryIdGenerator, TemporaryIdGenerator>();
 
 		builder.Services.AddSingleton<RegistrationEventLog>();
 		builder.Services.AddSingleton<ComplianceEventLog>();

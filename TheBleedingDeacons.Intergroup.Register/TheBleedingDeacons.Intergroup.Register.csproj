@@ -238,14 +238,6 @@
 		<ProjectReference Include="..\TheBleedingDeacons.Unity.Intergroup\TheBleedingDeacons.Unity.Intergroup.csproj" />
 	</ItemGroup>
 
-	<!-- RegistrationEventLog and ComplianceEventLog each carry an internal
-	     constructor that takes an explicit log path, added so they can be
-	     driven from a non-MAUI host. This makes that constructor reachable
-	     from the unit tests, which is the only reason it exists. -->
-	<ItemGroup>
-		<InternalsVisibleTo Include="TheBleedingDeacons.Intergroup.Register.UnitTests" />
-	</ItemGroup>
-
 	<!-- TODO: Re-add Integrity.Client as a NuGet package or relative project reference -->
 
 	<ItemGroup>

@@ -9,23 +9,6 @@ using TheBleedingDeacons.Intergroup.Register.Support;
 
 namespace TheBleedingDeacons.Intergroup.Register.Services
 {
-	/// <summary>
-	/// Reads and writes every persisted app setting: SMTP, Unity and Better
-	/// Stack credentials, the feature toggles, and the device label.
-	///
-	/// <para><b>Platform services are injected</b> — <see cref="IPreferences"/>,
-	/// <see cref="IFileSystem"/>, <see cref="ISecureStorage"/> and
-	/// <see cref="IDeviceInfo"/> — rather than reached through the
-	/// <c>Preferences</c> / <c>FileSystem</c> / <c>SecureStorage</c> /
-	/// <c>DeviceInfo</c> statics. Those statics throw outside a MAUI host,
-	/// which left the whole of this class untestable, including the
-	/// default-on / default-off policy on each toggle and every
-	/// "prefs unavailable → fail safe" fallback.
-	///
-	/// MAUI ships these interfaces for exactly this purpose and
-	/// <c>Preferences.Default</c> and friends implement them, so injecting
-	/// them changes no runtime behaviour.</para>
-	/// </summary>
 	public class ConfigurationService : IConfigurationService
 	{
 		private static readonly ILogger Logger = AppLogger.ForContext<ConfigurationService>();
@@ -51,9 +34,6 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 #endif
 
 		private readonly IConfiguration _configuration;
-		private readonly IPreferences _preferences;
-		private readonly ISecureStorage _secureStorage;
-		private readonly IDeviceInfo _deviceInfo;
 		private readonly string _configFilePath;
 		private readonly string _unityConfigFilePath;
 		private readonly string _betterStackConfigFilePath;
@@ -62,18 +42,8 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		private UnityConfiguration? _cachedUnityConfig;
 		private BetterStackConfiguration? _cachedBetterStackConfig;
 
-		public ConfigurationService(
-			IPreferences preferences,
-			IFileSystem fileSystem,
-			ISecureStorage secureStorage,
-			IDeviceInfo deviceInfo)
+		public ConfigurationService()
 		{
-			ArgumentNullException.ThrowIfNull(fileSystem);
-
-			_preferences = preferences ?? throw new ArgumentNullException(nameof(preferences));
-			_secureStorage = secureStorage ?? throw new ArgumentNullException(nameof(secureStorage));
-			_deviceInfo = deviceInfo ?? throw new ArgumentNullException(nameof(deviceInfo));
-
 			var builder = new ConfigurationBuilder();
 
 			// Load embedded appsettings.json
@@ -85,9 +55,9 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			}
 
 			// Load user-specific config file from app data
-			_configFilePath = Path.Combine(fileSystem.AppDataDirectory, "mailsettings.json");
-			_unityConfigFilePath = Path.Combine(fileSystem.AppDataDirectory, "unitysettings.json");
-			_betterStackConfigFilePath = Path.Combine(fileSystem.AppDataDirectory, "betterstacksettings.json");
+			_configFilePath = Path.Combine(FileSystem.AppDataDirectory, "mailsettings.json");
+			_unityConfigFilePath = Path.Combine(FileSystem.AppDataDirectory, "unitysettings.json");
+			_betterStackConfigFilePath = Path.Combine(FileSystem.AppDataDirectory, "betterstacksettings.json");
 			if (File.Exists(_configFilePath))
 			{
 				builder.AddJsonFile(_configFilePath, optional: true, reloadOnChange: false);
@@ -200,7 +170,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			int? activeIntergroupMeetingId = null;
 			try
 			{
-				var raw = _preferences.Get(UNITY_ACTIVE_MEETING_KEY, string.Empty);
+				var raw = Preferences.Get(UNITY_ACTIVE_MEETING_KEY, string.Empty);
 				if (int.TryParse(raw, out var parsedId) && parsedId > 0)
 					activeIntergroupMeetingId = parsedId;
 			}
@@ -224,9 +194,9 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			try
 			{
 				if (meetingId.HasValue && meetingId.Value > 0)
-					_preferences.Set(UNITY_ACTIVE_MEETING_KEY, meetingId.Value.ToString());
+					Preferences.Set(UNITY_ACTIVE_MEETING_KEY, meetingId.Value.ToString());
 				else
-					_preferences.Remove(UNITY_ACTIVE_MEETING_KEY);
+					Preferences.Remove(UNITY_ACTIVE_MEETING_KEY);
 			}
 			catch (Exception ex)
 			{
@@ -323,7 +293,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 					// Preferences has no first-class bool accessor, so we
 					// store the string "true"/"false". Missing key →
 					// default true (safe / on by default).
-					var raw = _preferences.Get(REGISTRATION_LOG_ENABLED_KEY, string.Empty);
+					var raw = Preferences.Get(REGISTRATION_LOG_ENABLED_KEY, string.Empty);
 					if (string.IsNullOrEmpty(raw)) return true;
 					return !bool.TryParse(raw, out var value) || value;
 				}
@@ -341,7 +311,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		{
 			try
 			{
-				_preferences.Set(REGISTRATION_LOG_ENABLED_KEY, enabled ? "true" : "false");
+				Preferences.Set(REGISTRATION_LOG_ENABLED_KEY, enabled ? "true" : "false");
 				Logger.Information("Registration event log {State}", enabled ? "ENABLED" : "DISABLED");
 			}
 			catch (Exception ex)
@@ -367,7 +337,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			{
 				try
 				{
-					var raw = _preferences.Get(AUTO_REGISTER_POSITIONS_KEY, string.Empty);
+					var raw = Preferences.Get(AUTO_REGISTER_POSITIONS_KEY, string.Empty);
 					if (string.IsNullOrEmpty(raw)) return true;
 					return !bool.TryParse(raw, out var value) || value;
 				}
@@ -386,7 +356,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		{
 			try
 			{
-				_preferences.Set(AUTO_REGISTER_POSITIONS_KEY, enabled ? "true" : "false");
+				Preferences.Set(AUTO_REGISTER_POSITIONS_KEY, enabled ? "true" : "false");
 				Logger.Information("Auto-register positions on group {State}", enabled ? "ENABLED" : "DISABLED");
 			}
 			catch (Exception ex)
@@ -412,7 +382,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			{
 				try
 				{
-					var raw = _preferences.Get(COMPLIANCE_LOG_ENABLED_KEY, string.Empty);
+					var raw = Preferences.Get(COMPLIANCE_LOG_ENABLED_KEY, string.Empty);
 					if (string.IsNullOrEmpty(raw)) return true;
 					return !bool.TryParse(raw, out var value) || value;
 				}
@@ -430,7 +400,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		{
 			try
 			{
-				_preferences.Set(COMPLIANCE_LOG_ENABLED_KEY, enabled ? "true" : "false");
+				Preferences.Set(COMPLIANCE_LOG_ENABLED_KEY, enabled ? "true" : "false");
 				Logger.Information("Compliance event log {State}", enabled ? "ENABLED" : "DISABLED");
 			}
 			catch (Exception ex)
@@ -455,7 +425,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			{
 				try
 				{
-					var raw = _preferences.Get(SINGLE_GSR_SHORTCUT_KEY, string.Empty);
+					var raw = Preferences.Get(SINGLE_GSR_SHORTCUT_KEY, string.Empty);
 					if (string.IsNullOrEmpty(raw)) return false;
 					return bool.TryParse(raw, out var value) && value;
 				}
@@ -474,7 +444,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		{
 			try
 			{
-				_preferences.Set(SINGLE_GSR_SHORTCUT_KEY, enabled ? "true" : "false");
+				Preferences.Set(SINGLE_GSR_SHORTCUT_KEY, enabled ? "true" : "false");
 				Logger.Information("Single-GSR shortcut {State}", enabled ? "ENABLED" : "DISABLED");
 			}
 			catch (Exception ex)
@@ -500,7 +470,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			{
 				try
 				{
-					var raw = _preferences.Get(ADD_POSITION_HOLDER_ENABLED_KEY, string.Empty);
+					var raw = Preferences.Get(ADD_POSITION_HOLDER_ENABLED_KEY, string.Empty);
 					if (string.IsNullOrEmpty(raw)) return false;
 					return bool.TryParse(raw, out var value) && value;
 				}
@@ -519,7 +489,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		{
 			try
 			{
-				_preferences.Set(ADD_POSITION_HOLDER_ENABLED_KEY, enabled ? "true" : "false");
+				Preferences.Set(ADD_POSITION_HOLDER_ENABLED_KEY, enabled ? "true" : "false");
 				Logger.Information("Add-position-holder button {State}", enabled ? "ENABLED" : "DISABLED");
 			}
 			catch (Exception ex)
@@ -546,7 +516,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			{
 				try
 				{
-					var raw = _preferences.Get(WELCOME_EMAIL_ENABLED_KEY, string.Empty);
+					var raw = Preferences.Get(WELCOME_EMAIL_ENABLED_KEY, string.Empty);
 					if (string.IsNullOrEmpty(raw)) return false;
 					return bool.TryParse(raw, out var value) && value;
 				}
@@ -566,7 +536,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		{
 			try
 			{
-				_preferences.Set(WELCOME_EMAIL_ENABLED_KEY, enabled ? "true" : "false");
+				Preferences.Set(WELCOME_EMAIL_ENABLED_KEY, enabled ? "true" : "false");
 				Logger.Information("Welcome-email-on-registration {State}", enabled ? "ENABLED" : "DISABLED");
 			}
 			catch (Exception ex)
@@ -595,7 +565,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			{
 				try
 				{
-					var stored = _preferences.Get(DEVICE_LABEL_KEY, string.Empty);
+					var stored = Preferences.Get(DEVICE_LABEL_KEY, string.Empty);
 					if (!string.IsNullOrWhiteSpace(stored))
 						return stored;
 				}
@@ -615,13 +585,13 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			{
 				if (string.IsNullOrWhiteSpace(label))
 				{
-					_preferences.Remove(DEVICE_LABEL_KEY);
+					Preferences.Remove(DEVICE_LABEL_KEY);
 					Logger.Information("Device label cleared — will use auto-default");
 				}
 				else
 				{
 					var trimmed = label.Trim();
-					_preferences.Set(DEVICE_LABEL_KEY, trimmed);
+					Preferences.Set(DEVICE_LABEL_KEY, trimmed);
 					Logger.Information("Device label set to {DeviceLabel}", trimmed);
 				}
 			}
@@ -637,11 +607,11 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		/// <see cref="DeviceInfo"/>, on desktop we use the OS host name which
 		/// is what the operator already recognises.
 		/// </summary>
-		private string BuildDefaultDeviceLabel()
+		private static string BuildDefaultDeviceLabel()
 		{
 			try
 			{
-				var platform = _deviceInfo.Platform;
+				var platform = DeviceInfo.Platform;
 
 				if (platform == DevicePlatform.WinUI || platform == DevicePlatform.MacCatalyst)
 				{
@@ -659,10 +629,10 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 				// Combine manufacturer, model and OS version. The version is
 				// the bit that lets you tell apart two otherwise-identical
 				// tablets on different Android releases.
-				var manufacturer = (_deviceInfo.Manufacturer ?? string.Empty).Trim();
-				var model = (_deviceInfo.Model ?? string.Empty).Trim();
+				var manufacturer = (DeviceInfo.Manufacturer ?? string.Empty).Trim();
+				var model = (DeviceInfo.Model ?? string.Empty).Trim();
 				var osName = platform.ToString();         // "Android", "iOS", "WinUI", "MacCatalyst"
-				var osVer = (_deviceInfo.VersionString ?? string.Empty).Trim();
+				var osVer = (DeviceInfo.VersionString ?? string.Empty).Trim();
 
 				// Avoid repeating the manufacturer when it's already in the model
 				// string (Samsung tends to do this; "Samsung SM-G991B" vs "SM-G991B").
@@ -894,11 +864,11 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		/// called from the MAUI UI thread. Returns empty string on failure.
 		/// </summary>
 		[SuppressMessage("Major Code Smell", "S1144:Unused private types or members should be removed", Justification = "Only called from the #else (production credentials) branches; a USE_DEV_CREDENTIALS build cannot see those call sites. Deleting this breaks every production build.")]
-		private string GetSecretSync(string key, string description)
+		private static string GetSecretSync(string key, string description)
 		{
 			try
 			{
-				return Task.Run(() => _secureStorage.GetAsync(key)).GetAwaiter().GetResult() ?? "";
+				return Task.Run(() => SecureStorage.GetAsync(key)).GetAwaiter().GetResult() ?? "";
 			}
 			catch (Exception ex)
 			{
@@ -911,11 +881,11 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		/// Reads a secret from SecureStorage (async). Returns empty string on failure.
 		/// </summary>
 		[SuppressMessage("Major Code Smell", "S1144:Unused private types or members should be removed", Justification = "Only called from the #else (production credentials) branches; a USE_DEV_CREDENTIALS build cannot see those call sites. Deleting this breaks every production build.")]
-		private async Task<string> GetSecretAsync(string key, string description)
+		private static async Task<string> GetSecretAsync(string key, string description)
 		{
 			try
 			{
-				return await _secureStorage.GetAsync(key) ?? "";
+				return await SecureStorage.GetAsync(key) ?? "";
 			}
 			catch (Exception ex)
 			{
@@ -927,11 +897,11 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		/// <summary>
 		/// Writes a secret to SecureStorage. Logs a warning on failure.
 		/// </summary>
-		private async Task SaveSecretAsync(string key, string value, string description)
+		private static async Task SaveSecretAsync(string key, string value, string description)
 		{
 			try
 			{
-				await _secureStorage.SetAsync(key, value);
+				await SecureStorage.SetAsync(key, value);
 			}
 			catch (Exception ex)
 			{
@@ -953,7 +923,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			{
 				try
 				{
-					var raw = _preferences.Get(COMPLIANCE_ACCEPTANCE_EMAIL_ENABLED_KEY, string.Empty);
+					var raw = Preferences.Get(COMPLIANCE_ACCEPTANCE_EMAIL_ENABLED_KEY, string.Empty);
 					if (string.IsNullOrEmpty(raw)) return true;
 					return bool.TryParse(raw, out var value) && value;
 				}
@@ -973,7 +943,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		{
 			try
 			{
-				_preferences.Set(COMPLIANCE_ACCEPTANCE_EMAIL_ENABLED_KEY, enabled ? "true" : "false");
+				Preferences.Set(COMPLIANCE_ACCEPTANCE_EMAIL_ENABLED_KEY, enabled ? "true" : "false");
 				Logger.Information("Compliance-acceptance-email {State}", enabled ? "ENABLED" : "DISABLED");
 			}
 			catch (Exception ex)
@@ -1006,7 +976,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 #else
 				try
 				{
-					return _preferences.Get(COMPLIANCE_EMAIL_KEY, string.Empty);
+					return Preferences.Get(COMPLIANCE_EMAIL_KEY, string.Empty);
 				}
 				catch (Exception ex)
 				{
@@ -1028,13 +998,13 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			{
 				if (string.IsNullOrWhiteSpace(email))
 				{
-					_preferences.Remove(COMPLIANCE_EMAIL_KEY);
+					Preferences.Remove(COMPLIANCE_EMAIL_KEY);
 					Logger.Information("Compliance email cleared — no recipient configured");
 				}
 				else
 				{
 					var trimmed = email.Trim();
-					_preferences.Set(COMPLIANCE_EMAIL_KEY, trimmed);
+					Preferences.Set(COMPLIANCE_EMAIL_KEY, trimmed);
 					Logger.Information("Compliance email set to {ComplianceEmail}", trimmed);
 				}
 			}

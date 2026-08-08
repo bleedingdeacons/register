@@ -21,44 +21,26 @@
 /// their negative IDs never meet.
 ///
 /// <para><b>Persistence:</b></para>
-/// The counter is persisted to <see cref="IPreferences"/> on every increment.
+/// The counter is persisted to <see cref="Preferences"/> on every increment.
 /// This is intentional: if the app crashes after generating a temp ID but
 /// before the member row is saved to SQLite, the next launch must not reissue
 /// the same ID — an orphan row from the crashed session may still be in the
 /// database and would cause a primary-key collision. Synchronous persistence
 /// is cheap at the rate these are generated (handful per meeting).
-///
-/// <para><b>Why an instance and not a static class:</b></para>
-/// This was a static class holding a static counter seeded from the
-/// <c>Preferences.Default</c> static. That made it untestable twice over: the
-/// static seed throws outside a MAUI host, and a process-wide counter means
-/// tests cannot be isolated from each other or from execution order — the
-/// resume-from-persisted-value behaviour, which is the entire point of the
-/// class, is unobservable when there is only ever one counter per process.
-/// Registered as a singleton, so the one-counter-per-device guarantee is
-/// unchanged at runtime.
 /// </summary>
-public sealed class TemporaryIdGenerator : ITemporaryIdGenerator
+public static class TemporaryIdGenerator
 {
 	private const string CounterKey = "temp_id_counter";
 
-	private readonly IPreferences _preferences;
-
 	// Counter decreases monotonically: first call returns -1, next -2, etc.
-	// Seeded from Preferences so we resume where we left off.
-	private int _counter;
-
-	public TemporaryIdGenerator(IPreferences preferences)
-	{
-		_preferences = preferences ?? throw new ArgumentNullException(nameof(preferences));
-		_counter = LoadCounter();
-	}
+	// Initial value loaded from Preferences so we resume where we left off.
+	private static int _counter = LoadCounter();
 
 	/// <summary>
 	/// Returns the next unique negative temporary ID for this device.
 	/// Thread-safe.
 	/// </summary>
-	public int Next()
+	public static int Next()
 	{
 		var next = Interlocked.Decrement(ref _counter);
 
@@ -66,7 +48,7 @@ public sealed class TemporaryIdGenerator : ITemporaryIdGenerator
 		// reissue an ID still referenced by an orphaned row.
 		try
 		{
-			_preferences.Set(CounterKey, next);
+			Preferences.Default.Set(CounterKey, next);
 		}
 		catch
 		{
@@ -92,12 +74,12 @@ public sealed class TemporaryIdGenerator : ITemporaryIdGenerator
 	/// after a full purge, or after reconciliation + sync has replaced
 	/// every temp ID with its real Unity counterpart).
 	/// </summary>
-	public void ResetCounter()
+	public static void ResetCounter()
 	{
 		Interlocked.Exchange(ref _counter, 0);
 		try
 		{
-			_preferences.Set(CounterKey, 0);
+			Preferences.Default.Set(CounterKey, 0);
 		}
 		catch
 		{
@@ -105,11 +87,11 @@ public sealed class TemporaryIdGenerator : ITemporaryIdGenerator
 		}
 	}
 
-	private int LoadCounter()
+	private static int LoadCounter()
 	{
 		try
 		{
-			var stored = _preferences.Get(CounterKey, 0);
+			var stored = Preferences.Default.Get(CounterKey, 0);
 			// Guard against positive values ending up in the pref (e.g. from
 			// an older version or corrupt prefs). Counter must start at 0 or
 			// below — Next() always decrements, so a positive seed would hand

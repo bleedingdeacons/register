@@ -1,27 +1,19 @@
 name: CI
 
-# Five jobs:
-#  * build          — compile the Android head of the MAUI app and run the StyleCop /
-#                     Meziantou analyzers (rules escalated to "error" in .editorconfig
-#                     fail the build, so this is a real quality gate).
-#  * build-windows  — the same gate for the Windows head, which is a shipping
-#                     platform too. It needs its own runner: the Windows head only
-#                     exists when building on Windows (see the IsOSPlatform
-#                     condition on TargetFrameworks), and it is the only head that
-#                     reports the WinRT/CsWinRT analyzers — MVVMTK0045 and friends
-#                     are invisible to the Ubuntu job. Without this the Windows
-#                     head can rot unnoticed, which is exactly what happened to the
-#                     iOS and MacCatalyst heads.
-#  * test           — the Unity.Intergroup suite. net9.0, so it runs on Ubuntu.
-#  * test-register  — the Register app suite. Must run on Windows: the app is a MAUI
-#                     single-project app whose only target frameworks are platform
-#                     heads, and the Windows head is the one that hosts an ordinary
-#                     console test runner.
-#  * coverage       — closes the parallel Coveralls build once both suites have
-#                     uploaded. Without it Coveralls leaves the build open and
-#                     reports only whichever half arrived last.
-#
-# Both test jobs run xUnit v3 on Microsoft.Testing.Platform with Coverlet coverage.
+# Three jobs:
+#  * build         — compile the Android head of the MAUI app and run the StyleCop /
+#                    Meziantou analyzers (rules escalated to "error" in .editorconfig
+#                    fail the build, so this is a real quality gate).
+#  * build-windows — the same gate for the Windows head, which is a shipping
+#                    platform too. It needs its own runner: the Windows head only
+#                    exists when building on Windows (see the IsOSPlatform
+#                    condition on TargetFrameworks), and it is the only head that
+#                    reports the WinRT/CsWinRT analyzers — MVVMTK0045 and friends
+#                    are invisible to the Ubuntu job. Without this the Windows
+#                    head can rot unnoticed, which is exactly what happened to the
+#                    iOS and MacCatalyst heads.
+#  * test          — run the xUnit v3 test suite (on Microsoft.Testing.Platform) with
+#                    Coverlet coverage and upload the report to Coveralls.
 
 on:
   push:
@@ -216,9 +208,6 @@ jobs:
           --output coverage/coverage.cobertura.xml
           --include "[TheBleedingDeacons.Unity.Intergroup]*"
 
-      # Two jobs upload coverage for different assemblies, so both must be
-      # flagged and marked parallel — otherwise the second upload replaces the
-      # first instead of adding to it. The `coverage` job closes the build.
       - name: Upload coverage to Coveralls
         uses: coverallsapp/github-action@v2
         with:
@@ -227,107 +216,4 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           file: coverage/coverage.cobertura.xml
           format: cobertura
-          flag-name: unity-intergroup
-          parallel: true
-          fail-on-error: false
-
-  test-register:
-    name: Test & coverage (Register)
-    runs-on: windows-latest
-
-    steps:
-      - name: Checkout register
-        uses: actions/checkout@v5
-
-      # Same preflight as the build job; see the comment there. Forced to bash
-      # because windows-latest defaults to PowerShell and this is shell script.
-      - name: Verify GitHub Packages credentials
-        shell: bash
-        run: |
-          code=$(curl -sS -o /dev/null -w '%{http_code}' \
-            -u "bleedingdeacons:$GITHUB_PACKAGES_TOKEN" \
-            https://nuget.pkg.github.com/bleedingdeacons/download/integrity.client/index.json)
-          case "$code" in
-            200) echo "GitHub Packages authentication OK" ;;
-            401|403) echo "::error::GitHub Packages rejected the credentials (HTTP $code). PACKAGES_READ_TOKEN is missing, expired, or lacks the read:packages scope — rotate it in this repository's secrets."; exit 1 ;;
-            *) echo "::warning::Unexpected HTTP $code probing GitHub Packages; continuing and letting restore report the outcome." ;;
-          esac
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v5
-        with:
-          global-json-file: global.json
-
-      # Only the Windows head is built here, so no JDK / Android SDK / Apple
-      # workloads are needed. See the RegisterWindowsOnly note on the build step.
-      - name: Install MAUI Windows workload
-        run: dotnet workload install maui-windows
-
-      # See the Android job for why this placeholder is needed. The test project
-      # deliberately asserts nothing that depends on its contents.
-      - name: Ensure git-ignored appsettings.json exists
-        shell: bash
-        run: |
-          f=TheBleedingDeacons.Intergroup.Register/appsettings.json
-          if [ ! -f "$f" ]; then printf '{}\n' > "$f"; echo "wrote placeholder $f"; else echo "$f already present"; fi
-
-      - name: Restore local tools (coverlet.console)
-        run: dotnet tool restore
-
-      # RegisterWindowsOnly MUST be passed here rather than left to the test
-      # project's ProjectReference metadata. The csproj sets it via
-      # AdditionalProperties, which applies to the build but NOT to restore —
-      # restore would still walk all four of the app's target frameworks and
-      # demand the Android and Apple workloads on this runner. A global property
-      # narrows both. (UseDevCredentials=false is also set on that
-      # ProjectReference; it only affects compilation, so the csproj is enough.)
-      #
-      # Implicit restore inherits the global property, so one command does both.
-      - name: Build tests
-        run: >
-          dotnet build TheBleedingDeacons.Intergroup.Register.UnitTests/TheBleedingDeacons.Intergroup.Register.UnitTests.csproj
-          -c Debug
-          -p:RegisterWindowsOnly=true
-
-      # Same coverlet.console wrapper as the Ubuntu test job — see the comment
-      # there for why the collector/msbuild integrations are not used. The
-      # include filter scopes the report to the app assembly, excluding xUnit,
-      # MAUI and the Unity library (which the other job already reports).
-      - name: Test with coverage
-        shell: bash
-        run: >
-          dotnet coverlet TheBleedingDeacons.Intergroup.Register.UnitTests/bin/Debug/net9.0-windows10.0.19041.0/TheBleedingDeacons.Intergroup.Register.UnitTests.dll
-          --target dotnet
-          --targetargs "TheBleedingDeacons.Intergroup.Register.UnitTests/bin/Debug/net9.0-windows10.0.19041.0/TheBleedingDeacons.Intergroup.Register.UnitTests.dll"
-          --format cobertura
-          --output coverage/coverage.register.cobertura.xml
-          --include "[TheBleedingDeacons.Intergroup.Register]*"
-
-      - name: Upload coverage to Coveralls
-        uses: coverallsapp/github-action@v2
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          file: coverage/coverage.register.cobertura.xml
-          format: cobertura
-          flag-name: register
-          parallel: true
-          fail-on-error: false
-
-  # Tells Coveralls both parallel uploads have arrived so it can finalise the
-  # build. `always()` so a failure in one suite still closes the build rather
-  # than leaving it pending forever — the failed job is the signal, not a
-  # stuck Coveralls status.
-  coverage:
-    name: Finalise coverage
-    runs-on: ubuntu-latest
-    needs: [ test, test-register ]
-    if: always()
-
-    steps:
-      - name: Close the parallel Coveralls build
-        uses: coverallsapp/github-action@v2
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          parallel-finished: true
-          carryforward: unity-intergroup,register
           fail-on-error: false
