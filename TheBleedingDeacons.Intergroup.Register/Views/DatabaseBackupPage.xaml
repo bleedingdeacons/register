@@ -1,8 +1,9 @@
-<?xml version="1.0" encoding="utf-8" ?>
+﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage x:Class="TheBleedingDeacons.Intergroup.Register.Views.DatabaseBackupPage"
              xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:viewmodels="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
+             x:DataType="viewmodels:DatabaseBackupViewModel"
              Title="Database Backup">
 
     <ContentPage.BindingContext>
@@ -62,7 +63,7 @@
                                     SelectedItem="{Binding SelectedDatabaseFileInfo}"
                                     MaximumHeightRequest="200">
                         <CollectionView.ItemTemplate>
-                            <DataTemplate>
+                            <DataTemplate x:DataType="viewmodels:DatabaseFileInfo">
                                 <Border Margin="0,2">
                                     <Border.Triggers>
                                         <DataTrigger TargetType="Border" Binding="{Binding IsSelected}" Value="True">
@@ -80,7 +81,7 @@
                                         <RoundRectangle CornerRadius="5" />
                                     </Border.StrokeShape>
                                     <Border.GestureRecognizers>
-                                        <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:DatabaseBackupViewModel}}, Path=SelectDatabaseCommand}"
+                                        <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:DatabaseBackupViewModel}}, Path=SelectDatabaseCommand, x:DataType=viewmodels:DatabaseBackupViewModel}"
                                                             CommandParameter="{Binding FullPath}" />
                                     </Border.GestureRecognizers>
 

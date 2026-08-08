@@ -4,6 +4,7 @@
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:controls="clr-namespace:TheBleedingDeacons.Intergroup.Register.Controls"
+    xmlns:entities="clr-namespace:TheBleedingDeacons.Unity.Intergroup.Entities;assembly=TheBleedingDeacons.Unity.Intergroup"
     x:Name="GroupMemberCardRoot">
 
     <!--
@@ -35,13 +36,16 @@
             control root via x:Reference.
         -->
         <Grid>
-            <VerticalStackLayout BindingContext="{Binding Member, Source={x:Reference GroupMemberCardRoot}}" Spacing="6">
+            <VerticalStackLayout
+                BindingContext="{Binding Member, Source={x:Reference GroupMemberCardRoot}, x:DataType=controls:GroupMemberCard}"
+                x:DataType="entities:Member"
+                Spacing="6">
 
                 <Label Style="{StaticResource FieldLabelStyle}" Text="Name" />
                 <Label
                     Style="{StaticResource ValueLabelStyle}"
                     Text="{Binding AnonymousName}"
-                    TextDecorations="{Binding ValueTextDecorations, Source={x:Reference GroupMemberCardRoot}}" />
+                    TextDecorations="{Binding ValueTextDecorations, Source={x:Reference GroupMemberCardRoot}, x:DataType=controls:GroupMemberCard}" />
 
                 <Label Style="{StaticResource FieldLabelStyle}" Text="Personal Email" />
                 <controls:MaskedRevealLabel
@@ -88,7 +92,7 @@
             <Button
                 HeightRequest="36"
                 HorizontalOptions="End"
-                IsVisible="{Binding ShowRevealButton, Source={x:Reference GroupMemberCardRoot}}"
+                IsVisible="{Binding ShowRevealButton, Source={x:Reference GroupMemberCardRoot}, x:DataType=controls:GroupMemberCard}"
                 Pressed="OnRevealPressed"
                 Released="OnRevealReleased"
                 Style="{StaticResource M3SecondaryButtonStyle}"

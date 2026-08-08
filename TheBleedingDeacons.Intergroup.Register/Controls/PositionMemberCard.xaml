@@ -4,6 +4,7 @@
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:controls="clr-namespace:TheBleedingDeacons.Intergroup.Register.Controls"
+    xmlns:entities="clr-namespace:TheBleedingDeacons.Unity.Intergroup.Entities;assembly=TheBleedingDeacons.Unity.Intergroup"
     x:Name="PositionMemberCardRoot">
 
     <!--
@@ -30,13 +31,16 @@
             the rationale on this pattern.
         -->
         <Grid>
-            <VerticalStackLayout BindingContext="{Binding Member, Source={x:Reference PositionMemberCardRoot}}" Spacing="6">
+            <VerticalStackLayout
+                BindingContext="{Binding Member, Source={x:Reference PositionMemberCardRoot}, x:DataType=controls:PositionMemberCard}"
+                x:DataType="entities:Member"
+                Spacing="6">
 
                 <Label Style="{StaticResource FieldLabelStyle}" Text="Name" />
                 <Label
                     Style="{StaticResource ValueLabelStyle}"
                     Text="{Binding AnonymousName}"
-                    TextDecorations="{Binding ValueTextDecorations, Source={x:Reference PositionMemberCardRoot}}" />
+                    TextDecorations="{Binding ValueTextDecorations, Source={x:Reference PositionMemberCardRoot}, x:DataType=controls:PositionMemberCard}" />
 
                 <Label Style="{StaticResource FieldLabelStyle}" Text="Personal Email" />
                 <controls:MaskedRevealLabel
@@ -66,7 +70,7 @@
                 <Label
                     Style="{StaticResource ValueLabelStyle}"
                     Text="{Binding IntergroupPositionRotation}"
-                    TextDecorations="{Binding ValueTextDecorations, Source={x:Reference PositionMemberCardRoot}}" />
+                    TextDecorations="{Binding ValueTextDecorations, Source={x:Reference PositionMemberCardRoot}, x:DataType=controls:PositionMemberCard}" />
 
                 <!--
                     Action slot. The caller-supplied view is parented here in code
@@ -84,7 +88,7 @@
             <Button
                 HeightRequest="36"
                 HorizontalOptions="End"
-                IsVisible="{Binding ShowRevealButton, Source={x:Reference PositionMemberCardRoot}}"
+                IsVisible="{Binding ShowRevealButton, Source={x:Reference PositionMemberCardRoot}, x:DataType=controls:PositionMemberCard}"
                 Pressed="OnRevealPressed"
                 Released="OnRevealReleased"
                 Style="{StaticResource M3SecondaryButtonStyle}"

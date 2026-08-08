@@ -2,6 +2,7 @@
 <ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+             xmlns:controls="clr-namespace:TheBleedingDeacons.Intergroup.Register.Controls"
              x:Class="TheBleedingDeacons.Intergroup.Register.Controls.PageScaffold"
              x:Name="Root">
 
@@ -27,7 +28,13 @@
     ════════════════════════════════════════════════════════════════════
     -->
 
-    <Grid RowDefinitions="Auto,*,Auto"
+    <!--
+        x:DataType here matches the {x:Reference Root} Source used by the slot
+        bindings below, so XamlC can compile them instead of falling back to
+        reflection. See ClearableEntry.xaml for the fuller note.
+    -->
+    <Grid x:DataType="controls:PageScaffold"
+          RowDefinitions="Auto,*,Auto"
           BackgroundColor="{AppThemeBinding Light={StaticResource PageBackground}, Dark={StaticResource PageBackgroundDim}}">
 
         <!-- ═══ Row 0: Context header (optional) ═══ -->

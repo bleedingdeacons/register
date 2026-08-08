@@ -154,7 +154,7 @@
                             <!--  Row 2: "Your Name" label + entry, centred, only when ticked  -->
                             <VerticalStackLayout
                                 HorizontalOptions="Center"
-                                IsVisible="{Binding Source={x:Reference StandingInCheckBox}, Path=IsChecked}"
+                                IsVisible="{Binding Source={x:Reference StandingInCheckBox}, Path=IsChecked, x:DataType=CheckBox}"
                                 MaximumWidthRequest="360"
                                 Spacing="6"
                                 WidthRequest="360">
