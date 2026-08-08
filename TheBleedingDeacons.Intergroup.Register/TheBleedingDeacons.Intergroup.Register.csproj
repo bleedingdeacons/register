@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<TargetFrameworks>net9.0-android;net9.0-ios;net9.0-maccatalyst</TargetFrameworks>
@@ -22,8 +22,25 @@
 		<!-- App Identifier -->
 		<ApplicationId>com.thebleedingdeacons.intergroup.register</ApplicationId>
 
-		<!-- Versions -->
-		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+		<!--
+			Versions. ApplicationDisplayVersion must stay unconditional: it feeds
+			PackageVersion, which NuGet requires to have a single value across all
+			target frameworks.
+
+			It previously defaulted to 1.0 here and was overridden to 1.0.26 in eight
+			per-Configuration/TargetFramework/Platform groups that all tested
+			Platform=='AnyCPU'. Visual Studio evaluates with the solution platform
+			'Any CPU' — with a space — so those conditions missed and the default 1.0
+			applied, while other evaluations got 1.0.26. NuGet then saw both 1.0.0 and
+			1.0.26 across the target frameworks and failed the restore with NU1105.
+			A command-line build never hit it, because there Platform defaults to the
+			'AnyCPU' declared below.
+
+			Visual Studio's project-properties version editor writes those per-config
+			groups back. If it does, collapse them here again rather than leaving the
+			value split.
+		-->
+		<ApplicationDisplayVersion>1.0.26</ApplicationDisplayVersion>
 		<ApplicationVersion>1</ApplicationVersion>
 
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">11.0</SupportedOSPlatformVersion>
@@ -44,41 +61,12 @@
 		<DefineConstants Condition="'$(UseDevCredentials)' == 'true'">$(DefineConstants);USE_DEV_CREDENTIALS</DefineConstants>
 	</PropertyGroup>
 
-	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net9.0-android|AnyCPU'">
-		<ApplicationDisplayVersion>1.0.26</ApplicationDisplayVersion>
-	</PropertyGroup>
-
-	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net9.0-ios|AnyCPU'">
-		<ApplicationDisplayVersion>1.0.26</ApplicationDisplayVersion>
-	</PropertyGroup>
-
-	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net9.0-maccatalyst|AnyCPU'">
-		<ApplicationDisplayVersion>1.0.26</ApplicationDisplayVersion>
-	</PropertyGroup>
-
-	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net9.0-windows10.0.19041.0|AnyCPU'">
-		<ApplicationDisplayVersion>1.0.26</ApplicationDisplayVersion>
-	</PropertyGroup>
-
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net9.0-android|AnyCPU'">
-		<ApplicationDisplayVersion>1.0.26</ApplicationDisplayVersion>
 		<AndroidPackageFormat>apk</AndroidPackageFormat>
 		<AndroidUseAapt2>True</AndroidUseAapt2>
 		<AndroidCreatePackagePerAbi>False</AndroidCreatePackagePerAbi>
 		<DebugSymbols>True</DebugSymbols>
 		<AndroidKeyStore>True</AndroidKeyStore>
-	</PropertyGroup>
-
-	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net9.0-ios|AnyCPU'">
-		<ApplicationDisplayVersion>1.0.26</ApplicationDisplayVersion>
-	</PropertyGroup>
-
-	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net9.0-maccatalyst|AnyCPU'">
-		<ApplicationDisplayVersion>1.0.26</ApplicationDisplayVersion>
-	</PropertyGroup>
-
-	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net9.0-windows10.0.19041.0|AnyCPU'">
-		<ApplicationDisplayVersion>1.0.26</ApplicationDisplayVersion>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -111,7 +99,6 @@
 	<ItemGroup Condition="'$(UseDevCredentials)' == 'true'">
 		<EmbeddedResource Include="devsettings.json" />
 	</ItemGroup>
-
 
 	<ItemGroup>
 		<PackageReference Include="Ben.Demystifier" Version="0.4.1" />
@@ -234,6 +221,5 @@
 			<DependentUpon>GroupSelectionPage.xaml</DependentUpon>
 		</Compile>
 	</ItemGroup>
-
 
 </Project>
