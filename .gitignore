@@ -444,6 +444,10 @@ Properties/launchSettings.json
 /org.aa_bristol.thebleedingdeacons.intergroup.register.apk
 /Utils/TheBleedingDeacons.Intergroup.Register.zip
 /Utils/TheBleedingDeacons.Unity.Intergroup.zip
-/.claude
+# Everything under .claude/ is local scratch (worktrees, plans, session state)
+# except the checked-in project settings. Git cannot re-include a file whose
+# parent directory is excluded, so ignore the contents rather than the folder.
+/.claude/*
+!/.claude/settings.json
 /Utils/TheBleedingDeacons.Unity.Client.zip
 *.zip
