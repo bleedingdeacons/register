@@ -278,7 +278,7 @@ public partial class VerifyPositionViewModel : BaseViewModel
 			var mainPage = Application.Current?.Windows?.FirstOrDefault()?.Page;
 			if (mainPage != null)
 			{
-				await mainPage.DisplayAlert("Error", $"Failed to register: {ex.Message}", "OK");
+				await mainPage.DisplayAlertAsync("Error", $"Failed to register: {ex.Message}", "OK");
 			}
 		}
 	}
@@ -436,7 +436,7 @@ public partial class VerifyPositionViewModel : BaseViewModel
 				var mainPage = Application.Current?.Windows?.FirstOrDefault()?.Page;
 				if (mainPage != null)
 				{
-					await mainPage.DisplayAlert("Not Found", $"Position with ID {positionId} was not found.", "OK");
+					await mainPage.DisplayAlertAsync("Not Found", $"Position with ID {positionId} was not found.", "OK");
 				}
 			}
 		}
@@ -449,7 +449,7 @@ public partial class VerifyPositionViewModel : BaseViewModel
 				var mainPage = Application.Current?.Windows?.FirstOrDefault()?.Page;
 				if (mainPage != null)
 				{
-					await mainPage.DisplayAlert("Error", $"Failed to load position: {ex.Message}", "OK");
+					await mainPage.DisplayAlertAsync("Error", $"Failed to load position: {ex.Message}", "OK");
 				}
 			}
 			catch (Exception alertEx)

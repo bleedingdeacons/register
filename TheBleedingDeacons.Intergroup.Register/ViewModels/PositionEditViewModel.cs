@@ -263,14 +263,14 @@ public partial class PositionEditViewModel : BaseViewModel
 			}
 			else
 			{
-				await Shell.Current.DisplayAlert("Error", "Position not found.", "OK");
+				await Shell.Current.DisplayAlertAsync("Error", "Position not found.", "OK");
 				await Shell.Current.GoToAsync("//MainPage");
 			}
 		}
 		catch (Exception ex)
 		{
 			Logger.Error(ex, "Failed to load position {PositionId}", positionId);
-			await Shell.Current.DisplayAlert("Error", $"Failed to load position: {ex.Message}", "OK");
+			await Shell.Current.DisplayAlertAsync("Error", $"Failed to load position: {ex.Message}", "OK");
 			await Shell.Current.GoToAsync("//MainPage");
 		}
 	}
@@ -437,7 +437,7 @@ public partial class PositionEditViewModel : BaseViewModel
 			ValidatePhone();
 			ValidateEmail();
 			ValidateRotationDate();
-			await Shell.Current.DisplayAlert("Validation Error", "Please fix the form errors before saving.", "OK");
+			await Shell.Current.DisplayAlertAsync("Validation Error", "Please fix the form errors before saving.", "OK");
 			return;
 		}
 
@@ -528,7 +528,7 @@ public partial class PositionEditViewModel : BaseViewModel
 		catch (Exception ex)
 		{
 			Logger.Error(ex, "Failed to save holder");
-			await Shell.Current.DisplayAlert("Error", $"Failed to save holder: {ex.Message}", "OK");
+			await Shell.Current.DisplayAlertAsync("Error", $"Failed to save holder: {ex.Message}", "OK");
 		}
 		finally
 		{
@@ -615,7 +615,7 @@ public partial class PositionEditViewModel : BaseViewModel
 
 		if (HasUnsavedChanges)
 		{
-			bool shouldCancel = await Shell.Current.DisplayAlert(
+			bool shouldCancel = await Shell.Current.DisplayAlertAsync(
 				"Unsaved Changes",
 				"You have unsaved changes. Are you sure you want to cancel?",
 				"Yes", "No");
@@ -637,7 +637,7 @@ public partial class PositionEditViewModel : BaseViewModel
 	{
 		if (IsEditing && HasUnsavedChanges)
 		{
-			bool shouldLeave = await Shell.Current.DisplayAlert(
+			bool shouldLeave = await Shell.Current.DisplayAlertAsync(
 				"Unsaved Changes",
 				"You have unsaved changes on the current holder. Discard and go back?",
 				"Discard", "Keep Editing");
@@ -689,7 +689,7 @@ public partial class PositionEditViewModel : BaseViewModel
 		catch (Exception ex)
 		{
 			Logger.Error(ex, "Failed to commit pending removals");
-			await Shell.Current.DisplayAlert("Error", $"Failed to save changes: {ex.Message}", "OK");
+			await Shell.Current.DisplayAlertAsync("Error", $"Failed to save changes: {ex.Message}", "OK");
 			return;
 		}
 
@@ -704,7 +704,7 @@ public partial class PositionEditViewModel : BaseViewModel
 	{
 		if (HasPendingChanges || (IsEditing && HasUnsavedChanges))
 		{
-			bool shouldLeave = await Shell.Current.DisplayAlert(
+			bool shouldLeave = await Shell.Current.DisplayAlertAsync(
 				"Discard Changes",
 				"You have unsaved changes. Discard and go back?",
 				"Discard", "Keep Editing");

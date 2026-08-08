@@ -195,7 +195,7 @@ public partial class RegistrationOverviewViewModel : BaseViewModel
 
 		if (!desired && currentlyRegistered)
 		{
-			bool confirmed = await Shell.Current.DisplayAlert(
+			bool confirmed = await Shell.Current.DisplayAlertAsync(
 				"Unregister Group",
 				$"Unregister {row.Entity.Name}?",
 				"Yes", "No");
@@ -239,7 +239,7 @@ public partial class RegistrationOverviewViewModel : BaseViewModel
 
 		if (!desired && currentlyRegistered)
 		{
-			bool confirmed = await Shell.Current.DisplayAlert(
+			bool confirmed = await Shell.Current.DisplayAlertAsync(
 				"Unregister Officer",
 				$"Unregister {row.Entity.ShortDescription}?",
 				"Yes", "No");

@@ -464,7 +464,7 @@ public partial class EditGroupViewModel : BaseViewModel
 		catch (Exception ex)
 		{
 			Logger.Error(ex, "Failed to save member");
-			await Shell.Current.DisplayAlert("Error", $"Failed to save member: {ex.Message}", "OK");
+			await Shell.Current.DisplayAlertAsync("Error", $"Failed to save member: {ex.Message}", "OK");
 		}
 		finally
 		{
@@ -557,7 +557,7 @@ public partial class EditGroupViewModel : BaseViewModel
 
 		if (HasUnsavedChanges)
 		{
-			bool shouldCancel = await Shell.Current.DisplayAlert(
+			bool shouldCancel = await Shell.Current.DisplayAlertAsync(
 				"Unsaved Changes",
 				"You have unsaved changes. Are you sure you want to cancel?",
 				"Yes", "No");
@@ -581,7 +581,7 @@ public partial class EditGroupViewModel : BaseViewModel
 	{
 		if (IsEditing && HasUnsavedChanges)
 		{
-			bool shouldLeave = await Shell.Current.DisplayAlert(
+			bool shouldLeave = await Shell.Current.DisplayAlertAsync(
 				"Unsaved Changes",
 				"You have unsaved changes on the current member. Discard and go back?",
 				"Discard", "Keep Editing");
@@ -634,7 +634,7 @@ public partial class EditGroupViewModel : BaseViewModel
 		catch (Exception ex)
 		{
 			Logger.Error(ex, "Failed to commit pending removals");
-			await Shell.Current.DisplayAlert("Error", $"Failed to save changes: {ex.Message}", "OK");
+			await Shell.Current.DisplayAlertAsync("Error", $"Failed to save changes: {ex.Message}", "OK");
 			return;
 		}
 
@@ -686,7 +686,7 @@ public partial class EditGroupViewModel : BaseViewModel
 	{
 		if (HasPendingChanges || (IsEditing && HasUnsavedChanges))
 		{
-			bool shouldLeave = await Shell.Current.DisplayAlert(
+			bool shouldLeave = await Shell.Current.DisplayAlertAsync(
 				"Discard Changes",
 				"You have unsaved changes. Discard and go back?",
 				"Discard", "Keep Editing");

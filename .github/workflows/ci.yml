@@ -15,9 +15,14 @@ name: CI
 #  * test          — run the xUnit v3 test suite (on Microsoft.Testing.Platform) with
 #                    Coverlet coverage and upload the report to Coveralls.
 
+# The build/** push trigger exists so a long-lived branch that is deliberately
+# not merged — the .NET 10 upgrade, which is kept switchable against a .NET 9
+# main — still gets the full gate without opening a PR. It is a pattern rather
+# than a branch name so nothing has to be cleaned up afterwards; any future
+# build/* branch simply gets the same treatment.
 on:
   push:
-    branches: [ main ]
+    branches: [ main, 'build/**' ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
@@ -46,7 +51,7 @@ env:
 
 jobs:
   build:
-    name: Build & analyze (net9.0-android)
+    name: Build & analyze (net10.0-android)
     runs-on: ubuntu-latest
 
     steps:
@@ -67,11 +72,13 @@ jobs:
             *) echo "::warning::Unexpected HTTP $code probing GitHub Packages; continuing and letting restore report the outcome." ;;
           esac
 
-      - name: Setup JDK 17
+      # JDK 21: what .NET 10's Android SDK builds against, and what the Android
+      # SDK's API 36 tooling expects.
+      - name: Setup JDK 21
         uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
@@ -91,10 +98,10 @@ jobs:
           if [ ! -f "$f" ]; then printf '{}\n' > "$f"; echo "wrote placeholder $f"; else echo "$f already present"; fi
 
       # Single build with implicit restore. RegisterAndroidOnly=true trims the
-      # app to just the net9.0-android head, so we restore/build only the
+      # app to just the net10.0-android head, so we restore/build only the
       # Android graph — no iOS/MacCatalyst workloads needed. Still do NOT pass
-      # -f net9.0-android: that sets TargetFramework as a global property, which
-      # forces net9.0-android onto the net9.0-only projects in this repo and
+      # -f net10.0-android: that sets TargetFramework as a global property, which
+      # forces net10.0-android onto the net10.0-only projects in this repo and
       # breaks their restore (NU1105). RegisterAndroidOnly instead narrows only
       # the Register project's TargetFrameworks, letting each project reference
       # resolve its own TFM.
@@ -111,7 +118,7 @@ jobs:
           -p:ContinuousIntegrationBuild=true
 
   build-windows:
-    name: Build & analyze (net9.0-windows)
+    name: Build & analyze (net10.0-windows)
     runs-on: windows-latest
 
     steps:
@@ -152,7 +159,7 @@ jobs:
       # project's TargetFrameworks to the single head under test, so the runner
       # needs no Android/iOS/MacCatalyst workloads. As in the Android job, do NOT
       # substitute the -f option — that sets TargetFramework globally and breaks
-      # restore of the net9.0-only projects with NU1105.
+      # restore of the net10.0-only projects with NU1105.
       - name: Build & analyze
         run: >
           dotnet build TheBleedingDeacons.Intergroup.Register/TheBleedingDeacons.Intergroup.Register.csproj
@@ -189,7 +196,7 @@ jobs:
       - name: Restore local tools (coverlet.console)
         run: dotnet tool restore
 
-      # Unity.Intergroup and its tests are net9.0 — no MAUI workload needed.
+      # Unity.Intergroup and its tests are net10.0 — no MAUI workload needed.
       - name: Build tests
         run: >
           dotnet build TheBleedingDeacons.Unity.Intergroup.Tests/TheBleedingDeacons.Unity.Intergroup.Tests.csproj
@@ -201,9 +208,9 @@ jobs:
       # msbuild integrations hook VSTest, which MTP doesn't use — hence the tool.)
       - name: Test with coverage
         run: >
-          dotnet coverlet TheBleedingDeacons.Unity.Intergroup.Tests/bin/Debug/net9.0/TheBleedingDeacons.Unity.Intergroup.Tests.dll
+          dotnet coverlet TheBleedingDeacons.Unity.Intergroup.Tests/bin/Debug/net10.0/TheBleedingDeacons.Unity.Intergroup.Tests.dll
           --target dotnet
-          --targetargs "TheBleedingDeacons.Unity.Intergroup.Tests/bin/Debug/net9.0/TheBleedingDeacons.Unity.Intergroup.Tests.dll"
+          --targetargs "TheBleedingDeacons.Unity.Intergroup.Tests/bin/Debug/net10.0/TheBleedingDeacons.Unity.Intergroup.Tests.dll"
           --format cobertura
           --output coverage/coverage.cobertura.xml
           --include "[TheBleedingDeacons.Unity.Intergroup]*"

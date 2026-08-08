@@ -35,7 +35,7 @@ if ($isProduction) {
 # Single source of truth. It appeared in four places before, which is four
 # chances to half-upgrade the script; on a .NET version bump this is now the
 # only line that changes. It also names the output APKs (see the copy below).
-$targetFramework = 'net9.0-android'
+$targetFramework = 'net10.0-android'
 
 $registerProject = 'TheBleedingDeacons.Intergroup.Register\TheBleedingDeacons.Intergroup.Register.csproj'
 

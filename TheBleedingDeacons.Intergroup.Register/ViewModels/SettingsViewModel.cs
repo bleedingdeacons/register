@@ -673,7 +673,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 		[RelayCommand]
 		private async Task PurgeDatabase()
 		{
-			bool confirmed = await Shell.Current.DisplayAlert(
+			bool confirmed = await Shell.Current.DisplayAlertAsync(
 				"Reset Device",
 				"This will permanently delete ALL local data including groups, members, meetings, positions, and snapshots, and clear the registration event log.\n\nThis action cannot be undone. Are you sure?",
 				"Yes, Reset Device",

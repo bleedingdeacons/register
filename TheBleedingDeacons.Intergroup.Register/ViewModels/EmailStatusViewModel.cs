@@ -603,7 +603,7 @@ public partial class EmailStatusViewModel : BaseViewModel
 	{
 		var page = Application.Current?.Windows?.FirstOrDefault()?.Page;
 		if (page is null) return false;
-		return await page.DisplayAlert(title, message, affirmText, "Cancel");
+		return await page.DisplayAlertAsync(title, message, affirmText, "Cancel");
 	}
 
 	protected override void Dispose(bool disposing)

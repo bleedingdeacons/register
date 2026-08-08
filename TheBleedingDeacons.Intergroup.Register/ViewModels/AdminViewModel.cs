@@ -491,7 +491,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 		[RelayCommand]
 		private async Task FinishMeeting()
 		{
-			bool confirmed = await Shell.Current.DisplayAlert(
+			bool confirmed = await Shell.Current.DisplayAlertAsync(
 				"Finish Meeting",
 				"All registrations and member changes will be pushed to Unity.\n\nAre you sure?",
 				"Yes, Finish",
@@ -595,7 +595,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 				return;
 			}
 
-			bool confirmed = await Shell.Current.DisplayAlert(
+			bool confirmed = await Shell.Current.DisplayAlertAsync(
 				"Purge Database",
 				"This will permanently delete ALL local data including groups, members, meetings, positions, and snapshots.\n\nThis action cannot be undone. Are you sure?",
 				"Yes, Purge Everything",

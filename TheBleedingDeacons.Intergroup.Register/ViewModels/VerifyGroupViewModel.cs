@@ -401,7 +401,7 @@ public partial class VerifyGroupViewModel : BaseViewModel
 			var mainPage = Application.Current?.Windows?.FirstOrDefault()?.Page;
 			if (mainPage != null)
 			{
-				await mainPage.DisplayAlert("Error", $"Failed to register: {ex.Message}", "OK");
+				await mainPage.DisplayAlertAsync("Error", $"Failed to register: {ex.Message}", "OK");
 			}
 		}
 	}
@@ -559,7 +559,7 @@ public partial class VerifyGroupViewModel : BaseViewModel
 				var mainPage = Application.Current?.Windows?.FirstOrDefault()?.Page;
 				if (mainPage != null)
 				{
-					await mainPage.DisplayAlert("Not Found", $"Group with ID {groupId} was not found.", "OK");
+					await mainPage.DisplayAlertAsync("Not Found", $"Group with ID {groupId} was not found.", "OK");
 				}
 			}
 		}
@@ -572,7 +572,7 @@ public partial class VerifyGroupViewModel : BaseViewModel
 				var mainPage = Application.Current?.Windows?.FirstOrDefault()?.Page;
 				if (mainPage != null)
 				{
-					await mainPage.DisplayAlert("Error", $"Failed to load group: {ex.Message}", "OK");
+					await mainPage.DisplayAlertAsync("Error", $"Failed to load group: {ex.Message}", "OK");
 				}
 			}
 			catch (Exception alertEx)
