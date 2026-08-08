@@ -4,7 +4,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Converters
 {
     public class BoolToColorConverter : IValueConverter
     {
-        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
             if (value is bool isError)
             {
@@ -13,7 +13,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Converters
             return Colors.Gray;
         }
 
-        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
             throw new NotImplementedException();
         }
@@ -21,12 +21,12 @@ namespace TheBleedingDeacons.Intergroup.Register.Converters
 
     public class BoolToTestButtonTextConverter : IValueConverter
     {
-        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
-            return (bool)value ? "Testing Connection..." : "Test Connection";
+            return value is bool isBusy && isBusy ? "Testing Connection..." : "Test Connection";
         }
 
-        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
             throw new NotImplementedException();
         }
@@ -34,12 +34,12 @@ namespace TheBleedingDeacons.Intergroup.Register.Converters
 
     public class BoolToSaveButtonTextConverter : IValueConverter
     {
-        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
-            return (bool)value ? "Saving..." : "Save Settings";
+            return value is bool isSaving && isSaving ? "Saving..." : "Save Settings";
         }
 
-        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
             throw new NotImplementedException();
         }
