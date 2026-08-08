@@ -26,7 +26,7 @@ public partial class BaseViewModel : ObservableObject, IQueryAttributable, IDisp
 	{
 
 	}
-	protected async Task ShowFeedback()
+	protected static async Task ShowFeedback()
 	{
 		await Task.Delay(100);
 	}

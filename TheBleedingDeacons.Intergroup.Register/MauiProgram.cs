@@ -116,7 +116,7 @@ public static class MauiProgram
 				.UseSqlite($"Data Source={unityDbPath}")
 				.AddInterceptors(sp.GetRequiredService<SqlitePragmaInterceptor>()));
 
-		Log.Logger.Information("Unity Db {databasePath}", unityDbPath);
+		Log.Logger.Information("Unity Db {DatabasePath}", unityDbPath);
 
 		builder.Services.AddScoped<IGroupRepository, GroupRepository>();
 		builder.Services.AddScoped<IMeetingRepository, MeetingRepository>();

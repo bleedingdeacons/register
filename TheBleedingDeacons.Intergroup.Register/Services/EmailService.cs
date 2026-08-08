@@ -441,7 +441,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			}
 		}
 
-		private MimeMessage CreateMimeMessage(QueuedEmail queuedEmail)
+		private static MimeMessage CreateMimeMessage(QueuedEmail queuedEmail)
 		{
 			var message = new MimeMessage();
 
@@ -1187,9 +1187,14 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 				client.SslProtocols = System.Security.Authentication.SslProtocols.Tls12;
 				client.CheckCertificateRevocation = false;
 
-				var port = config.Port;
-
-				port = 587; // Force StartTLS for testing, even if the user put 465. This is because many servers misconfigure their SSL ports and don't actually support SSL-on-connect, but do support StartTLS. For a connection test, we want to give the user the best chance of succeeding and diagnosing their config, rather than failing due to a common server misconfiguration.
+				// Force StartTLS for the connection test even if the user configured
+				// 465. Many servers misconfigure their SSL ports and don't actually
+				// support SSL-on-connect but do support StartTLS; for a diagnostic
+				// test we want to give the operator the best chance of connecting and
+				// seeing what's wrong, rather than failing on a common server-side
+				// misconfiguration. Note this means the test does not exercise
+				// config.Port.
+				const int port = 587;
 
 				var secureSocketOptions = ResolveSecureSocketOptions(config.EnableSsl, port);
 
@@ -1322,7 +1327,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			}
 		}
 
-		private Task<bool> IsNetworkAvailableAsync()
+		private static Task<bool> IsNetworkAvailableAsync()
 		{
 			try
 			{

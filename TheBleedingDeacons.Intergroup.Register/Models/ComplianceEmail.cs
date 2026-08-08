@@ -25,7 +25,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Models
 	/// </list>
 	///
 	/// <para>All fields are <see cref="string"/> rather than typed
-	/// (DateTime, int, etc.) because <see cref="EmailTemplateService"/>
+	/// (DateTime, int, etc.) because <see cref="Services.EmailTemplateService"/>
 	/// substitutes via <c>ToString()</c> without any culture or format
 	/// awareness; pre-formatting at the call-site keeps the template
 	/// readable and the rendered output predictable across locales.</para>

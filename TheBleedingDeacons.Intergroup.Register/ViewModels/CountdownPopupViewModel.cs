@@ -14,7 +14,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
         private readonly Func<Task> _navigateAction;
 
         [ObservableProperty]
-        private string _message = string.Empty;
+        private string _message;
 
         [ObservableProperty]
         private int _countdownSeconds = 3;
@@ -23,7 +23,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
         private string _nextButtonText = "Next Fellow 👆";
 
         [ObservableProperty]
-        private string _title = string.Empty;
+        private string _title;
 
         public CountdownPopupViewModel(Popup popup, string title, string message, Func<Task> navigateAction)
         {

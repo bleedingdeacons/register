@@ -1,4 +1,5 @@
 ﻿using CommunityToolkit.Maui.Converters;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using TheBleedingDeacons.Intergroup.Register.Models;
 using TheBleedingDeacons.Intergroup.Register.ViewModels;
@@ -14,6 +15,10 @@ public class InvertedBoolConverter : IValueConverter
 		return false;
 	}
 
+	// Identical to Convert by design: boolean negation is its own inverse, so a
+	// round trip through this converter must apply the same operation in both
+	// directions. Differentiating the two would make the binding asymmetric.
+	[SuppressMessage("Major Code Smell", "S4144:Methods should not have identical implementations", Justification = "Negation is an involution; ConvertBack must mirror Convert exactly.")]
 	public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
 	{
 		if (value is bool boolValue)

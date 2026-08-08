@@ -192,7 +192,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 			return new SmtpConfiguration
 			{
 				Host = Host.Trim(),
-				Port = int.TryParse(Port, out int port) ? port : 587,
+				Port = int.TryParse(Port, out int parsedPort) ? parsedPort : 587,
 				Username = Username.Trim(),
 				Password = Password,
 				EnableSsl = EnableSsl,

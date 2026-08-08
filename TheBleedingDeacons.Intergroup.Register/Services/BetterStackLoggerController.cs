@@ -11,7 +11,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services;
 ///
 /// <para>Implementation notes:</para>
 /// <list type="bullet">
-/// <item>The <paramref name="baseLoggerFactory"/> passed to the constructor
+/// <item>The <c>baseLoggerFactory</c> passed to the constructor
 ///       must build a <i>fresh</i> logger instance on every invocation — the
 ///       previous one is disposed on each reconfigure and a disposed logger
 ///       cannot be reused.</item>

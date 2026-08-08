@@ -165,7 +165,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			}
 		}
 
-		private string ReplaceNestedProperties<T>(string template, T model)
+		private static string ReplaceNestedProperties<T>(string template, T model)
 		{
 			// Match patterns like {{Property.SubProperty}} or {{Property.Method()}}
 			var pattern = @"\{\{([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*(?:\(\))?)\}\}";
@@ -186,7 +186,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			});
 		}
 
-		private object? GetNestedPropertyValue<T>(T obj, string propertyPath)
+		private static object? GetNestedPropertyValue<T>(T obj, string propertyPath)
 		{
 			if (obj == null) return null;
 
@@ -213,7 +213,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			return current;
 		}
 
-		private string ProcessConditionals<T>(string template, T model)
+		private static string ProcessConditionals<T>(string template, T model)
 		{
 			// Handle {{#if PropertyName}}...{{/if}} blocks
 			var pattern = @"\{\{#if\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)\}\}(.*?)\{\{/if\}\}";
@@ -227,11 +227,18 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 				try
 				{
 					var value = GetNestedPropertyValue(model, propertyName);
-					var isTrue = value != null &&
-								(value is bool boolValue ? boolValue :
-								 value is int intValue ? intValue != 0 :
-								 value is string stringValue ? !string.IsNullOrEmpty(stringValue) :
-								 true);
+
+					// Truthiness for {{#if}} sections: null is false, bool is
+					// itself, 0 is false, an empty string is false, and any
+					// other non-null value counts as present.
+					var isTrue = value switch
+					{
+						null => false,
+						bool boolValue => boolValue,
+						int intValue => intValue != 0,
+						string stringValue => !string.IsNullOrEmpty(stringValue),
+						_ => true,
+					};
 
 					return isTrue ? content : string.Empty;
 				}
@@ -242,7 +249,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			});
 		}
 
-		private string ProcessLoops<T>(string template, T model)
+		private static string ProcessLoops<T>(string template, T model)
 		{
 			var result = template;
 			const int maxIterations = 100;
@@ -313,7 +320,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		}
 
 		// Complete item processing method
-		private string ProcessSingleItemTemplate<T>(string itemTemplate, T item)
+		private static string ProcessSingleItemTemplate<T>(string itemTemplate, T item)
 		{
 			if (item == null) return itemTemplate;
 

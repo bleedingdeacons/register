@@ -1,4 +1,4 @@
-using CommunityToolkit.Mvvm.ComponentModel;
+﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
@@ -467,10 +467,13 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 			var local = cachedAtUtc.ToLocalTime();
 			var delta = DateTime.UtcNow - cachedAtUtc;
 
-			string relative = delta.TotalSeconds < 60 ? "just now"
-				: delta.TotalMinutes < 60 ? $"{(int)delta.TotalMinutes} min ago"
-				: delta.TotalHours < 24 ? $"{(int)delta.TotalHours} h ago"
-				: $"{(int)delta.TotalDays} d ago";
+			string relative = delta switch
+			{
+				{ TotalSeconds: < 60 } => "just now",
+				{ TotalMinutes: < 60 } => $"{(int)delta.TotalMinutes} min ago",
+				{ TotalHours: < 24 } => $"{(int)delta.TotalHours} h ago",
+				_ => $"{(int)delta.TotalDays} d ago",
+			};
 
 			return $"{local.ToString("g", CultureInfo.CurrentCulture)} ({relative})";
 		}
@@ -738,7 +741,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 			IsPurgeStatusVisible = true;
 		}
 
-		private async Task ShowFeedback()
+		private static async Task ShowFeedback()
 		{
 			await Task.Delay(100);
 		}
