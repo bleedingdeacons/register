@@ -293,6 +293,12 @@ jobs:
       # there for why the collector/msbuild integrations are not used. The
       # include filter scopes the report to the app assembly, excluding xUnit,
       # MAUI and the Unity library (which the other job already reports).
+      #
+      # exclude-by-file drops the XAML plumbing the MAUI build generates into
+      # obj/ — XamlTypeInfo.g.cs alone is ~1,600 lines that no test can ever
+      # execute and that nobody can act on. Left in, it was 15% of the reported
+      # uncovered total and made the percentage describe the code generator
+      # rather than the code we write.
       - name: Test with coverage
         shell: bash
         run: >
@@ -302,6 +308,7 @@ jobs:
           --format cobertura
           --output coverage/coverage.register.cobertura.xml
           --include "[TheBleedingDeacons.Intergroup.Register]*"
+          --exclude-by-file "**/obj/**"
 
       - name: Upload coverage to Coveralls
         uses: coverallsapp/github-action@v2

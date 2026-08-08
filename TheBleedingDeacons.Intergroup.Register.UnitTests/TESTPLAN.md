@@ -44,14 +44,32 @@ Windows App SDK's module initializer in the *app* assembly throws
 No seams, no database, no fakes. This is the bulk of the achievable coverage and
 should be done first.
 
-### 2.1 Already written (19 of the suite's 119 tests)
+### 2.1 Status — **done**
 
-| Target | Tests | Focus |
-| --- | --- | --- |
-| `Support/EmailValidator` | 11 | The TLD rule that `EmailAddressAttribute` misses — the whole reason the class exists. |
-| `Converters/ObscurePhoneNumberConverter` | 8 | Digit extraction, custom obscure char/visible count, pass-through, `ConvertBack` throwing. |
+Tier 1 is complete. 227 tests, covering everything listed in §2.2–§2.9 below
+except the three classes noted as unreachable in §4.4.
 
-The other 100 belong to tier 3, which has since been done — see §4.
+| Target | Tests |
+| --- | ---: |
+| `Utilities/Converters.cs`, `BoolToColorConverter`, `DaySelectionConverters` | 152 |
+| `Utilities/BasicMarkdownConverter` | 34 |
+| `Services/EmailTemplateService` | 29 |
+| `Services/PhoneNumberService` | 15 |
+| `Services/CacheService` | 10 |
+| `Support/EmailValidator` | 11 |
+| `Converters/ObscurePhoneNumberConverter` | 8 |
+| `Extensions/MeetingExtensions` | 9 |
+| `Utilities/MeetingCriteriaConverter` | 5 |
+| `Utilities/RegisterData` | 3 |
+| `Support/TaskExtensions` | 4 |
+| `Support/BetterStackDurable/BetterStackNdjsonBatchFormatter` | 4 |
+
+`Utilities` went from 0% to 93.1% and `Extensions` to 100%. The suite total is
+346 tests; app-assembly line coverage is **14.3%**, up from 6.0%.
+
+Not done from §2.9: `Support/ExceptionEnricher`. It needs a Serilog
+`ILogEventPropertyFactory` fake and a constructed `LogEvent`, which is more
+scaffolding than the rest of tier 1 combined; deferred rather than rushed.
 
 ### 2.2 `Utilities/BasicMarkdownConverter` — **highest value in tier 1**
 
@@ -290,7 +308,8 @@ is outside "make this testable".
 | `Services/BetterStackLoggerController` | MAUI statics |
 | `Services/PopupNotificationService` | UI |
 | `Support/AppLogger` | `FileSystem` |
-| One converter in `Utilities/Converters.cs:513` | `Application.Current` |
+| `HasGsrToColorConverter` | Reads `Application.Current.Resources`, which is null with no running app |
+| `StringToBoolConverter`, `CountToBoolConverter` | Derive from CommunityToolkit's `BaseConverterOneWay`, whose **constructor** calls `DispatcherProvider.GetForCurrentThread()` and throws `REGDB_E_CLASSNOTREG` in a console host. They cannot be instantiated here at all — no amount of test-side work reaches them. |
 | `RegistrationEventLog.ReplayIntoDatabaseAsync` / `ComplianceEventLog` replay | Not blocked — needs a seeded `UnityDbContext`, so it belongs with tier 2 §3 |
 
 ViewModels are a separate question. `BaseViewModel` itself is clean
@@ -334,22 +353,44 @@ The Register report is written to `coverage/coverage.register.cobertura.xml` —
 the leading `coverage` matters, because `.gitignore` ignores `coverage*.xml` by
 filename, not the directory.
 
-Current line coverage of the app assembly is ~6%, measured across the whole
-assembly including all the XAML, Views and ViewModels that tiers 1–2 do not
-attempt.
+`--exclude-by-file "**/obj/**"` drops the XAML plumbing the MAUI build
+generates. `XamlTypeInfo.g.cs` alone is ~1,600 lines that no test can execute
+and nobody can act on; left in, it was 15% of the reported uncovered total and
+made the percentage describe the code generator rather than the code we write.
+
+Current app-assembly line coverage is **14.3%** (branch 16.7%, method 20.7%),
+measured across all remaining hand-written code including the Views, Controls
+and ViewModels that no tier has reached yet.
 
 ---
 
 ## 7. Remaining order
 
-Tier 3 (§4) and the CI job (§6) are done. What is left, in order:
+Tier 1 (§2), tier 3 (§4) and the CI job (§6) are done. What is left, in order:
 
-1. **Decide on the two defects in §4.3** — both are behaviour choices that
-   someone with product context needs to make, and both have a test ready to
-   flip. Neither should sit unresolved.
-2. Tier 1 §2.2–§2.5 — markdown, templates, phone, cache. Real logic, no
-   prerequisites.
-3. Tier 1 §2.6–§2.9 — converters and small helpers. Fast, bulk coverage.
-4. Tier 2 §3.1–§3.3 — pragmas, mail model, queue operations.
-5. Tier 2 §3.4–§3.5 plus the event-log replay from §4.4 — snapshot, replay,
+1. **Decide on the four pinned defects** — §4.3 (SMTP reload, compliance-email
+   toggle) and §2.8 (`MeetingCriteriaConverter` round trip and unguarded
+   index). All four are behaviour choices needing product context, and all four
+   have a test ready to flip. None should sit unresolved indefinitely.
+2. Tier 2 §3.1–§3.3 — pragmas, mail model, queue operations.
+3. Tier 2 §3.4–§3.5 plus the event-log replay from §4.4 — snapshot, replay,
    then the reconcile diff.
+4. **ViewModels** — 3,645 lines at 0%, now the single largest block at 44% of
+   all uncovered code. They look hopeless but the coupling is shallow: about 90
+   call sites, dominated by `Shell.Current.GoToAsync` (29),
+   `Shell.Current.DisplayAlert` / `DisplayAlert` (26) and
+   `MainThread.BeginInvokeOnMainThread` / `InvokeOnMainThreadAsync` (22). Three
+   seams — an `INavigationService`, an extension of the **existing**
+   `IPopupNotification`, and MAUI's `IDispatcher` — cover 77 of them.
+
+   `ApiSettingsViewModel` (446 lines) and `MailSettingsViewModel` (234) take
+   nothing but interfaces and need no refactor at all, but both call
+   `LoadConfigurationAsync().SafeFireAndForget(...)` **in the constructor**, so
+   tests would race it. They need an awaitable initialise first.
+
+### Realistic ceiling
+
+Views, Controls, Platforms and `MauiProgram` are ~1,610 lines (16.6%) that need
+a running MAUI app; no console-hosted test will ever reach them. That puts the
+absolute ceiling near 83%, and **55–60% is the realistic target** for this
+harness. Anything beyond needs a MAUI device-test project.
