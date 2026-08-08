@@ -103,7 +103,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
                             // Auto-select the first database if none selected
                             if (string.IsNullOrEmpty(SelectedDatabaseFile))
                             {
-                                var firstDb = DatabaseFiles.First();
+                                var firstDb = DatabaseFiles[0];
                                 firstDb.IsSelected = true;
                                 SelectedDatabaseFile = firstDb.FullPath;
                                 SelectedDatabaseFileInfo = firstDb;
@@ -222,7 +222,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
             }
         }
 
-        private string GetDownloadsPath()
+        private static string GetDownloadsPath()
         {
 #if ANDROID
             // For Android, use the public Downloads directory
@@ -240,7 +240,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 #endif
         }
 
-        private void SaveLastBackupDate()
+        private static void SaveLastBackupDate()
         {
             Preferences.Set("LastBackupDate", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
         }

@@ -304,7 +304,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 				// progress fields, which the page's bindings pick up.
 				var progress = new Progress<SyncProgress>(OnSyncProgress);
 
-				var (meetings, positions, members, groups, contacts, intergroupMeetings) =
+				var (meetings, positions, members, groups, _, _) =
 					await _dataService.ImportWithSnapshotAsync(Token, progress);
 
 				ShowStatus(

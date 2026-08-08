@@ -75,7 +75,7 @@ public partial class PageScaffold : ContentView
     public static readonly BindableProperty IsBusyProperty =
         BindableProperty.Create(nameof(IsBusy), typeof(bool), typeof(PageScaffold), false);
 
-    public new bool IsBusy
+    public bool IsBusy
     {
         get => (bool)GetValue(IsBusyProperty);
         set => SetValue(IsBusyProperty, value);

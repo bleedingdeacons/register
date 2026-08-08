@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Serilog;
+using System.Diagnostics.CodeAnalysis;
 using TheBleedingDeacons.Intergroup.Register.Models;
 using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Support;
@@ -422,6 +423,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 			RecomputeHasUnsavedChanges();
 		}
 
+		[SuppressMessage("Major Code Smell", "S4144:Methods should not have identical implementations", Justification = "One hook per property by design — see the note above; the Unity and Better Stack sections feed different validation flags and must stay independently editable.")]
 		partial void OnUnityApiKeyChanged(string value)
 		{
 			OnPropertyChanged(nameof(IsUnityFormValid));
@@ -434,6 +436,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 			RecomputeHasUnsavedChanges();
 		}
 
+		[SuppressMessage("Major Code Smell", "S4144:Methods should not have identical implementations", Justification = "One hook per property by design — see the note above; the Unity and Better Stack sections feed different validation flags and must stay independently editable.")]
 		partial void OnBetterStackEndpointChanged(string value)
 		{
 			OnPropertyChanged(nameof(IsBetterStackFormValid));

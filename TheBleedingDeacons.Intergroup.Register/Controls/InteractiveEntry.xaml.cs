@@ -447,7 +447,7 @@ public partial class InteractiveEntry : ContentView
 	/// inside the outer rounded edge while presenting a flat left side
 	/// against the entry text.
 	///
-	/// <see cref="RoundRectangle.CornerRadius"/> is a four-value struct, not
+	/// <see cref="Microsoft.Maui.Controls.Shapes.RoundRectangle.CornerRadius"/> is a four-value struct, not
 	/// a single double, so we can't bind it directly from the control's
 	/// <c>double</c>-typed CornerRadius — hence this helper.
 	/// </summary>

@@ -27,7 +27,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 			await SelectType(false);
 		}
 
-		private async Task SelectType(bool isOnline)
+		private static async Task SelectType(bool isOnline)
 		{
 
 			await ShowFeedback();

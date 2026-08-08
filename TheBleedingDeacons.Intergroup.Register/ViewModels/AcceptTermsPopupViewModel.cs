@@ -58,10 +58,10 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
         private readonly TaskCompletionSource<bool> _resultTcs;
 
         [ObservableProperty]
-        private string _title = string.Empty;
+        private string _title;
 
         [ObservableProperty]
-        private string _message = string.Empty;
+        private string _message;
 
         // Two-way bound to the consent checkbox below the policy text.
         // Combined with HasScrolledToEnd to gate AcceptCommand.
