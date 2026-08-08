@@ -48,7 +48,7 @@ public partial class App : Application
 		// CloseAndFlush drains and disposes every sink, including the durable
 		// HTTP sink's shipper loop — giving it a last chance to send anything
 		// still on disk before the process exits. Bounded so a slow Better
-		// Stack response can't block window-destroy behind HttpClient.Timeout;
+		// Stack response can't block window-destroy behind HttpClient.Timeout —
 		// anything left on disk ships on the next launch.
 		MauiProgram.TryFlushLogs();
 

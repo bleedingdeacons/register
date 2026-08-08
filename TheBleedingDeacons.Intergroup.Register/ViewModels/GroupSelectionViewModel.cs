@@ -1,4 +1,4 @@
-using CommunityToolkit.Mvvm.ComponentModel;
+﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Serilog;
 using System.Collections.ObjectModel;
@@ -13,8 +13,6 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels;
 
 public partial class GroupSelectionViewModel : BaseViewModel
 {
-    private static readonly ILogger Logger = AppLogger.ForContext<GroupSelectionViewModel>();
-
     private readonly IGroupRepository _groupRepository;
     private readonly IMeetingRepository _meetingRepository;
 

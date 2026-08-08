@@ -454,7 +454,7 @@ public class ReconciliationService
 					Accepted = member.GdprAccepted.Value,
 					AcceptedAt = acceptedAt,
 					// On revocations these will be null on the entity
-					// (ComplianceService and replay both clear them);
+					// (ComplianceService and replay both clear them),
 					// JsonIgnore-when-null on RecordComplianceRequest
 					// drops them from the wire payload, which is what
 					// the server expects.

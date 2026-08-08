@@ -376,15 +376,6 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 				_ => SecureSocketOptions.Auto
 			};
 		}
-		//private static SecureSocketOptions ResolveSecureSocketOptions(bool enableSsl, int port)
-		//{
-		//	if (!enableSsl) return SecureSocketOptions.None;
-		//	if (port == 465) return SecureSocketOptions.SslOnConnect;
-		//	// Use StartTlsWhenAvailable instead of StartTls — mandatory StartTls throws
-		//	// SslHandshakeException if the server doesn't advertise it in the EHLO banner.
-		//	if (port is 587 or 25) return SecureSocketOptions.StartTlsWhenAvailable;
-		//	return SecureSocketOptions.Auto;
-		//}
 
 		/// <summary>
 		/// Creates, connects, and authenticates a new SmtpClient.
@@ -1204,7 +1195,6 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 
 				using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(config.TimeoutSeconds + 10));
 
-				//client.ServerCertificateValidationCallback = (s, c, h, e) => true;
 				Logger.Debug("Testing connection to {Host}:{Port}", config.Host, port);
 				await client.ConnectAsync(config.Host, port, secureSocketOptions, cts.Token);
 

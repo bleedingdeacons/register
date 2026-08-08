@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Serilog;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Text.Json;
 using TheBleedingDeacons.Intergroup.Register.Models;
@@ -133,6 +134,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		/// SecureStorage). IConfiguration's typed binding handles Port/EnableSsl/
 		/// TimeoutSeconds conversion, so no manual TryParse is needed.
 		/// </summary>
+		[SuppressMessage("Major Code Smell", "S1144:Unused private types or members should be removed", Justification = "Only called from the #else (production credentials) branches; a USE_DEV_CREDENTIALS build cannot see those call sites. Deleting this breaks every production build.")]
 		private SmtpConfiguration BuildSmtpConfiguration(string password)
 		{
 			var config = new SmtpConfiguration();
@@ -662,6 +664,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		/// Reads a single property from a JSON settings file (sync).
 		/// Returns empty string if the file doesn't exist or the property is missing.
 		/// </summary>
+		[SuppressMessage("Major Code Smell", "S1144:Unused private types or members should be removed", Justification = "Only called from the #else (production credentials) branches; a USE_DEV_CREDENTIALS build cannot see those call sites. Deleting this breaks every production build.")]
 		private string ReadJsonProperty(string filePath, string sectionName, string propertyName, string description)
 		{
 			if (!File.Exists(filePath))
@@ -683,6 +686,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		/// Reads a single property from a JSON settings file (async).
 		/// Returns empty string if the file doesn't exist or the property is missing.
 		/// </summary>
+		[SuppressMessage("Major Code Smell", "S1144:Unused private types or members should be removed", Justification = "Only called from the #else (production credentials) branches; a USE_DEV_CREDENTIALS build cannot see those call sites. Deleting this breaks every production build.")]
 		private async Task<string> ReadJsonPropertyAsync(string filePath, string sectionName, string propertyName, string description)
 		{
 			if (!File.Exists(filePath))
@@ -859,6 +863,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		/// hop off the calling SynchronizationContext, avoiding deadlock when
 		/// called from the MAUI UI thread. Returns empty string on failure.
 		/// </summary>
+		[SuppressMessage("Major Code Smell", "S1144:Unused private types or members should be removed", Justification = "Only called from the #else (production credentials) branches; a USE_DEV_CREDENTIALS build cannot see those call sites. Deleting this breaks every production build.")]
 		private static string GetSecretSync(string key, string description)
 		{
 			try
@@ -875,6 +880,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		/// <summary>
 		/// Reads a secret from SecureStorage (async). Returns empty string on failure.
 		/// </summary>
+		[SuppressMessage("Major Code Smell", "S1144:Unused private types or members should be removed", Justification = "Only called from the #else (production credentials) branches; a USE_DEV_CREDENTIALS build cannot see those call sites. Deleting this breaks every production build.")]
 		private static async Task<string> GetSecretAsync(string key, string description)
 		{
 			try

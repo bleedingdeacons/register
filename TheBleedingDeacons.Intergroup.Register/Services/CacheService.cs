@@ -11,8 +11,6 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 {
     public class CacheService
     {
-        private static readonly ILogger Logger = AppLogger.ForContext<CacheService>();
-
         private readonly IMemoryCache _cache;
         private readonly TimeSpan _defaultExpiration = TimeSpan.FromMinutes(30);
 

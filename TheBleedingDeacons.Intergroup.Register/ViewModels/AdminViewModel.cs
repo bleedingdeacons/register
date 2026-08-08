@@ -231,7 +231,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 
 		private void OnConnectivityChanged(object? sender, ConnectivityChangedEventArgs e)
 		{
-			// Connectivity events fire on a background thread on Android;
+			// Connectivity events fire on a background thread on Android —
 			// marshal back to UI so the bound CanExecute / IsEnabled updates
 			// don't trip cross-thread checks.
 			MainThread.BeginInvokeOnMainThread(() =>

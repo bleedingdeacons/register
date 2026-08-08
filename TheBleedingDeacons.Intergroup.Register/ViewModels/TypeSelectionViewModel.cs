@@ -1,4 +1,4 @@
-using CommunityToolkit.Maui.Alerts;
+﻿using CommunityToolkit.Maui.Alerts;
 using CommunityToolkit.Maui.Core;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -10,8 +10,6 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 {
 	public partial class TypeSelectionViewModel : BaseViewModel
 	{
-		private static readonly ILogger Logger = AppLogger.ForContext<TypeSelectionViewModel>();
-
 		public TypeSelectionViewModel()
 		{
 			Title = "Meeting Type";

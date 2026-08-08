@@ -27,12 +27,6 @@ public static class MauiProgram
 	public const string UNITY_DATABASE_NAME = "unity.db";
 	public const string MAIL_DATABASE_NAME = "emails.db";
 
-	//// Resolved once in SetupSerilog.
-	//private const string DefaultAppName = "Badi";
-	//private const string DefaultEnvironment = "Development";
-	//private static string _resolvedAppName = DefaultAppName;
-	//private static string _resolvedEnvironment = DefaultEnvironment;
-
 	// Factory that produces a fresh base-logger configuration (file/console/debug
 	// sinks + enrichers). Captured during SetupSerilog so BetterStackLoggerController
 	// can rebuild the whole pipeline on demand when the user edits Better Stack
@@ -117,23 +111,10 @@ public static class MauiProgram
 
 		// ── Unity.Data: DbContext + Repositories ──────────────────────
 		var unityDbPath = Path.Combine(FileSystem.AppDataDirectory, UNITY_DATABASE_NAME);
-		//builder.Services.AddDbContext<UnityDbContext>((sp, options) =>
-		//	options
-		//		.UseSqlite($"Data Source={unityDbPath}")
-		//		.AddInterceptors(sp.GetRequiredService<SqlitePragmaInterceptor>()));
-
 		builder.Services.AddDbContextFactory<UnityDbContext>((sp, options) =>
 			options
 				.UseSqlite($"Data Source={unityDbPath}")
 				.AddInterceptors(sp.GetRequiredService<SqlitePragmaInterceptor>()));
-
-		//// Factory for ViewModels — each transient ViewModel creates its own
-		//// short-lived DbContext, avoiding stale-entity tracking bleed between pages.
-		//builder.Services.AddDbContextFactory<UnityDbContext>((sp, options) =>
-		//	options
-		//		.UseSqlite($"Data Source={unityDbPath}")
-		//		.AddInterceptors(sp.GetRequiredService<SqlitePragmaInterceptor>()),
-		//	ServiceLifetime.Singleton);
 
 		Log.Logger.Information("Unity Db {databasePath}", unityDbPath);
 
@@ -378,11 +359,6 @@ public static class MauiProgram
 
 		var appName = builder.Configuration["App:Name"];
 		var environment = builder.Configuration["App:Environment"];
-
-		// Persist for the Better Stack controller which rebuilds the pipeline
-		// when settings change at runtime — it calls back into the factory below.
-		//_resolvedAppName = appName;
-		//_resolvedEnvironment = environment;
 
 		// Capture the base-logger factory so the Better Stack controller can
 		// rebuild a fresh pipeline on demand. We capture `builder.Configuration`

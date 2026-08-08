@@ -1,4 +1,4 @@
-using CommunityToolkit.Mvvm.ComponentModel;
+﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Serilog;
 using System.Threading.Tasks;
@@ -10,8 +10,6 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels;
 
 public partial class MainPageViewModel : BaseViewModel
 {
-	private static readonly ILogger Logger = AppLogger.ForContext<MainPageViewModel>();
-
 	private const string BaseTitle = "Intergroup Attendance Register";
 
 	private readonly IConfigurationService _configService;

@@ -9,8 +9,6 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 {
     public partial class CountdownPopupViewModel : ObservableObject, IDisposable
     {
-        private static readonly ILogger Logger = AppLogger.ForContext<CountdownPopupViewModel>();
-
         private readonly System.Timers.Timer _timer;
         private readonly Popup _popup;
         private readonly Func<Task> _navigateAction;
