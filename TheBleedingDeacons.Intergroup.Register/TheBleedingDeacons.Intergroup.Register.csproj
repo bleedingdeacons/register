@@ -184,9 +184,15 @@
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
-		<PackageReference Include="System.Formats.Asn1" Version="10.0.10" />
+		<!--
+			System.Formats.Asn1 and System.Text.Json used to be referenced here
+			to force patched versions over what the graph resolved. On net10.0
+			both ship in the shared framework, so the references did nothing but
+			shadow it — which is precisely what NU1510 reports. Removed.
+
+			System.Security.Cryptography.Xml is NOT in-box and stays.
+		-->
 		<PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.10" />
-		<PackageReference Include="System.Text.Json" Version="10.0.10" />
 	</ItemGroup>
 	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">
 		<PackageReference Include="System.Net.Http.WinHttpHandler" Version="10.0.10" />
