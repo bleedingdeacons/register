@@ -21,7 +21,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 
         public async Task<T> GetOrSetAsync<T>(string key, Func<Task<T>> getItem, TimeSpan? expiration = null)
         {
-            if (_cache.TryGetValue(key, out T cachedValue))
+            if (_cache.TryGetValue(key, out T? cachedValue) && cachedValue is not null)
             {
                 return cachedValue;
             }

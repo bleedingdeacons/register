@@ -19,16 +19,16 @@ namespace TheBleedingDeacons.Intergroup.Register.Services.Interfaces
 		DateTime? CircuitOpenedAt { get; }
 
 		// Events
-		event EventHandler<EmailSentEventArgs> EmailSent;
-		event EventHandler<EmailFailedEventArgs> EmailFailed;
-		event EventHandler<QueueProcessedEventArgs> QueueProcessed;
+		event EventHandler<EmailSentEventArgs>? EmailSent;
+		event EventHandler<EmailFailedEventArgs>? EmailFailed;
+		event EventHandler<QueueProcessedEventArgs>? QueueProcessed;
 
 		/// <summary>
 		/// Fires when the background-queue circuit breaker transitions between
 		/// open (paused) and closed (running). Raised from background threads —
 		/// marshal to the UI thread in handlers if you touch bindable state.
 		/// </summary>
-		event EventHandler<CircuitStateChangedEventArgs> CircuitStateChanged;
+		event EventHandler<CircuitStateChangedEventArgs>? CircuitStateChanged;
 
 		// Core email sending methods
 		/// <summary>

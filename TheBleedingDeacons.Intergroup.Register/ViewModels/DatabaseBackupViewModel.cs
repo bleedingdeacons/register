@@ -22,7 +22,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
         private string selectedDatabaseFile = string.Empty;
 
         [ObservableProperty]
-        private DatabaseFileInfo selectedDatabaseFileInfo;
+        private DatabaseFileInfo? selectedDatabaseFileInfo;
 
         public ObservableCollection<DatabaseFileInfo> DatabaseFiles { get; } = new();
 
@@ -213,7 +213,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
             BackupDatabaseCommand.NotifyCanExecuteChanged();
         }
 
-        partial void OnSelectedDatabaseFileInfoChanged(DatabaseFileInfo value)
+        partial void OnSelectedDatabaseFileInfoChanged(DatabaseFileInfo? value)
         {
             // Update the selected database file path when the info changes
             if (value != null)

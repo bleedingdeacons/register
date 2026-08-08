@@ -26,9 +26,14 @@ public class MainActivity : MauiAppCompatActivity
 
 	private void HideNavigationBar()
 	{
-		if (Window is null) return;
+		// Held in a local so the null test narrows for both arguments below —
+		// testing Window.DecorView directly leaves Window itself nullable.
+		var window = Window;
+		if (window?.DecorView is not { } decorView) return;
 
-		var controller = WindowCompat.GetInsetsController(Window, Window.DecorView);
+		var controller = WindowCompat.GetInsetsController(window, decorView);
+		if (controller is null) return;
+
 		controller.Hide(WindowInsetsCompat.Type.NavigationBars());
 
 		// Use the AndroidX compat constant rather than the platform

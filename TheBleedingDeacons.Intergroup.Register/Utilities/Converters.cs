@@ -269,25 +269,25 @@ public class UsingGenericUnifiedVisibilityConverter : IMultiValueConverter
 
 		if (values[0] is bool isEditing)
 		{
-			string controlType = parameter?.ToString()?.ToLower();
+			string? controlType = parameter?.ToString()?.ToLower();
 
 			if (controlType == "label")
 			{
 				// Show label when NOT editing AND display email has value
-				string displayEmail = values[1] as string;
+				string? displayEmail = values[1] as string;
 				return !isEditing && !string.IsNullOrWhiteSpace(displayEmail);
 			}
 			else if (controlType == "checkbox")
 			{
 				// Show checkbox when editing AND edit email has value
-				string editEmail = values[2] as string;
+				string? editEmail = values[2] as string;
 				return isEditing && !string.IsNullOrWhiteSpace(editEmail);
 			}
 			else if (controlType == "labeltext")
 			{
 				// Show "Using Generic:" label when either display or edit email has value
-				string displayEmail = values[1] as string;
-				string editEmail = values[2] as string;
+				string? displayEmail = values[1] as string;
+				string? editEmail = values[2] as string;
 
 				if (isEditing)
 					return !string.IsNullOrWhiteSpace(editEmail);
