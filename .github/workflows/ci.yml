@@ -27,10 +27,12 @@ permissions:
 # the Integrity.Client package from GitHub Packages (see nuget.config). That
 # registry requires authentication even for packages from public repos.
 #
-# GITHUB_TOKEN works only if this repository has been granted access to the
-# package (package page -> Package settings -> Manage Actions access). If restore
-# fails with 403, add a PACKAGES_READ_TOKEN secret holding a PAT with the
-# read:packages scope and it will be used in preference.
+# The package is linked to the integrity-sharp repository, and a GITHUB_TOKEN
+# cannot read a package belonging to a different repository — that combination
+# returns 403 — so restore uses PACKAGES_READ_TOKEN, a secret holding a classic
+# PAT with the read:packages scope. GITHUB_TOKEN remains as a fallback in case
+# the package is later granted access to this repository under its Manage
+# Actions access settings.
 env:
   GITHUB_PACKAGES_TOKEN: ${{ secrets.PACKAGES_READ_TOKEN || secrets.GITHUB_TOKEN }}
 
@@ -41,16 +43,30 @@ jobs:
 
     steps:
       - name: Checkout register
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
+
+      # A revoked or expired token is still non-empty, so probe the feed rather
+      # than only checking the variable is set. Otherwise the failure surfaces
+      # several minutes later as a wall of NU1301/403 restore errors.
+      - name: Verify GitHub Packages credentials
+        run: |
+          code=$(curl -sS -o /dev/null -w '%{http_code}' \
+            -u "bleedingdeacons:$GITHUB_PACKAGES_TOKEN" \
+            https://nuget.pkg.github.com/bleedingdeacons/download/integrity.client/index.json)
+          case "$code" in
+            200) echo "GitHub Packages authentication OK" ;;
+            401|403) echo "::error::GitHub Packages rejected the credentials (HTTP $code). PACKAGES_READ_TOKEN is missing, expired, or lacks the read:packages scope — rotate it in this repository's secrets."; exit 1 ;;
+            *) echo "::warning::Unexpected HTTP $code probing GitHub Packages; continuing and letting restore report the outcome." ;;
+          esac
 
       - name: Setup JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           global-json-file: global.json
 
@@ -92,10 +108,22 @@ jobs:
 
     steps:
       - name: Checkout register
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
+
+      # Same preflight as the build job; see the comment there.
+      - name: Verify GitHub Packages credentials
+        run: |
+          code=$(curl -sS -o /dev/null -w '%{http_code}' \
+            -u "bleedingdeacons:$GITHUB_PACKAGES_TOKEN" \
+            https://nuget.pkg.github.com/bleedingdeacons/download/integrity.client/index.json)
+          case "$code" in
+            200) echo "GitHub Packages authentication OK" ;;
+            401|403) echo "::error::GitHub Packages rejected the credentials (HTTP $code). PACKAGES_READ_TOKEN is missing, expired, or lacks the read:packages scope — rotate it in this repository's secrets."; exit 1 ;;
+            *) echo "::warning::Unexpected HTTP $code probing GitHub Packages; continuing and letting restore report the outcome." ;;
+          esac
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           global-json-file: global.json
 
