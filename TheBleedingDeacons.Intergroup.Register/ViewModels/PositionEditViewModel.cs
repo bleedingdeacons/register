@@ -39,6 +39,7 @@ public partial class PositionEditViewModel : BaseViewModel
 	private readonly IDbContextFactory<UnityDbContext> _contextFactory;
 	private readonly IPopupNotification _popupService;
 	private readonly IConfigurationService _configService;
+	private readonly ITemporaryIdGenerator _tempIds;
 
 	// The position whose holders are being managed
 	private Position? _position;
@@ -185,12 +186,14 @@ public partial class PositionEditViewModel : BaseViewModel
 		IPositionRepository positionRepository,
 		IDbContextFactory<UnityDbContext> contextFactory,
 		IPopupNotification popupService,
-		IConfigurationService configService)
+		IConfigurationService configService,
+		ITemporaryIdGenerator tempIds)
 	{
 		_positionRepository = positionRepository ?? throw new ArgumentNullException(nameof(positionRepository));
 		_contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
 		_popupService = popupService;
 		_configService = configService ?? throw new ArgumentNullException(nameof(configService));
+		_tempIds = tempIds ?? throw new ArgumentNullException(nameof(tempIds));
 
 		ValidateForm();
 	}
@@ -463,7 +466,7 @@ public partial class PositionEditViewModel : BaseViewModel
 				//     CreateMember API call is required.
 				var newMember = new Member
 				{
-					Id = TemporaryIdGenerator.Next(),
+					Id = _tempIds.Next(),
 					IntergroupPositionId = _position.Id,
 					AnonymousName = EditName?.Trim() ?? string.Empty,
 					MobileNumber = EditPhone?.Trim(),

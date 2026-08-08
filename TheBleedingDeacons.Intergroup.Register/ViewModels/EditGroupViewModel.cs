@@ -36,6 +36,7 @@ public partial class EditGroupViewModel : BaseViewModel
 	private readonly IPhoneNumberService _phoneService;
 	private readonly IConfigurationService _configService;
 	private readonly IAttendanceRegistration<Group> _groupAttendance;
+	private readonly ITemporaryIdGenerator _tempIds;
 
 	// The group whose GSRs are being managed
 	private Group? _group;
@@ -171,13 +172,15 @@ public partial class EditGroupViewModel : BaseViewModel
 		IPopupNotification popupService,
 		IPhoneNumberService phoneService,
 		IConfigurationService configService,
-		IAttendanceRegistration<Group> groupAttendance)
+		IAttendanceRegistration<Group> groupAttendance,
+		ITemporaryIdGenerator tempIds)
 	{
 		_contextFactory = contextFactory;
 		_popupService = popupService;
 		_phoneService = phoneService;
 		_configService = configService;
 		_groupAttendance = groupAttendance;
+		_tempIds = tempIds ?? throw new ArgumentNullException(nameof(tempIds));
 
 		ValidateForm();
 	}
@@ -401,7 +404,7 @@ public partial class EditGroupViewModel : BaseViewModel
 				//     CreateMember API call is required.
 				var newMember = new Member
 				{
-					Id = TemporaryIdGenerator.Next(),
+					Id = _tempIds.Next(),
 					HomeGroupId = _group.Id,
 					AnonymousName = EditName?.Trim() ?? string.Empty,
 					MobileNumber = EditPhone?.Trim(),
