@@ -225,8 +225,8 @@ public partial class VerifyPositionViewModel : BaseViewModel
 			// must do so now before their data is committed as a registered
 			// attendance. The popup is shown once per holder with that
 			// holder's name in the title (mirrors VerifyGroupViewModel) —
-			// declining for any holder aborts the registration silently;
-			// accepting records (or refreshes) that holder's acceptance at
+			// declining for any holder aborts the registration silently.
+			// Accepting records (or refreshes) that holder's acceptance at
 			// the current version before moving on to the next.
 			//
 			// The cached version comparison is intentionally an inequality

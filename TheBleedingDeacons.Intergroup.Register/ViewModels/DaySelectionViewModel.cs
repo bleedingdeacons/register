@@ -13,8 +13,6 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels;
 [QueryProperty(nameof(MeetingType), "meetingType")]
 public partial class DaySelectionViewModel : BaseViewModel
 {
-	private static readonly ILogger Logger = AppLogger.ForContext<DaySelectionViewModel>();
-
 	[ObservableProperty]
 	private string meetingType = string.Empty;
 

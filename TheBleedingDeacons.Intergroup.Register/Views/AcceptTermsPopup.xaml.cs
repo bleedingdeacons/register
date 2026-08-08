@@ -58,7 +58,7 @@ public partial class AcceptTermsPopup : Popup
     {
         if (BindingContext is not AcceptTermsPopupViewModel vm) return;
 
-        // ContentSize.Height can be 0 transiently during layout passes;
+        // ContentSize.Height can be 0 transiently during layout passes —
         // ignore those frames rather than incorrectly flipping the flag.
         var contentHeight = PolicyScrollView.ContentSize.Height;
         if (contentHeight <= 0) return;

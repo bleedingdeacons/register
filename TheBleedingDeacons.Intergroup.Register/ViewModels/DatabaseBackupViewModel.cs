@@ -9,8 +9,6 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 {
     public partial class DatabaseBackupViewModel : ObservableObject
     {
-        private static readonly ILogger Logger = AppLogger.ForContext<DatabaseBackupViewModel>();
-
         [ObservableProperty]
         private bool isBackupInProgress;
 

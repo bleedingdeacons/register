@@ -1,4 +1,4 @@
-using CommunityToolkit.Mvvm.ComponentModel;
+﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Serilog;
 using System.Collections.ObjectModel;
@@ -11,8 +11,6 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 {
 	public partial class PositionSelectionViewModel : BaseViewModel
 	{
-		private static readonly ILogger Logger = AppLogger.ForContext<PositionSelectionViewModel>();
-
 		private readonly IPositionRepository _positionRepository;
 
 		[ObservableProperty]
