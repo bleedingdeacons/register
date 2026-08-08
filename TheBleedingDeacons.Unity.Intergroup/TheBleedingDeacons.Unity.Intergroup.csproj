@@ -23,6 +23,21 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.10" />
+
+    <!--
+      Direct reference purely to lift a transitive version. EF Core 10's Sqlite
+      provider resolves SQLitePCLRaw 2.1.11, and everything up to and including
+      2.1.11 carries GHSA-2m69-gcr7-jv3q (high: the bundled SQLite itself is
+      vulnerable), which NuGet audit reports as NU1903. 2.1.12 is the fix.
+
+      Referencing the bundle rather than lib.e_sqlite3 directly is deliberate —
+      the bundle is what EF Core actually depends on, and it pins the whole
+      matched set (lib, provider, android lib) to one version instead of
+      leaving them to resolve independently.
+
+      Remove this once EF Core's own dependency has moved past 2.1.11.
+    -->
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.12" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.10">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
