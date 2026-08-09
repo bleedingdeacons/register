@@ -1,4 +1,6 @@
-﻿namespace TheBleedingDeacons.Intergroup.Register.Models
+﻿using System.Diagnostics.CodeAnalysis;
+
+namespace TheBleedingDeacons.Intergroup.Register.Models
 {
     public class SmtpConfiguration
     {
@@ -29,6 +31,7 @@
         /// Creates a copy of the configuration with sanitized password for logging
         /// </summary>
         /// <returns>SmtpConfiguration with masked password</returns>
+        [SuppressMessage("Security Hotspot", "S2068:Hard-coded credentials are security-sensitive", Justification = "The literal is the mask, not a credential. This method exists precisely to keep the real password out of logs; replacing it with \"***\" is the whole point.")]
         public SmtpConfiguration ToLogSafe()
         {
             return new SmtpConfiguration

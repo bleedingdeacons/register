@@ -804,7 +804,7 @@ public partial class EditGroupViewModel : BaseViewModel
 				.ToListAsync();
 
 			_allMemberNamesSnapshot = rows
-				.Select(r => (r.Id, Name: r.AnonymousName!))
+				.Select(r => (r.Id, Name: r.AnonymousName))
 				.ToList();
 
 			Logger.Information("Loaded {Count} member names for uniqueness check",
@@ -840,7 +840,7 @@ public partial class EditGroupViewModel : BaseViewModel
 
 	private void UpdateTitle()
 	{
-		var baseName = !string.IsNullOrEmpty(_group?.Name) ? _group!.Name : "Edit Members";
+		var baseName = !string.IsNullOrEmpty(_group?.Name) ? _group.Name : "Edit Members";
 		Title = HasUnsavedChanges ? $"{baseName} *" : baseName;
 	}
 

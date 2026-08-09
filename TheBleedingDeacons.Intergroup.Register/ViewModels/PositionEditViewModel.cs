@@ -295,7 +295,7 @@ public partial class PositionEditViewModel : BaseViewModel
 				.ToListAsync();
 
 			_allMemberNamesSnapshot = rows
-				.Select(r => (r.Id, Name: r.AnonymousName!))
+				.Select(r => (r.Id, Name: r.AnonymousName))
 				.ToList();
 
 			Logger.Information("Loaded {Count} member names for uniqueness check",
@@ -824,7 +824,7 @@ public partial class PositionEditViewModel : BaseViewModel
 	private void UpdateTitle()
 	{
 		var baseName = !string.IsNullOrEmpty(_position?.ShortDescription)
-			? _position!.ShortDescription
+			? _position.ShortDescription
 			: "Edit Holders";
 		Title = HasUnsavedChanges ? $"{baseName} *" : baseName;
 	}

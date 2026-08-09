@@ -134,8 +134,12 @@ public partial class VerifyPositionViewModel : BaseViewModel
 		{
 			int parsedPositionId = 0;
 
-			if (positionIdObj is string positionIdStr)
-				int.TryParse(positionIdStr, out parsedPositionId);
+			// Folding the parse into the pattern uses TryParse's result rather
+			// than discarding it (MA0060). Behaviour is unchanged: a string
+			// that fails to parse leaves parsedPositionId at 0 and falls past
+			// the int branch, which the guard below already rejects.
+			if (positionIdObj is string positionIdStr && int.TryParse(positionIdStr, out var parsedFromString))
+				parsedPositionId = parsedFromString;
 			else if (positionIdObj is int intValue)
 				parsedPositionId = intValue;
 
@@ -359,7 +363,7 @@ public partial class VerifyPositionViewModel : BaseViewModel
 			// VerifyGroupViewModel so the position flow is consistent
 			// with the group flow.
 			string memberName = !string.IsNullOrWhiteSpace(member.AnonymousName)
-				? member.AnonymousName!
+				? member.AnonymousName
 				: "this position holder";
 			string perMemberTitle = $"{cachedPolicy.Title} — {memberName}";
 
@@ -493,7 +497,7 @@ public partial class VerifyPositionViewModel : BaseViewModel
 	private void UpdateTitle()
 	{
 		Title = !string.IsNullOrEmpty(Position?.ShortDescription)
-			? Position!.ShortDescription
+			? Position.ShortDescription
 			: "Position Verification";
 	}
 

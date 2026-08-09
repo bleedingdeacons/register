@@ -288,7 +288,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			if (accepted)
 			{
 				await TryQueueAcceptanceEmailAsync(
-					persistedMember!, timestampUtc, version, method);
+					persistedMember, timestampUtc, version, method);
 			}
 		}
 
@@ -340,7 +340,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 				var cached = _policyCache.GetCached();
 
 				var displayName = !string.IsNullOrWhiteSpace(member.AnonymousName)
-					? member.AnonymousName!
+					? member.AnonymousName
 					: "there";
 
 				// The body quoted in the email comes from the cached
@@ -365,7 +365,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 					// is what's persisted to the DB and what the server will
 					// see, so it's the authoritative one for this email.
 					PolicyVersion = !string.IsNullOrWhiteSpace(version)
-						? version!
+						? version
 						: cached?.Version ?? string.Empty,
 					PolicyModified = cached?.Modified ?? string.Empty,
 

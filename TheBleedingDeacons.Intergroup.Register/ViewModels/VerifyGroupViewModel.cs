@@ -171,8 +171,12 @@ public partial class VerifyGroupViewModel : BaseViewModel
 		{
 			int parsedGroupId = 0;
 
-			if (groupIdObj is string groupIdStr)
-				int.TryParse(groupIdStr, out parsedGroupId);
+			// Folding the parse into the pattern uses TryParse's result rather
+			// than discarding it (MA0060). Behaviour is unchanged: a string
+			// that fails to parse leaves parsedGroupId at 0 and falls past the
+			// int branch, which the guard below already rejects.
+			if (groupIdObj is string groupIdStr && int.TryParse(groupIdStr, out var parsedFromString))
+				parsedGroupId = parsedFromString;
 			else if (groupIdObj is int intValue)
 				parsedGroupId = intValue;
 
@@ -479,7 +483,7 @@ public partial class VerifyGroupViewModel : BaseViewModel
 			// sees, the audit trail records, and the confirmation
 			// email quotes.
 			string memberName = !string.IsNullOrWhiteSpace(member.AnonymousName)
-				? member.AnonymousName!
+				? member.AnonymousName
 				: "this GSR";
 			string perMemberTitle = $"{cachedPolicy.Title} — {memberName}";
 
@@ -616,7 +620,7 @@ public partial class VerifyGroupViewModel : BaseViewModel
 
 	private void UpdateTitle()
 	{
-		Title = !string.IsNullOrEmpty(Group?.Name) ? Group!.Name : "Group Service Representative";
+		Title = !string.IsNullOrEmpty(Group?.Name) ? Group.Name : "Group Service Representative";
 	}
 
 	private void UpdateCanRegister()

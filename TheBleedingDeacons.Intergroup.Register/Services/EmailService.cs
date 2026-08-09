@@ -177,12 +177,12 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			// SMTP account username — same default the service has always
 			// used. Trim so a stray space in the override doesn't break
 			// the MailboxAddress parser downstream.
-			var resolvedFrom = string.IsNullOrWhiteSpace(from) ? _username : from!.Trim();
+			var resolvedFrom = string.IsNullOrWhiteSpace(from) ? _username : from.Trim();
 
 			// Reply-To is independent of From: NULL means "no header at
 			// all", a non-empty value is trimmed and persisted on the row
 			// so the sender path picks it up unchanged.
-			var resolvedReplyTo = string.IsNullOrWhiteSpace(replyTo) ? null : replyTo!.Trim();
+			var resolvedReplyTo = string.IsNullOrWhiteSpace(replyTo) ? null : replyTo.Trim();
 
 			var email = new QueuedEmail
 			{
@@ -223,10 +223,10 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 				// resolved value is persisted on the QueuedEmail row so
 				// the override survives an app restart and is applied
 				// when the background processor eventually sends.
-				var resolvedFrom = string.IsNullOrWhiteSpace(from) ? _username : from!.Trim();
+				var resolvedFrom = string.IsNullOrWhiteSpace(from) ? _username : from.Trim();
 
 				// Reply-To has no fallback — null means no Reply-To header.
-				var resolvedReplyTo = string.IsNullOrWhiteSpace(replyTo) ? null : replyTo!.Trim();
+				var resolvedReplyTo = string.IsNullOrWhiteSpace(replyTo) ? null : replyTo.Trim();
 
 				var email = new QueuedEmail
 				{
