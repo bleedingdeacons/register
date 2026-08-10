@@ -82,10 +82,7 @@
 
                     <VerticalStackLayout>
                         <Label Text="API Key *" />
-                        <controls:ClearableEntry
-                            IsPassword="True"
-                            Placeholder="Enter your Integrity API key"
-                            Text="{Binding UnityApiKey}" />
+                        <controls:ClearableEntry Placeholder="Enter your Integrity API key" Text="{Binding UnityApiKey}" />
                     </VerticalStackLayout>
 
                 </VerticalStackLayout>
@@ -200,10 +197,7 @@
 
                     <VerticalStackLayout>
                         <Label Text="Source Token *" />
-                        <controls:ClearableEntry
-                            IsPassword="True"
-                            Placeholder="Enter your Better Stack source token"
-                            Text="{Binding BetterStackSourceToken}" />
+                        <controls:ClearableEntry Placeholder="Enter your Better Stack source token" Text="{Binding BetterStackSourceToken}" />
                     </VerticalStackLayout>
 
                 </VerticalStackLayout>

@@ -82,7 +82,7 @@
                 CornerRadius="8"
                 FontSize="18"
                 HeightRequest="60"
-                Text="Database Backup"
+                Text="Diagnostics Dump"
                 TextColor="White" />
 
             <!--

@@ -71,7 +71,11 @@ public sealed class BetterStackLoggerController : IBetterStackLoggerController
 						logEventsInBatchLimit: 500,
 						batchSizeLimitBytes: 5L * 1024 * 1024,
 						period: TimeSpan.FromSeconds(5),
-						textFormatter: new Serilog.Formatting.Json.JsonFormatter(renderMessage: true),
+						// Must be the Better Stack shape (dt/level/message), not Serilog's
+						// stock JsonFormatter — see BetterStackTextFormatter. This is what
+						// gets written into the buffer file, so it is also what determines
+						// the timestamp Better Stack records for a batch that shipped late.
+						textFormatter: new BetterStackTextFormatter(),
 						batchFormatter: new BetterStackNdjsonBatchFormatter(),
 						httpClient: betterStackHttpClient);
 				}

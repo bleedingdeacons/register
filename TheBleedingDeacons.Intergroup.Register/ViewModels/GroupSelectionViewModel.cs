@@ -47,10 +47,13 @@ public partial class GroupSelectionViewModel : BaseViewModel
 
     partial void OnCriteriaChanged(MeetingCriteria? value)
     {
-        MainThread.BeginInvokeOnMainThread(async () =>
-        {
-            await LoadDataAsync();
-        });
+        // ApplyQueryAttributes is not guaranteed to run on the UI thread, and
+        // LoadDataAsync mutates the bound Groups collection, so marshal before
+        // starting it. SafeFireAndForget replaces an async-void lambda whose
+        // exceptions would otherwise have gone unobserved.
+        MainThread.BeginInvokeOnMainThread(
+            () => LoadDataAsync().SafeFireAndForget(
+                nameof(GroupSelectionViewModel) + "." + nameof(OnCriteriaChanged)));
     }
 
     [RelayCommand]
@@ -71,12 +74,8 @@ public partial class GroupSelectionViewModel : BaseViewModel
             IsLoading = true;
             IsDataLoaded = false;
 
-            await Task.Yield();
-
-            Groups.Clear();
-
             // Get all meetings matching the day/type criteria
-            var allMeetings = await _meetingRepository.GetAllAsync();
+            var allMeetings = await _meetingRepository.GetAllAsync(Token);
 
             var filteredMeetings = allMeetings
                 .Where(m =>
@@ -95,7 +94,7 @@ public partial class GroupSelectionViewModel : BaseViewModel
             var groups = new List<Group>();
             foreach (var groupId in groupIds)
             {
-                var group = await _groupRepository.GetByIdWithMembersAsync(groupId);
+                var group = await _groupRepository.GetByIdWithMembersAsync(groupId, Token);
                 if (group != null)
                     groups.Add(group);
             }
@@ -103,21 +102,29 @@ public partial class GroupSelectionViewModel : BaseViewModel
             // Sort by group name
             groups = groups.OrderBy(g => g.Name, StringComparer.CurrentCulture).ToList();
 
-            MainThread.BeginInvokeOnMainThread(() =>
-            {
-                foreach (var group in groups)
-                {
-                    Groups.Add(group);
-                }
+            // Clear and repopulate in a single synchronous block: no await
+            // between them, so the bound CollectionView never observes the
+            // collection half-updated.
+            Groups.Clear();
 
-                IsDataLoaded = true;
-                IsLoading = false;
-            });
+            foreach (var group in groups)
+            {
+                Groups.Add(group);
+            }
+
+            IsDataLoaded = true;
 
             Header = $"{activeCriteria.Day} {activeCriteria.MeetingType} Groups";
         }
+        catch (OperationCanceledException)
+        {
+            // Navigated away mid-load — the view-model has been disposed and
+            // there is nothing left to publish.
+        }
         finally
         {
+            // Released only once the collection is fully rebuilt, so the
+            // IsBusy guard above genuinely serialises overlapping loads.
             IsBusy = false;
             IsLoading = false;
         }

@@ -24,8 +24,26 @@ and hard app kills, the pipeline is configured as follows:
 
 The glue between the sink and Better Stack lives in
 `Support/BetterStackDurable/` — a custom `IHttpClient` that attaches the
-bearer token and NDJSON content-type, and a batch formatter that emits
-one JSON event per line.
+bearer token and NDJSON content-type, a text formatter that writes each
+event in Better Stack's ingest schema, and a batch formatter that frames
+those events one per line.
+
+### Event schema
+
+Better Stack reserves three field names and treats everything else as
+structured metadata, so events are serialised (by `BetterStackTextFormatter`,
+matching Better Stack's own `BetterStack.Logs.Serilog` client) as:
+
+```json
+{"dt":"2026-08-10T19:04:31.1234567Z","level":"INFO","message":"...","messageTemplate":"...","exception":"...","properties":{"DeviceLabel":"...","AppVersion":"..."}}
+```
+
+`dt` matters here more than in a typical app: events can sit in the buffer
+for hours before they ship, and an event without `dt` is stamped by Better
+Stack with the time the *request* arrived — which would collapse a whole
+meeting's worth of logs onto whenever the device next found signal. Enriched
+properties are nested rather than hoisted to the top level, so query them as
+`properties.DeviceLabel`.
 
 Serilog's `SelfLog` is enabled in `ReconfigureSerilogWithBetterStack`
 so any sink errors (bad endpoint, revoked token, permission issues on
