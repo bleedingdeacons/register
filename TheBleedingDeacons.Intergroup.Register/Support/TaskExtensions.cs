@@ -32,19 +32,4 @@ public static class TaskExtensions
 			onException?.Invoke(ex);
 		}
 	}
-
-	/// <summary>
-	/// Runs <paramref name="work"/> on a thread-pool thread and fires-and-forgets
-	/// the resulting task, logging any exception. Use this in place of
-	/// <c>_ = Task.Run(async () =&gt; await DoWorkAsync())</c> so failures aren't
-	/// silently dropped.
-	/// </summary>
-	public static void RunSafeFireAndForget(
-		Func<Task> work,
-		string? context = null,
-		Action<Exception>? onException = null)
-	{
-		ArgumentNullException.ThrowIfNull(work);
-		Task.Run(work).SafeFireAndForget(context, onException);
-	}
 }

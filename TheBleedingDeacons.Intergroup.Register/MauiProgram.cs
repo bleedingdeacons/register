@@ -279,7 +279,7 @@ public static class MauiProgram
 		builder.Services.AddTransient<GroupSelectionPage>();
 		builder.Services.AddTransient<EditPositionPage>();
 		builder.Services.AddTransient<PositionSelectionPage>();
-		builder.Services.AddTransient<DatabaseBackupPage>();
+		builder.Services.AddTransient<DiagnosticDumpPage>();
 		builder.Services.AddTransient<EmailStatusPage>();
 		builder.Services.AddTransient<SettingsPage>();
 		builder.Services.AddTransient<ApiSettingsPage>();		
@@ -296,7 +296,7 @@ public static class MauiProgram
 		builder.Services.AddSingleton<DaySelectionViewModel>();
 		builder.Services.AddTransient<PositionSelectionViewModel>();
 		builder.Services.AddTransient<PositionEditViewModel>();
-		builder.Services.AddTransient<DatabaseBackupViewModel>();
+		builder.Services.AddTransient<DiagnosticDumpViewModel>();
 		builder.Services.AddTransient<EmailStatusViewModel>();
 		builder.Services.AddTransient<SettingsViewModel>();
 		builder.Services.AddTransient<ApiSettingsViewModel>();		

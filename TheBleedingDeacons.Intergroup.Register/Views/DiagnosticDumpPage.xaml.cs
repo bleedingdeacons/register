@@ -2,10 +2,10 @@ using TheBleedingDeacons.Intergroup.Register.ViewModels;
 
 namespace TheBleedingDeacons.Intergroup.Register.Views
 {
-    public partial class DatabaseBackupPage : ContentPage
+    public partial class DiagnosticDumpPage : ContentPage
     {
-        private readonly DatabaseBackupViewModel _viewModel;
-        public DatabaseBackupPage(DatabaseBackupViewModel viewModel)
+        private readonly DiagnosticDumpViewModel _viewModel;
+        public DiagnosticDumpPage(DiagnosticDumpViewModel viewModel)
         {
             InitializeComponent();
             BindingContext = _viewModel = viewModel;
