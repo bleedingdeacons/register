@@ -276,9 +276,15 @@ public static class MauiProgram
 		builder.Services.AddTransient<VerifyGroupPage>();
 		builder.Services.AddSingleton<DaySelectionPage>();
 		builder.Services.AddSingleton<TypeSelectionPage>();
-		builder.Services.AddTransient<GroupSelectionPage>();
+		// Singleton, like DaySelectionPage and TypeSelectionPage above: the
+		// two list pages are each reached from exactly one place and never
+		// appear twice on the navigation stack, so one instance can be
+		// reused for the life of the app instead of rebuilding the page and
+		// its CollectionView on every visit. See the view-model
+		// registrations below for the reload behaviour this relies on.
+		builder.Services.AddSingleton<GroupSelectionPage>();
 		builder.Services.AddTransient<EditPositionPage>();
-		builder.Services.AddTransient<PositionSelectionPage>();
+		builder.Services.AddSingleton<PositionSelectionPage>();
 		builder.Services.AddTransient<DiagnosticDumpPage>();
 		builder.Services.AddTransient<EmailStatusPage>();
 		builder.Services.AddTransient<SettingsPage>();
@@ -289,12 +295,21 @@ public static class MauiProgram
 		// ── ViewModels ────────────────────────────────────────────────
 		builder.Services.AddTransient<MailSettingsViewModel>();
 		builder.Services.AddSingleton<MainPageViewModel>();
-		builder.Services.AddTransient<GroupSelectionViewModel>();
+		// Singleton to match GroupSelectionPage. Its list still reloads on
+		// every visit: DaySelectionViewModel hands over a freshly constructed
+		// MeetingCriteria each time and MeetingCriteria is a plain class, so
+		// reference inequality means OnCriteriaChanged fires even when the
+		// day and type are unchanged. Nothing disposes this view-model, so
+		// BaseViewModel's cancellation token stays live across visits.
+		builder.Services.AddSingleton<GroupSelectionViewModel>();
 		builder.Services.AddTransient<EditGroupViewModel>();
 		builder.Services.AddTransient<VerifyGroupViewModel>();
 		builder.Services.AddSingleton<TypeSelectionViewModel>();
 		builder.Services.AddSingleton<DaySelectionViewModel>();
-		builder.Services.AddTransient<PositionSelectionViewModel>();
+		// Singleton to match PositionSelectionPage. Its list still reloads on
+		// every visit, because PositionSelectionPage.OnAppearing drives the
+		// load and fires again each time the page is returned to.
+		builder.Services.AddSingleton<PositionSelectionViewModel>();
 		builder.Services.AddTransient<PositionEditViewModel>();
 		builder.Services.AddTransient<DiagnosticDumpViewModel>();
 		builder.Services.AddTransient<EmailStatusViewModel>();
