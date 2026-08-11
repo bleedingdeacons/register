@@ -42,9 +42,9 @@ public sealed class RepositoryTests : IDisposable
 		await ctx.SaveChangesAsync();
 	}
 
-	// ── MeetingRepository (takes a DbContext directly) ───────────────────────
+	// ── MeetingRepository ────────────────────────────────────────────────────
 
-	private MeetingRepository Meetings() => new(new UnityDbContext(_options));
+	private MeetingRepository Meetings() => new(_factory);
 
 	[Fact]
 	public async Task Meetings_GetAll_OrdersByDayThenTime()
