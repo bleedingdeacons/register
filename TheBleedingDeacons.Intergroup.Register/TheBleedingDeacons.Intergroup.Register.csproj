@@ -72,9 +72,17 @@
 			Visual Studio's project-properties version editor writes those per-config
 			groups back. If it does, collapse them here again rather than leaving the
 			value split.
+
+			Version must be set here too, and not left to the MAUI targets. Only the
+			Android head derives Version from ApplicationDisplayVersion; the Windows
+			head leaves it at the default VersionPrefix of 1.0.0. PackageVersion
+			follows Version, so the two heads disagreed and NU1105 came back. A
+			command-line restore does not run NuGet's cross-framework consistency
+			check, so this only ever shows up in Visual Studio.
 		-->
-		<ApplicationDisplayVersion>1.0.26</ApplicationDisplayVersion>
-		<ApplicationVersion>1</ApplicationVersion>
+		<ApplicationDisplayVersion>1.0.27</ApplicationDisplayVersion>
+		<Version>$(ApplicationDisplayVersion)</Version>
+		<ApplicationVersion>2</ApplicationVersion>
 
 		<!--
 			Platform floors, raised for .NET 10.
@@ -213,7 +221,7 @@
 		<MauiXaml Update="Controls\PositionMemberCard.xaml">
 			<Generator>MSBuild:Compile</Generator>
 		</MauiXaml>
-		<MauiXaml Update="Views\DatabaseBackupPage.xaml">
+		<MauiXaml Update="Views\DiagnosticDumpPage.xaml">
 			<Generator>MSBuild:Compile</Generator>
 		</MauiXaml>
 		<MauiXaml Update="Views\DaySelectionPage.xaml">
@@ -266,8 +274,8 @@
 		<Compile Update="Views\GroupEditPage.xaml.cs">
 			<DependentUpon>GroupEditPage.xaml</DependentUpon>
 		</Compile>
-		<Compile Update="Views\DatabaseBackupPage.xaml.cs">
-			<DependentUpon>DatabaseBackupPage.xaml</DependentUpon>
+		<Compile Update="Views\DiagnosticDumpPage.xaml.cs">
+			<DependentUpon>DiagnosticDumpPage.xaml</DependentUpon>
 		</Compile>
 		<Compile Update="Views\GroupSelectionPage.xaml.cs">
 			<DependentUpon>GroupSelectionPage.xaml</DependentUpon>

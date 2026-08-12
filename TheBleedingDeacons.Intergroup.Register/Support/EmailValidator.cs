@@ -28,9 +28,39 @@ namespace TheBleedingDeacons.Intergroup.Register.Support;
 ///
 /// Empty / whitespace input returns <c>false</c>. Required-ness is the
 /// caller's concern — this method only validates format.
+///
+/// <para><b>Service addresses:</b></para>
+/// <see cref="IsIntergroupAddress"/> is a separate policy check (not part
+/// of <see cref="IsValid"/>, which stays format-only) for the personal
+/// email fields on the GSR and officer edit screens.
 /// </summary>
 public static class EmailValidator
 {
+	/// <summary>
+	/// The intergroup's own domain. Addresses on it are service aliases
+	/// (<see cref="TheBleedingDeacons.Unity.Intergroup.Entities.Member.Email"/>), never a
+	/// member's personal address.
+	/// </summary>
+	private const string IntergroupDomain = "aa-bristol.org";
+
+	/// <summary>
+	/// Returns <c>true</c> when <paramref name="email"/> mentions the
+	/// intergroup domain anywhere in the value.
+	///
+	/// A member's personal email is the address they own themselves; the
+	/// aa-bristol.org address is the rotating service alias that forwards
+	/// *to* it. Storing the alias as the personal address breaks that
+	/// forward on the next rotation and means the member can no longer be
+	/// reached once they leave the position.
+	///
+	/// The check is a plain case-insensitive substring match rather than a
+	/// domain comparison, so it also catches sub-domains and look-alikes
+	/// such as <c>gsr@mail.aa-bristol.org</c> or <c>…@aa-bristol.org.uk</c>.
+	/// </summary>
+	public static bool IsIntergroupAddress(string? email) =>
+		email is not null &&
+		email.Contains(IntergroupDomain, StringComparison.OrdinalIgnoreCase);
+
 	/// <summary>
 	/// Returns <c>true</c> when <paramref name="email"/> is a syntactically
 	/// valid address with a TLD. Does not perform DNS or mailbox checks.

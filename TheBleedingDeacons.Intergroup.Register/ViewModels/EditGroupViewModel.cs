@@ -929,6 +929,8 @@ public partial class EditGroupViewModel : BaseViewModel
 			SetEmailError("Email address cannot exceed 255 characters.");
 		else if (!IsValidEmail(EditEmail.Trim()))
 			SetEmailError("Please check the email address is correct.");
+		else if (IsIntergroupAddress(EditEmail.Trim()))
+			SetEmailError("Enter the member's own email address, not their aa-bristol.org service address.");
 	}
 
 	private void ValidateForm()
@@ -972,6 +974,8 @@ public partial class EditGroupViewModel : BaseViewModel
 	private void ClearEmailError() { EmailError = null; HasEmailError = false; }
 
 	private static bool IsValidEmail(string email) => EmailValidator.IsValid(email);
+
+	private static bool IsIntergroupAddress(string email) => EmailValidator.IsIntergroupAddress(email);
 
 	private bool IsValidPhoneFormat(string phone)
 	{

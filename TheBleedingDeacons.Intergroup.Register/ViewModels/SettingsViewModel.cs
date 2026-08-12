@@ -643,7 +643,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 		private async Task NavigateToBackup()
 		{
 			await ShowFeedback();
-			await Shell.Current.GoToAsync(nameof(DatabaseBackupPage));
+			await Shell.Current.GoToAsync(nameof(DiagnosticDumpPage));
 		}
 
 		[RelayCommand]

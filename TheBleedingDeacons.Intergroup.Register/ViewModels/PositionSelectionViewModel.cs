@@ -38,25 +38,30 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 				IsLoading = true;
 				IsDataLoaded = false;
 
-				await Task.Yield();
+				var allPositions = await _positionRepository.GetAllAsync(Token);
 
+				// Clear and repopulate in a single synchronous block: no await
+				// between them, so the bound CollectionView never observes the
+				// collection half-updated. Both run on the UI thread because
+				// the page invokes this from OnAppearing without Task.Run.
 				Positions.Clear();
 
-				var allPositions = await _positionRepository.GetAllAsync();
-
-				MainThread.BeginInvokeOnMainThread(() =>
+				foreach (var position in allPositions)
 				{
-					foreach (var position in allPositions)
-					{
-						Positions.Add(position);
-					}
+					Positions.Add(position);
+				}
 
-					IsDataLoaded = true;
-					IsLoading = false;
-				});
+				IsDataLoaded = true;
+			}
+			catch (OperationCanceledException)
+			{
+				// Navigated away mid-load — the view-model has been disposed
+				// and there is nothing left to publish.
 			}
 			finally
 			{
+				// Released only once the collection is fully rebuilt, so the
+				// IsBusy guard above genuinely serialises overlapping loads.
 				IsBusy = false;
 				IsLoading = false;
 			}

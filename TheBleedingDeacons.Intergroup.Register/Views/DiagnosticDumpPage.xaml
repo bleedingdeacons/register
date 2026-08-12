@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="TheBleedingDeacons.Intergroup.Register.Views.DiagnosticDumpPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:viewmodels="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
+    Title="Diagnostic Dump"
+    x:DataType="viewmodels:DiagnosticDumpViewModel">
+
+    <ContentPage.BindingContext>
+        <viewmodels:DiagnosticDumpViewModel />
+    </ContentPage.BindingContext>
+
+    <ScrollView>
+        <VerticalStackLayout Padding="30" Spacing="20">
+
+            <!--  Database Files List  -->
+            <Frame
+                Padding="15"
+                BackgroundColor="{AppThemeBinding Light=#FFFFFF,
+                                                  Dark=#1E1E1E}"
+                BorderColor="{AppThemeBinding Light=#E0E0E0,
+                                              Dark=#404040}"
+                CornerRadius="8">
+                <VerticalStackLayout Spacing="10">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label
+                            Grid.Column="0"
+                            FontAttributes="Bold"
+                            FontSize="16"
+                            Text="Available Database Files:" />
+                        <Button
+                            Grid.Column="1"
+                            BackgroundColor="Transparent"
+                            Command="{Binding RefreshDatabaseListCommand}"
+                            FontSize="16"
+                            HeightRequest="40"
+                            Text="🔄"
+                            TextColor="{AppThemeBinding Light=#007ACC,
+                                                        Dark=#0E7ACC}"
+                            WidthRequest="40" />
+                    </Grid>
+
+                    <CollectionView
+                        ItemsSource="{Binding DatabaseFiles}"
+                        MaximumHeightRequest="200"
+                        SelectedItem="{Binding SelectedDatabaseFileInfo}"
+                        SelectionMode="Single">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="viewmodels:DatabaseFileInfo">
+                                <Border Margin="0,2">
+                                    <Border.Triggers>
+                                        <DataTrigger
+                                            Binding="{Binding IsSelected}"
+                                            TargetType="Border"
+                                            Value="True">
+                                            <Setter Property="BackgroundColor" Value="{AppThemeBinding Light=#E3F2FD, Dark=#1E3A5F}" />
+                                            <Setter Property="Stroke" Value="{AppThemeBinding Light=#1976D2, Dark=#42A5F5}" />
+                                            <Setter Property="StrokeThickness" Value="2" />
+                                        </DataTrigger>
+                                        <DataTrigger
+                                            Binding="{Binding IsSelected}"
+                                            TargetType="Border"
+                                            Value="False">
+                                            <Setter Property="BackgroundColor" Value="{AppThemeBinding Light=#F8F9FA, Dark=#2D2D30}" />
+                                            <Setter Property="Stroke" Value="{AppThemeBinding Light=#E9ECEF, Dark=#404040}" />
+                                            <Setter Property="StrokeThickness" Value="1" />
+                                        </DataTrigger>
+                                    </Border.Triggers>
+                                    <Border.StrokeShape>
+                                        <RoundRectangle CornerRadius="5" />
+                                    </Border.StrokeShape>
+                                    <Border.GestureRecognizers>
+                                        <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:DiagnosticDumpViewModel}}, Path=SelectDatabaseCommand, x:DataType=viewmodels:DiagnosticDumpViewModel}" CommandParameter="{Binding FullPath}" />
+                                    </Border.GestureRecognizers>
+
+                                    <Grid
+                                        Padding="12"
+                                        ColumnDefinitions="*,Auto"
+                                        RowDefinitions="Auto,Auto">
+
+                                        <Label
+                                            Grid.Row="0"
+                                            Grid.Column="0"
+                                            FontAttributes="Bold"
+                                            FontSize="14"
+                                            Text="{Binding FileName}" />
+                                        <Label
+                                            Grid.Row="0"
+                                            Grid.Column="1"
+                                            FontSize="12"
+                                            Text="{Binding SizeText}"
+                                            TextColor="{AppThemeBinding Light=#666666,
+                                                                        Dark=#CCCCCC}" />
+                                        <Label
+                                            Grid.Row="1"
+                                            Grid.Column="0"
+                                            Grid.ColumnSpan="2">
+                                            <Label.FormattedText>
+                                                <FormattedString>
+                                                    <Span
+                                                        FontSize="12"
+                                                        Text="{Binding Location}"
+                                                        TextColor="{AppThemeBinding Light=#888888,
+                                                                                    Dark=#AAAAAA}" />
+                                                    <Span
+                                                        FontSize="12"
+                                                        Text=" • "
+                                                        TextColor="{AppThemeBinding Light=#888888,
+                                                                                    Dark=#AAAAAA}" />
+                                                    <Span
+                                                        FontSize="12"
+                                                        Text="{Binding LastModifiedText}"
+                                                        TextColor="{AppThemeBinding Light=#888888,
+                                                                                    Dark=#AAAAAA}" />
+                                                </FormattedString>
+                                            </Label.FormattedText>
+                                        </Label>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+
+                    <Label
+                        HorizontalOptions="Center"
+                        IsVisible="{Binding DatabaseFiles.Count, Converter={StaticResource CountToBoolConverter}}"
+                        Text="No database files found"
+                        TextColor="{AppThemeBinding Light=#666666,
+                                                    Dark=#CCCCCC}" />
+                </VerticalStackLayout>
+            </Frame>
+
+            <!--  Selected Database Info  -->
+            <Frame
+                Padding="15"
+                BackgroundColor="{AppThemeBinding Light=#F0F8FF,
+                                                  Dark=#1A1F2E}"
+                BorderColor="{AppThemeBinding Light=#007ACC,
+                                              Dark=#0E7ACC}"
+                CornerRadius="8"
+                IsVisible="{Binding SelectedDatabaseFile, Converter={StaticResource StringToBoolConverter}}">
+                <VerticalStackLayout Spacing="5">
+                    <Label
+                        FontAttributes="Bold"
+                        FontSize="14"
+                        Text="Selected Database:" />
+                    <Label
+                        FontSize="12"
+                        LineBreakMode="TailTruncation"
+                        Text="{Binding SelectedDatabaseFile}"
+                        TextColor="{AppThemeBinding Light=#333333,
+                                                    Dark=#DDDDDD}" />
+                </VerticalStackLayout>
+            </Frame>
+
+            <!--  Backup Button  -->
+            <Button
+                BackgroundColor="{AppThemeBinding Light=#007ACC,
+                                                  Dark=#0E7ACC}"
+                Command="{Binding BackupDatabaseCommand}"
+                CornerRadius="8"
+                FontAttributes="Bold"
+                FontSize="16"
+                HeightRequest="50"
+                IsEnabled="{Binding IsBackupInProgress, Converter={StaticResource InvertedBoolConverter}}"
+                Text="Create Backup"
+                TextColor="White" />
+
+            <!--  Export Logs Button  -->
+            <!--
+                No IsEnabled binding here on purpose: ExportLogsCommand already
+                carries CanExecute (see CanExportLogs), and MAUI drives a
+                Button's IsEnabled from its Command. Binding IsEnabled as well
+                gives the property two writers racing at page load.
+            -->
+            <Button
+                BackgroundColor="{AppThemeBinding Light=#007ACC,
+                                                  Dark=#0E7ACC}"
+                Command="{Binding ExportLogsCommand}"
+                CornerRadius="8"
+                FontAttributes="Bold"
+                FontSize="16"
+                HeightRequest="50"
+                Text="Export Logs to Documents"
+                TextColor="White" />
+
+            <!--  Progress Indicator  -->
+            <ActivityIndicator
+                HeightRequest="30"
+                IsRunning="{Binding IsBackupInProgress}"
+                IsVisible="{Binding IsBackupInProgress}"
+                Color="{AppThemeBinding Light=#007ACC,
+                                        Dark=#0E7ACC}" />
+
+            <!--  Loading Text  -->
+            <Label
+                FontSize="14"
+                HorizontalOptions="Center"
+                IsVisible="{Binding IsBackupInProgress}"
+                Text="Backing up database..."
+                TextColor="{AppThemeBinding Light=#666666,
+                                            Dark=#CCCCCC}" />
+
+            <!--  Status Information  -->
+            <Frame
+                Padding="15"
+                BackgroundColor="{AppThemeBinding Light=#FFFFFF,
+                                                  Dark=#1E1E1E}"
+                BorderColor="{AppThemeBinding Light=#E0E0E0,
+                                              Dark=#404040}"
+                CornerRadius="8">
+                <VerticalStackLayout Spacing="5">
+                    <Label
+                        FontAttributes="Bold"
+                        FontSize="16"
+                        Text="Status:" />
+                    <Label
+                        FontSize="14"
+                        LineBreakMode="WordWrap"
+                        Text="{Binding StatusMessage}" />
+                    <Label
+                        Margin="0,5,0,0"
+                        FontSize="12"
+                        Text="{Binding LastBackupDate}"
+                        TextColor="{AppThemeBinding Light=#888888,
+                                                    Dark=#AAAAAA}" />
+                    <Label
+                        FontSize="12"
+                        Text="{Binding LastLogExportDate}"
+                        TextColor="{AppThemeBinding Light=#888888,
+                                                    Dark=#AAAAAA}" />
+                </VerticalStackLayout>
+            </Frame>
+
+        </VerticalStackLayout>
+
+    </ScrollView>
+
+</ContentPage>
