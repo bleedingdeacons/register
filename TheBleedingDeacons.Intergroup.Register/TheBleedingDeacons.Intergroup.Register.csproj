@@ -115,6 +115,32 @@
 		<DefineConstants Condition="'$(UseDevCredentials)' == 'true'">$(DefineConstants);USE_DEV_CREDENTIALS</DefineConstants>
 	</PropertyGroup>
 
+	<!--
+		Ship one ABI.
+
+		The Android SDK defaults RuntimeIdentifiers to 'android-arm64;android-x64'
+		when it is unset, and the 1.0.26 APK proves the cost: 45.2 MB of arm64-v8a
+		and 45.2 MB of x86_64, an exact half of the payload spent on an ABI that
+		only an emulator ever loads. Restricting Release takes the download from
+		~57 MB to ~31 MB with no change to the code that actually runs on a tablet.
+
+		Release only — Debug keeps both ABIs so emulator debugging is unaffected.
+		To install a Release build on an emulator, override on the command line:
+		    -p:RuntimeIdentifiers="android-arm64;android-x64"
+
+		Deliberately NOT placed in the Release|<tfm>|AnyCPU group below: that
+		condition tests $(Platform), which Visual Studio evaluates as 'Any CPU'
+		— with a space — so it silently misses there while matching on the command
+		line via the <Platforms>AnyCPU</Platforms> above. See the long note on
+		ApplicationDisplayVersion for the last time that cost us a day. A VS
+		Release build would quietly keep both ABIs. GetTargetPlatformIdentifier
+		is the form already used for SupportedOSPlatformVersion and has no such
+		trap.
+	-->
+	<PropertyGroup Condition="'$(Configuration)' == 'Release' and $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
+		<RuntimeIdentifiers>android-arm64</RuntimeIdentifiers>
+	</PropertyGroup>
+
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net10.0-android|AnyCPU'">
 		<AndroidPackageFormat>apk</AndroidPackageFormat>
 		<AndroidUseAapt2>True</AndroidUseAapt2>
