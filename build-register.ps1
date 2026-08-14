@@ -3,7 +3,7 @@ param(
     [string]$KeyStorePassword
 )
 
-# ── Always prompt for production flag ─────────────────────────────────
+# -- Always prompt for production flag ---------------------------------
 # PowerShell's Mandatory + default don't play well together, so we
 # prompt manually. Pressing Enter without typing anything defaults to no.
 $productionInput = Read-Host "Production build? (yes/no) [no]"
@@ -21,7 +21,7 @@ $isProduction = $productionInput -ieq 'yes'
 if ($isProduction) {
     $answer = Read-Host "PRODUCTION build requested. Type 'YES' to confirm"
     if ($answer -cne 'YES') {
-        Write-Host "Aborted — production build not confirmed." -ForegroundColor Yellow
+        Write-Host "Aborted -- production build not confirmed." -ForegroundColor Yellow
         exit 1
     }
     $useDevCredentials = 'false'
@@ -31,11 +31,11 @@ if ($isProduction) {
     Write-Host "Building with DEV credentials baked in..." -ForegroundColor Cyan
 }
 
-# ── Android head TFM ──────────────────────────────────────────────────
+# -- Android head TFM --------------------------------------------------
 # Single source of truth. It appeared in four places before, which is four
 # chances to half-upgrade the script; on a .NET version bump this is now the
 # only line that changes. It also names the output APKs (see the copy below).
-$targetFramework = 'net9.0-android'
+$targetFramework = 'net10.0-android'
 
 $registerProject = 'TheBleedingDeacons.Intergroup.Register\TheBleedingDeacons.Intergroup.Register.csproj'
 
@@ -57,7 +57,7 @@ if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
 
-# ── Copy the APKs out, stamped ────────────────────────────────────────
+# -- Copy the APKs out, stamped ----------------------------------------
 # The publish output is named after the application id alone, so every build
 # used to overwrite the last one in the drop folder and there was no way to
 # tell two APKs apart. Stamping the display version and the TFM into the
@@ -66,7 +66,7 @@ if ($LASTEXITCODE -ne 0) {
 # reports the same pair on its Settings page once running (see BuildInfo).
 #
 # ApplicationDisplayVersion is read straight from the csproj, where it is
-# deliberately kept unconditional — see the long comment on that property.
+# deliberately kept unconditional -- see the long comment on that property.
 $displayVersion = ([xml](Get-Content $registerProject)).Project.PropertyGroup.ApplicationDisplayVersion |
     Where-Object { $_ } | Select-Object -First 1
 

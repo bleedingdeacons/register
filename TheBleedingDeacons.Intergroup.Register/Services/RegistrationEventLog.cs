@@ -232,10 +232,14 @@ public sealed class RegistrationEventLog : IAsyncDisposable
 
 			int lineNum = 0;
 			int torn = 0;
-			while (!reader.EndOfStream)
+			// Loop on ReadLineAsync's null rather than on EndOfStream: the
+			// latter has to peek at the underlying stream to answer, and does
+			// so synchronously — a blocking read on every iteration of an
+			// otherwise async loop. .NET 10's CA2024 flags exactly this.
+			string? line;
+			while ((line = await reader.ReadLineAsync(ct).ConfigureAwait(false)) is not null)
 			{
 				ct.ThrowIfCancellationRequested();
-				var line = await reader.ReadLineAsync(ct).ConfigureAwait(false);
 				lineNum++;
 				if (string.IsNullOrWhiteSpace(line)) continue;
 

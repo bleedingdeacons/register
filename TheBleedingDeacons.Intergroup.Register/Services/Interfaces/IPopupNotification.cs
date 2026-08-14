@@ -13,7 +13,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services.Interfaces
 		/// <summary>
 		/// Shows a modal error dialog with a single dismiss button.
 		/// Centralised here so error presentation (styling, icons, or a
-		/// future migration from DisplayAlert to a custom popup) can be
+		/// future migration from DisplayAlertAsync to a custom popup) can be
 		/// changed in one place.
 		/// </summary>
 		Task ShowErrorAsync(string title, string message);

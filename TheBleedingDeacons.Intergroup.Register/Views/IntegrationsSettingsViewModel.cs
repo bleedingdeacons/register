@@ -128,7 +128,7 @@ public partial class ApiSettingsPage : ContentPage
 
     private Task<bool> PromptDiscardAsync()
     {
-        return DisplayAlert(
+        return DisplayAlertAsync(
             "Unsaved Changes",
             "You have unsaved changes on this page. Discard them and leave?",
             "Discard",

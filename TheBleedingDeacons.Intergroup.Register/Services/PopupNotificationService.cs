@@ -87,11 +87,11 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 
 			try
 			{
-				await currentPage.DisplayAlert(title, message, "OK");
+				await currentPage.DisplayAlertAsync(title, message, "OK");
 			}
 			catch (Exception ex)
 			{
-				// DisplayAlert can throw if the page is torn down between
+				// DisplayAlertAsync can throw if the page is torn down between
 				// resolution and the call. Log, don't propagate.
 				Logger.Warning(ex, "Failed to display error dialog: {Title} / {Message}", title, message);
 			}

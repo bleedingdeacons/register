@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <!-- xUnit v3 test projects are executables that host Microsoft.Testing.Platform. -->
@@ -25,7 +25,7 @@
       which MTP does not use, so they are intentionally not referenced here.
     -->
     <!-- Needed to build an in-memory SQLite database for the repository tests. -->
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.9" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.10" />
   </ItemGroup>
 
   <ItemGroup>
