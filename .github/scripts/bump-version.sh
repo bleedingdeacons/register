@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
-# Computes the next version for a pull request from the commits on it, and
-# writes it into the Register csproj.
+# Computes the next version from the commits just merged to main, and writes it
+# into the Register csproj.
 #
 # Rules (see .github/workflows/version.yml):
 #   any `feat:` commit  -> minor bump, patch reset to 0
@@ -12,19 +12,28 @@
 # It is what decides whether a build can update an existing install, so it must
 # never go backwards or stall.
 #
-# The baseline is deliberately read from the BASE branch rather than from the
-# working tree. That is what makes this idempotent: re-running against an
-# already-bumped branch computes the same target, sees it is already there, and
-# does nothing. Without it, every push would bump again and the version would
-# climb once per commit.
+# This runs on push to main, not on the pull request. Bumping in the PR put the
+# branch's final commit under github-actions[bot], and GitHub will not run
+# checks on a bot-authored head unaided — the runs either sat blocked at
+# `action_required`, or with [skip ci] never queued at all. Either way the
+# commit that actually merged was the one commit nobody built. Versioning after
+# the merge keeps pull requests fully checked; the cost is that the version a
+# change ships as is decided at merge rather than visible in review.
 #
-# Usage:  bump-version.sh [base-ref]        (default: origin/main)
-# Local dry run:  .github/scripts/bump-version.sh origin/main
+# Usage:  bump-version.sh <commit-range>
+#   e.g.  bump-version.sh abc123..def456
+# Local dry run against the last merge:
+#   .github/scripts/bump-version.sh HEAD~1..HEAD
 #
 set -euo pipefail
 
 CSPROJ="TheBleedingDeacons.Intergroup.Register/TheBleedingDeacons.Intergroup.Register.csproj"
-BASE_REF="${1:-origin/main}"
+RANGE="${1:-}"
+
+if [ -z "$RANGE" ]; then
+    echo "::error::A commit range is required, e.g. \$before..\$after." >&2
+    exit 1
+fi
 
 read_prop() { # read_prop <text> <property>
     printf '%s' "$1" | sed -n "s|.*<$2>\([^<]*\)</$2>.*|\1|p" | head -1
@@ -36,27 +45,38 @@ emit() { # emit <key> <value> — GitHub output when in CI, otherwise just echo
     return 0
 }
 
-base_csproj="$(git show "$BASE_REF:$CSPROJ")"
-base_version="$(read_prop "$base_csproj" ApplicationDisplayVersion)"
-base_code="$(read_prop "$base_csproj" ApplicationVersion)"
+# Never bump on top of a bump. Closes two cases: the push this workflow makes
+# itself, which would otherwise loop, and a manual re-run of an older push.
+head_subject="$(git log -1 --format='%s')"
+case "$head_subject" in
+    "chore: version "*)
+        echo "HEAD is already a version commit; nothing to do."
+        emit changed false
+        exit 0
+        ;;
+esac
+
+current="$(cat "$CSPROJ")"
+base_version="$(read_prop "$current" ApplicationDisplayVersion)"
+base_code="$(read_prop "$current" ApplicationVersion)"
 
 # Three parts, always. AssemblyVersion is $(ApplicationDisplayVersion).0, so a
 # fourth component here produces a five-part version and fails the build.
 if ! [[ "$base_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    echo "::error::ApplicationDisplayVersion on $BASE_REF is '$base_version'; expected three numeric parts." >&2
+    echo "::error::ApplicationDisplayVersion is '$base_version'; expected three numeric parts." >&2
     exit 1
 fi
 if ! [[ "$base_code" =~ ^[0-9]+$ ]]; then
-    echo "::error::ApplicationVersion on $BASE_REF is '$base_code'; expected an integer." >&2
+    echo "::error::ApplicationVersion is '$base_code'; expected an integer." >&2
     exit 1
 fi
 
 # Subjects only. Scanning bodies too would let prose like "reverts the feat:
 # commit" trigger a minor bump.
-subjects="$(git log --no-merges --format='%s' "$BASE_REF..HEAD")"
+subjects="$(git log --no-merges --format='%s' "$RANGE" 2>/dev/null || true)"
 
 if [ -z "$subjects" ]; then
-    echo "No commits on top of $BASE_REF; nothing to version."
+    echo "No non-merge commits in $RANGE; nothing to version."
     emit changed false
     exit 0
 fi
@@ -75,20 +95,12 @@ esac
 new_version="$major.$minor.$patch"
 new_code=$((base_code + 1))
 
-current_version="$(read_prop "$(cat "$CSPROJ")" ApplicationDisplayVersion)"
-current_code="$(read_prop "$(cat "$CSPROJ")" ApplicationVersion)"
-
-echo "base $BASE_REF: $base_version (code $base_code)"
-echo "bump:          $bump"
-echo "target:        $new_version (code $new_code)"
-echo "working tree:  $current_version (code $current_code)"
-
-if [ "$current_version" = "$new_version" ] && [ "$current_code" = "$new_code" ]; then
-    echo "Already at the target version; nothing to do."
-    emit changed false
-    emit version "$new_version"
-    exit 0
-fi
+echo "range:   $RANGE"
+echo "commits:"
+printf '%s\n' "$subjects" | sed 's/^/  /'
+echo "current: $base_version (code $base_code)"
+echo "bump:    $bump"
+echo "target:  $new_version (code $new_code)"
 
 sed -i "s|<ApplicationDisplayVersion>[^<]*</ApplicationDisplayVersion>|<ApplicationDisplayVersion>$new_version</ApplicationDisplayVersion>|" "$CSPROJ"
 sed -i "s|<ApplicationVersion>[^<]*</ApplicationVersion>|<ApplicationVersion>$new_code</ApplicationVersion>|" "$CSPROJ"
