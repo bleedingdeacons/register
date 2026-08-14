@@ -451,3 +451,16 @@ Properties/launchSettings.json
 !/.claude/settings.json
 /Utils/TheBleedingDeacons.Unity.Client.zip
 *.zip
+
+# ── Signing keys — never commit ───────────────────────────────────────
+# The Android signing key (badi.keystore) deliberately lives outside this
+# tree and is passed in by build-register.ps1. Nothing here is tracked
+# today; these patterns exist so it stays that way, because the mistake is
+# unrecoverable: an Android signing key that reaches a public repo cannot
+# be rotated for an app already published under it, and every future
+# release has to keep using the compromised key or ship as a new app that
+# existing installs cannot update.
+*.keystore
+*.jks
+*.p12
+*.pfx
