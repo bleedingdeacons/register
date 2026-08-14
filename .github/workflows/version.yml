@@ -63,7 +63,19 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -am "chore: version ${{ steps.bump.outputs.version }}"
+          # [skip ci] matters. Without it this push queues a fresh run of every
+          # workflow, and because the author is github-actions[bot] those runs
+          # land in `action_required` rather than executing — leaving two
+          # permanently pending checks on the PR that someone has to go and
+          # approve. Observed, not theorised: the first version of this workflow
+          # did exactly that.
+          #
+          # The trade is that the commit carrying the version string is not
+          # itself built. The jobs ran against the commit immediately before it
+          # and the only difference is that string, so the risk is a rounding
+          # error against a permanently amber PR. Drop the marker if you would
+          # rather approve the runs.
+          git commit -am "chore: version ${{ steps.bump.outputs.version }} [skip ci]"
           git push
 
       - name: Summary
