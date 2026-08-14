@@ -104,8 +104,22 @@
 		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
 		<DefaultLanguage>en-gb</DefaultLanguage>
 		<Copyright>Don't take yourself too damn seriously</Copyright>
-		<AssemblyVersion>1.0.6.1</AssemblyVersion>
-		<FileVersion>1.0.6.1</FileVersion>
+		<!--
+			Derived, not hand-written. These were stuck at 1.0.6.1 while the
+			display version had moved on to 1.0.28, and that was not cosmetic:
+			MauiProgram.AppVersion() reads FileVersion from the running process
+			on Windows, so the Windows head stamped 1.0.6.1 onto every log event
+			sent to Better Stack and onto the main page, while Android reported
+			the real version. Two heads of the same build disagreeing about
+			which build they are.
+
+			Deriving from ApplicationDisplayVersion means one number to bump.
+			The trailing .0 makes the four-part version the attributes want out
+			of the three-part display string — so keep ApplicationDisplayVersion
+			three-part, or this produces five parts and the build fails.
+		-->
+		<AssemblyVersion>$(ApplicationDisplayVersion).0</AssemblyVersion>
+		<FileVersion>$(ApplicationDisplayVersion).0</FileVersion>
 		<Platforms>AnyCPU</Platforms>
 	</PropertyGroup>
 
