@@ -1,0 +1,89 @@
+name: Version
+
+# Bumps the app version on every pull request, so the version a change ships as
+# is visible in review and lands atomically with the merge rather than being
+# remembered afterwards.
+#
+# Scope comes from the commits themselves, which this repo already writes as
+# conventional commits:
+#
+#   any `feat:` commit  -> minor bump (1.0.28 -> 1.1.0)
+#   anything else       -> patch bump (1.0.28 -> 1.0.29)
+#   never major         -> nothing here can declare a breaking release; that is
+#                          a deliberate act, taken by hand
+#
+# Commits without a conventional prefix — older history, and Dependabot's
+# "Bump X from A to B" — fall through to patch, which is the safe default.
+#
+# The bump is computed from the BASE branch's version, never from the branch's
+# own, so re-running is a no-op rather than a second bump. See the long comment
+# in .github/scripts/bump-version.sh.
+
+on:
+  pull_request:
+    branches: [ main ]
+    types: [ opened, synchronize, reopened ]
+
+# Needed to push the version commit back to the PR branch.
+permissions:
+  contents: write
+
+# One bump at a time per branch; a superseded run has nothing useful to say.
+concurrency:
+  group: version-${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  bump:
+    name: Bump version
+    # A fork's GITHUB_TOKEN is read-only, so the push would fail. Skip rather
+    # than fail the check on outside contributions.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the PR branch
+        uses: actions/checkout@v5
+        with:
+          # Check out the branch itself, not the merge commit, so the version
+          # commit has somewhere to land. Full history: the bump is derived by
+          # walking the commits back to the base.
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Compute and apply the bump
+        id: bump
+        # Invoked through bash rather than directly: this repo is authored on
+        # Windows, where git frequently does not record the executable bit, and
+        # a missing +x would fail the run for a reason nothing in the diff shows.
+        run: bash .github/scripts/bump-version.sh "origin/${{ github.base_ref }}"
+
+      - name: Commit the new version
+        if: steps.bump.outputs.changed == 'true'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # [skip ci] matters. Without it this push queues a fresh run of every
+          # workflow, and because the author is github-actions[bot] those runs
+          # land in `action_required` rather than executing — leaving two
+          # permanently pending checks on the PR that someone has to go and
+          # approve. Observed, not theorised: the first version of this workflow
+          # did exactly that.
+          #
+          # The trade is that the commit carrying the version string is not
+          # itself built. The jobs ran against the commit immediately before it
+          # and the only difference is that string, so the risk is a rounding
+          # error against a permanently amber PR. Drop the marker if you would
+          # rather approve the runs.
+          git commit -am "chore: version ${{ steps.bump.outputs.version }} [skip ci]"
+          git push
+
+      - name: Summary
+        run: |
+          if [ "${{ steps.bump.outputs.changed }}" = "true" ]; then
+            echo "### Version ${{ steps.bump.outputs.version }} (${{ steps.bump.outputs.bump }} bump)" >> "$GITHUB_STEP_SUMMARY"
+            echo "Android versionCode ${{ steps.bump.outputs.code }}." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### Version unchanged" >> "$GITHUB_STEP_SUMMARY"
+            echo "Already at the target for this branch." >> "$GITHUB_STEP_SUMMARY"
+          fi
