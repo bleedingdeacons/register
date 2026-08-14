@@ -131,8 +131,9 @@
 			than warning. InformationalVersion is a free-form string with no
 			numeric limits, which is exactly what SemVer build metadata is for.
 
-			UTC, deliberately: a build made either side of a BST change should
-			still sort and compare honestly.
+			Stamped UTC so builds either side of a BST change still sort and
+			compare honestly. BuildInfo converts it to the device's local time
+			for display, which is the form an operator can act on.
 
 			IncludeSourceRevisionInInformationalVersion is off because the SDK
 			would otherwise append '+<commit sha>' of its own, and the result
