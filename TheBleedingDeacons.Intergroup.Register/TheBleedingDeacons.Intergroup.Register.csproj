@@ -120,6 +120,33 @@
 		-->
 		<AssemblyVersion>$(ApplicationDisplayVersion).0</AssemblyVersion>
 		<FileVersion>$(ApplicationDisplayVersion).0</FileVersion>
+
+		<!--
+			When this build was made, to the second, stamped at build time.
+
+			It goes in InformationalVersion because that is the only one of the
+			three that can hold it. AssemblyVersion and FileVersion are four
+			16-bit fields capped at 65534 each — a yyyyMMddHHmmss stamp is about
+			202 billion, and AssemblyVersion fails the build outright rather
+			than warning. InformationalVersion is a free-form string with no
+			numeric limits, which is exactly what SemVer build metadata is for.
+
+			UTC, deliberately: a build made either side of a BST change should
+			still sort and compare honestly.
+
+			IncludeSourceRevisionInInformationalVersion is off because the SDK
+			would otherwise append '+<commit sha>' of its own, and the result
+			would carry two '+' segments — BuildInfo parses on the first one.
+
+			Cost worth knowing: this value changes every build, so the generated
+			AssemblyInfo.cs changes every build, so this assembly recompiles even
+			when nothing else has. Condition it on Release if that churn ever
+			outweighs knowing exactly which build is on a tablet.
+		-->
+		<BuildTimestampUtc>$([System.DateTime]::UtcNow.ToString("yyyyMMddHHmmss"))</BuildTimestampUtc>
+		<InformationalVersion>$(ApplicationDisplayVersion)+$(BuildTimestampUtc)</InformationalVersion>
+		<IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+
 		<Platforms>AnyCPU</Platforms>
 	</PropertyGroup>
 
