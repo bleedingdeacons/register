@@ -107,7 +107,6 @@
 		<AssemblyVersion>1.0.6.1</AssemblyVersion>
 		<FileVersion>1.0.6.1</FileVersion>
 		<Platforms>AnyCPU</Platforms>
-		<AndroidSigningKeyStore>register.keystore</AndroidSigningKeyStore>
 	</PropertyGroup>
 
 	<PropertyGroup>
@@ -139,6 +138,33 @@
 	-->
 	<PropertyGroup Condition="'$(Configuration)' == 'Release' and $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
 		<RuntimeIdentifiers>android-arm64</RuntimeIdentifiers>
+
+		<!--
+			Sign only when a keystore is actually supplied.
+
+			This used to be an unconditional AndroidKeyStore=True alongside
+			AndroidSigningKeyStore=register.keystore — a file that has never
+			existed in this repo. The real signing key is badi.keystore, which
+			lives outside the tree and is passed in by build-register.ps1, so
+			the declared default was dead weight that only ever fired as
+			XA4310 ("keystore file could not be found") the moment anyone ran a
+			plain `dotnet publish -c Release`. Signing a release is a
+			deliberate act with a password attached; it should not be the
+			accidental default of every Release build.
+
+			Naming a keystore is the opt-in, and it is taken at face value: if
+			the file turns out to be missing the build fails with XA4310 rather
+			than quietly emitting an unsigned APK, because someone who passed a
+			key path meant to sign and should hear about a typo. Only the
+			no-keystore case goes unsigned, which is what CI and any local
+			size/verification build actually wants.
+
+			Explicit values always win, so build-register.ps1 — which passes
+			AndroidKeyStore=true along with the key path and passwords — is
+			untouched by either condition.
+		-->
+		<AndroidKeyStore Condition="'$(AndroidKeyStore)' == '' and '$(AndroidSigningKeyStore)' != ''">true</AndroidKeyStore>
+		<AndroidKeyStore Condition="'$(AndroidKeyStore)' == ''">false</AndroidKeyStore>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net10.0-android|AnyCPU'">
@@ -146,7 +172,9 @@
 		<AndroidUseAapt2>True</AndroidUseAapt2>
 		<AndroidCreatePackagePerAbi>False</AndroidCreatePackagePerAbi>
 		<DebugSymbols>True</DebugSymbols>
-		<AndroidKeyStore>True</AndroidKeyStore>
+		<!-- AndroidKeyStore moved to the group above: it belongs with the
+		     keystore-presence logic, and this group's $(Platform) condition is
+		     the one Visual Studio misses. -->
 	</PropertyGroup>
 
 	<ItemGroup>
