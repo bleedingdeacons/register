@@ -82,7 +82,16 @@
                     </ScrollView>
                 </Border>
 
+                <!--
+                    Nudged up and down by the code-behind while the policy
+                    still needs scrolling — see StartScrollHint. The consent
+                    row below is disabled until the user reaches the bottom,
+                    and a static arrow was not saying so loudly enough.
+                    TranslationY is the animated property, so nothing here
+                    may set it.
+                -->
                 <Button
+                    x:Name="JumpToEndButton"
                     Margin="0,0,0,00"
                     Padding="0"
                     BackgroundColor="{AppThemeBinding Light={StaticResource Primary},

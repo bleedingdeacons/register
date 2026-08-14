@@ -1,4 +1,5 @@
 using CommunityToolkit.Maui.Views;
+using TheBleedingDeacons.Intergroup.Register.Support;
 using TheBleedingDeacons.Intergroup.Register.ViewModels;
 
 namespace TheBleedingDeacons.Intergroup.Register.Views;
@@ -15,6 +16,19 @@ public partial class AcceptTermsPopup : Popup
     // without letting the user accept while a meaningful slice of policy
     // text is still below the fold.
     private const double ScrollEndTolerance = 4.0;
+
+    // Scroll-hint animation. The jump-to-end arrow rises and falls to say
+    // "there is more below, and you need it" — the consent row stays
+    // disabled until the policy has been read to the end, and a static
+    // arrow left people waiting for a checkbox that never enabled.
+    private const double HintRiseDistance = 10.0;   // px travelled per bounce
+    private const uint HintLegDuration = 220;       // ms for one leg
+    private const int HintBouncesPerBurst = 2;      // bounces, then a rest
+    private static readonly TimeSpan HintRestBetweenBursts = TimeSpan.FromSeconds(2);
+
+    // Non-null only while the hint is running; doubles as the "already
+    // started" guard, since SizeChanged fires more than once.
+    private CancellationTokenSource? _hintCts;
 
     /// <summary>
     /// Completes with the user's choice once the popup closes:
@@ -44,6 +58,14 @@ public partial class AcceptTermsPopup : Popup
         // permanently disabled, since Scrolled never fires.
         PolicyScrollView.Scrolled += OnPolicyScrolled;
         PolicyScrollView.SizeChanged += OnPolicyScrollViewSizeChanged;
+
+        // The hint exists only to say "scroll for the gate to open", so it
+        // stops the instant the gate opens — by whichever route, scrolling
+        // or the jump button.
+        if (BindingContext is AcceptTermsPopupViewModel viewModel)
+        {
+            viewModel.PropertyChanged += OnViewModelPropertyChanged;
+        }
     }
 
     private void OnPopupClosed(object? sender, EventArgs e)
@@ -52,6 +74,80 @@ public partial class AcceptTermsPopup : Popup
         this.Closed -= OnPopupClosed;
         PolicyScrollView.Scrolled -= OnPolicyScrolled;
         PolicyScrollView.SizeChanged -= OnPolicyScrollViewSizeChanged;
+
+        if (BindingContext is AcceptTermsPopupViewModel vm)
+        {
+            vm.PropertyChanged -= OnViewModelPropertyChanged;
+        }
+
+        // Cancel before the visual tree goes away: an in-flight animation
+        // against a torn-down view is exactly the sort of thing that throws
+        // on one platform and not the others.
+        StopScrollHint();
+    }
+
+    private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(AcceptTermsPopupViewModel.HasScrolledToEnd)) return;
+        if (BindingContext is AcceptTermsPopupViewModel { HasScrolledToEnd: true })
+        {
+            StopScrollHint();
+        }
+    }
+
+    /// <summary>
+    /// Starts the arrow bouncing, if it isn't already. Idempotent: SizeChanged
+    /// fires repeatedly during layout, and only the first call should take.
+    /// </summary>
+    private void StartScrollHint()
+    {
+        if (_hintCts is not null) return;
+
+        _hintCts = new CancellationTokenSource();
+        RunScrollHintAsync(_hintCts.Token).SafeFireAndForget("GDPR policy scroll hint");
+    }
+
+    private void StopScrollHint()
+    {
+        var cts = _hintCts;
+        if (cts is null) return;
+
+        _hintCts = null;
+        cts.Cancel();
+        cts.Dispose();
+    }
+
+    /// <summary>
+    /// Rises and falls a couple of times, rests, repeats — until cancelled.
+    /// A continuous bounce would be nagging; a single one is missable if the
+    /// user happens to be reading the top of the policy when it plays.
+    /// </summary>
+    private async Task RunScrollHintAsync(CancellationToken ct)
+    {
+        try
+        {
+            while (!ct.IsCancellationRequested)
+            {
+                for (var i = 0; i < HintBouncesPerBurst && !ct.IsCancellationRequested; i++)
+                {
+                    // *Async forms, not the bare TranslateTo: MAUI 10
+                    // deprecated the originals and this repo builds clean.
+                    await JumpToEndButton.TranslateToAsync(0, -HintRiseDistance, HintLegDuration, Easing.CubicOut);
+                    await JumpToEndButton.TranslateToAsync(0, 0, HintLegDuration, Easing.CubicIn);
+                }
+
+                await Task.Delay(HintRestBetweenBursts, ct);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected: the gate opened, or the popup closed.
+        }
+        finally
+        {
+            // Leave the arrow where it belongs even if cancelled mid-rise.
+            JumpToEndButton.TranslationY = 0;
+        }
     }
 
     private void OnPolicyScrolled(object? sender, ScrolledEventArgs e)
@@ -83,7 +179,14 @@ public partial class AcceptTermsPopup : Popup
         if (contentHeight <= viewportHeight + ScrollEndTolerance)
         {
             vm.HasScrolledToEnd = true;
+            return;
         }
+
+        // Otherwise the policy genuinely runs past the fold, so the arrow has
+        // something to say. Started here rather than on open because this is
+        // the first point at which both heights are known — before layout
+        // settles we cannot tell a long policy from an unmeasured one.
+        StartScrollHint();
     }
 
     private void OnAgreementRowTapped(object? sender, TappedEventArgs e)
