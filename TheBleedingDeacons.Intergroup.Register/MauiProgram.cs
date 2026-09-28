@@ -101,8 +101,14 @@ public static class MauiProgram
 		// Ensure Serilog is flushed on unhandled / fatal errors
 		RegisterGlobalExceptionHandlers();
 
-		// Add configuration service
-		builder.Services.AddSingleton<IConfigurationService, ConfigurationService>();
+		// Freedom: the tablet's settings from the site instead of the build,
+		// when this build names a Freedom site. See FreedomStartup.
+		FreedomStartup.Register(builder);
+
+		// Add configuration service. Given the Freedom client when there is
+		// one, so a value Freedom holds is laid over the tablet's own.
+		builder.Services.AddSingleton<IConfigurationService>(sp =>
+			new ConfigurationService(sp.GetService<TheBleedingDeacons.Freedom.Client.FreedomClient>()));
 
 		builder.Services.AddSingleton<RegistrationEventLog>();
 		builder.Services.AddSingleton<ComplianceEventLog>();
@@ -345,6 +351,11 @@ public static class MauiProgram
 
 			System.Diagnostics.Debug.WriteLine("Unity and Mail databases initialized.");
 		}
+
+		// ── Freedom: stored settings now, a sync in the background ────
+		// Before the Better Stack sink below, which reads its endpoint and
+		// token through ConfigurationService and so should see Freedom's.
+		FreedomStartup.Start(mauiapp.Services);
 
 		// ── Attach Better Stack sink using user-saved settings ────────
 		// SetupSerilog runs before DI is built, so it cannot read from

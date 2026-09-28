@@ -198,5 +198,17 @@ namespace TheBleedingDeacons.Intergroup.Register.Services.Interfaces
 		/// before invoking this setter.
 		/// </summary>
 		void SetComplianceEmail(string? email);
+
+		/// <summary>
+		/// Whether Freedom supplies this key, so a value typed in on the
+		/// tablet is overridden. See FreedomSettings for the keys.
+		/// </summary>
+		bool IsManaged(string key);
+
+		/// <summary>
+		/// Forget the cached SMTP, Unity and Better Stack settings, so the
+		/// next read picks up what a Freedom sync just changed.
+		/// </summary>
+		void InvalidateCache();
 	}
 }

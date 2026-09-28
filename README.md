@@ -27,6 +27,46 @@ To build against a local integrity-sharp checkout instead — for working across
 both repos without cutting a release — pass `-p:UseLocalIntegritySharp=true`.
 `IntegritySharpDir` points at the checkout and defaults to a sibling directory.
 
+The Freedom packages (`Freedom.Client`, and `Freedom.Client.Maui` on
+Android) come from the same feed with the same token; `Freedom.*` is in the
+mapping.
+
+## Settings from Freedom
+
+A tablet can take its SMTP, Unity, Better Stack and compliance settings from
+the site instead of from this build or from what was typed in on it — see
+[freedom-sharp](https://github.com/bleedingdeacons/freedom-sharp) and the
+Freedom WordPress plugin. **Android only for now**, and **off unless the build
+names a site**: add a `Freedom` section to the git-ignored `appsettings.json`
+before building.
+
+```json
+"Freedom": {
+  "BaseUrl": "https://aa-bristol.org/amber",
+  "Application": "register"
+}
+```
+
+`CallbackUri` defaults to
+`com.thebleedingdeacons.intergroup.register.freedom://auth`, which is what
+`Platforms/Android/FreedomCallbackActivity.cs` catches; the Freedom admin's
+`register` application must have the same Callback URI. Then sign the tablet in
+from **API Settings → Freedom**.
+
+- **Freedom wins where it holds a value, and only there.** A key the site has
+  not set falls through to the tablet's own setting, so a tablet set up by hand
+  keeps working. The keys are in `Services/FreedomSettings.cs`: `smtp.host`,
+  `smtp.port`, `smtp.username`, `smtp.password`, `smtp.enable_ssl`,
+  `smtp.from_display_name`, `smtp.timeout_seconds`, `unity.base_url`,
+  `unity.api_key`, `betterstack.endpoint`, `betterstack.source_token`,
+  `compliance.email`. Tick the password, API key and source token as
+  **Secret** in the admin, so they arrive sealed to the tablet.
+- **Nothing waits on the network.** Each start reads what Freedom stored last
+  time, then syncs in the background; a change is applied as it arrives — the
+  email service and Better Stack sink are reconfigured, no restart needed.
+- **`devsettings.json` is untouched.** Dev builds still embed it; once the
+  `register` application's values are set on the site, it can go.
+
 ### Tokens in CI
 
 | Secret | Scope | Used for | On expiry |

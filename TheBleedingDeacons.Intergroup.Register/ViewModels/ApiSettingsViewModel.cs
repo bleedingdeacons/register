@@ -42,10 +42,13 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 
 		public ApiSettingsViewModel(
 			IConfigurationService configService,
-			IBetterStackLoggerController loggerController)
+			IBetterStackLoggerController loggerController,
+			TheBleedingDeacons.Freedom.Client.FreedomClient? freedom = null)
 		{
 			_configService = configService;
 			_loggerController = loggerController;
+			_freedom = freedom;
+			RefreshFreedomStatus();
 			LoadConfigurationAsync().SafeFireAndForget("LoadApiSettingsConfig");
 		}
 
