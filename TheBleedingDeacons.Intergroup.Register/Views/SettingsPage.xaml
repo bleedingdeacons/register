@@ -97,14 +97,6 @@
                                         Dark=#424242}" />
 
             <Label
-                FontAttributes="Italic"
-                FontSize="13"
-                IsVisible="{Binding IsAnySwitchManaged}"
-                Text="Switches greyed out below are set by the site (Freedom) for this tablet."
-                TextColor="{AppThemeBinding Light={StaticResource Gray600},
-                                            Dark={StaticResource Gray300}}" />
-
-            <Label
                 FontAttributes="Bold"
                 FontSize="14"
                 HorizontalOptions="Start"
@@ -139,7 +131,6 @@
                         Grid.RowSpan="2"
                         Grid.Column="1"
                         IsToggled="{Binding IsRegistrationEventLogEnabled, Mode=TwoWay}"
-                        IsEnabled="{Binding IsRegistrationEventLogEnabledEditable}"
                         VerticalOptions="Center" />
 
                     <Label
@@ -201,7 +192,6 @@
                             Grid.Row="0"
                             Grid.Column="1"
                             IsToggled="{Binding IsAutoRegisterPositionsOnGroupEnabled, Mode=TwoWay}"
-                        IsEnabled="{Binding IsAutoRegisterPositionsOnGroupEnabledEditable}"
                             VerticalOptions="Center" />
 
                         <Label
@@ -243,7 +233,6 @@
                             Grid.Row="0"
                             Grid.Column="1"
                             IsToggled="{Binding IsSingleGsrShortcutEnabled, Mode=TwoWay}"
-                        IsEnabled="{Binding IsSingleGsrShortcutEnabledEditable}"
                             VerticalOptions="Center" />
 
                         <Label
@@ -285,7 +274,6 @@
                             Grid.Row="0"
                             Grid.Column="1"
                             IsToggled="{Binding IsWelcomeEmailOnRegistrationEnabled, Mode=TwoWay}"
-                        IsEnabled="{Binding IsWelcomeEmailOnRegistrationEnabledEditable}"
                             VerticalOptions="Center" />
 
                         <Label
@@ -327,7 +315,6 @@
                             Grid.Row="0"
                             Grid.Column="1"
                             IsToggled="{Binding IsAddPositionHolderEnabled, Mode=TwoWay}"
-                        IsEnabled="{Binding IsAddPositionHolderEnabledEditable}"
                             VerticalOptions="Center" />
 
                         <Label
