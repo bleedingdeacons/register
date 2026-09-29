@@ -3,8 +3,10 @@ using CommunityToolkit.Mvvm.Input;
 using Serilog;
 using System.Diagnostics.CodeAnalysis;
 using TheBleedingDeacons.Intergroup.Register.Models;
+using TheBleedingDeacons.Intergroup.Register.Services;
 using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Support;
+using TheBleedingDeacons.Inventory;
 
 namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 {
@@ -24,7 +26,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 		private static readonly ILogger Logger = AppLogger.ForContext<ApiSettingsViewModel>();
 
 		private readonly IConfigurationService _configService;
-		private readonly IBetterStackLoggerController _loggerController;
+		private readonly ILogShipper _logShipper;
 
 		// Snapshots of the last-loaded / last-saved values. We compare the
 		// current form fields against these to decide if there are unsaved
@@ -42,11 +44,11 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 
 		public ApiSettingsViewModel(
 			IConfigurationService configService,
-			IBetterStackLoggerController loggerController,
+			ILogShipper logShipper,
 			TheBleedingDeacons.Freedom.Client.FreedomClient? freedom = null)
 		{
 			_configService = configService;
-			_loggerController = loggerController;
+			_logShipper = logShipper;
 			_freedom = freedom;
 			RefreshFreedomStatus();
 			LoadConfigurationAsync().SafeFireAndForget("LoadApiSettingsConfig");
@@ -300,7 +302,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 				// Tear down the previous Serilog pipeline and rebuild with the
 				// new credentials. Without this, the app continues shipping to
 				// the previous endpoint/token until restart.
-				_loggerController.Reconfigure(config);
+				_logShipper.Ship(config);
 
 				// Update snapshot and reflect normalised values in the form.
 				_betterStackSourceTokenSnapshot = config.SourceToken;

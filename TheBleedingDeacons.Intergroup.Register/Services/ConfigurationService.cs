@@ -7,6 +7,7 @@ using TheBleedingDeacons.Freedom.Client;
 using TheBleedingDeacons.Intergroup.Register.Models;
 using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Support;
+using TheBleedingDeacons.Inventory;
 
 namespace TheBleedingDeacons.Intergroup.Register.Services
 {

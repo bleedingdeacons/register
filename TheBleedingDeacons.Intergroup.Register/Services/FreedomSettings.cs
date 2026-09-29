@@ -1,6 +1,7 @@
 using System.Globalization;
 using TheBleedingDeacons.Freedom.Client;
 using TheBleedingDeacons.Intergroup.Register.Models;
+using TheBleedingDeacons.Inventory;
 
 namespace TheBleedingDeacons.Intergroup.Register.Services
 {
