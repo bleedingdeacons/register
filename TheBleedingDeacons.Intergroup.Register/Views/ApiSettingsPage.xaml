@@ -42,6 +42,42 @@
 
             <!--
                 ═══════════════════════════════════════════════════════
+                Freedom — settings from the site instead of this tablet.
+                Only shown when the build names a Freedom site (Android).
+                ═══════════════════════════════════════════════════════
+            -->
+            <Frame
+                BackgroundColor="{AppThemeBinding Light=White, Dark=#2D2D30}"
+                BorderColor="{AppThemeBinding Light=LightGray, Dark=Gray}"
+                IsVisible="{Binding IsFreedomAvailable}">
+                <VerticalStackLayout Spacing="10">
+                    <Label
+                        FontAttributes="Bold"
+                        FontSize="18"
+                        Text="Freedom" />
+                    <Label
+                        FontSize="13"
+                        Text="Sign this tablet in with a Google account the intergroup has set up — a tablet account or your own — and its settings come from the site. Anything the site sets replaces what is typed below." />
+                    <Label Text="{Binding FreedomStatus}" />
+                    <HorizontalStackLayout Spacing="10">
+                        <Button
+                            Command="{Binding SignInToFreedomCommand}"
+                            IsEnabled="{Binding IsFreedomIdle}"
+                            Text="Sign in" />
+                        <Button
+                            Command="{Binding SyncFreedomCommand}"
+                            IsEnabled="{Binding IsFreedomIdle}"
+                            Text="Check now" />
+                        <Button
+                            Command="{Binding SignOutOfFreedomCommand}"
+                            IsEnabled="{Binding IsFreedomIdle}"
+                            Text="Sign out" />
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
+            </Frame>
+
+            <!--
+                ═══════════════════════════════════════════════════════
                 Unity API
                 ═══════════════════════════════════════════════════════
             -->

@@ -3,6 +3,7 @@ using Serilog;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Text.Json;
+using TheBleedingDeacons.Freedom.Client;
 using TheBleedingDeacons.Intergroup.Register.Models;
 using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Support;
@@ -34,6 +35,11 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 #endif
 
 		private readonly IConfiguration _configuration;
+
+		// Null when the build names no Freedom site, or off Android. Every
+		// managed read below then falls through to the tablet's own settings,
+		// exactly as before Freedom existed. See FreedomSettings.
+		private readonly FreedomClient? _freedom;
 		private readonly string _configFilePath;
 		private readonly string _unityConfigFilePath;
 		private readonly string _betterStackConfigFilePath;
@@ -43,7 +49,14 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		private BetterStackConfiguration? _cachedBetterStackConfig;
 
 		public ConfigurationService()
+			: this(null)
 		{
+		}
+
+		public ConfigurationService(FreedomClient? freedom)
+		{
+			_freedom = freedom;
+
 			var builder = new ConfigurationBuilder();
 
 			// Load embedded appsettings.json
@@ -91,6 +104,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			var password = GetSecretSync(SMTP_PASSWORD_KEY, "SMTP password");
 			_cachedSmtpConfig = BuildSmtpConfiguration(password);
 #endif
+			_cachedSmtpConfig = FreedomSettings.Apply(_cachedSmtpConfig, Managed);
 			return _cachedSmtpConfig;
 		}
 
@@ -119,11 +133,11 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			// reload path) but the read itself is from an in-memory
 			// resource so there's no real I/O to await — Task.FromResult
 			// keeps the signature without spawning unnecessary work.
-			_cachedSmtpConfig = LoadEmbeddedDevSmtpConfiguration();
+			_cachedSmtpConfig = FreedomSettings.Apply(LoadEmbeddedDevSmtpConfiguration(), Managed);
 			return await Task.FromResult(_cachedSmtpConfig);
 #else
 			var password = await GetSecretAsync(SMTP_PASSWORD_KEY, "SMTP password");
-			_cachedSmtpConfig = BuildSmtpConfiguration(password);
+			_cachedSmtpConfig = FreedomSettings.Apply(BuildSmtpConfiguration(password), Managed);
 			return _cachedSmtpConfig;
 #endif
 		}
@@ -166,6 +180,8 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			baseUrl = await ReadJsonPropertyAsync(_unityConfigFilePath, "UnitySettings", "BaseUrl", "Unity settings");
 			apiKey = await GetSecretAsync(UNITY_API_KEY, "Unity API key");
 #endif
+			baseUrl = Managed(FreedomSettings.UnityBaseUrl) ?? baseUrl;
+			apiKey = Managed(FreedomSettings.UnityApiKey) ?? apiKey;
 
 			int? activeIntergroupMeetingId = null;
 			try
@@ -231,11 +247,13 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			var sourceToken = GetSecretSync(BETTERSTACK_SOURCE_TOKEN_KEY, "Better Stack source token");
 #endif
 
-			_cachedBetterStackConfig = new BetterStackConfiguration
-			{
-				Endpoint = endpoint,
-				SourceToken = sourceToken
-			};
+			_cachedBetterStackConfig = FreedomSettings.Apply(
+				new BetterStackConfiguration
+				{
+					Endpoint = endpoint,
+					SourceToken = sourceToken
+				},
+				Managed);
 
 			return _cachedBetterStackConfig;
 		}
@@ -264,13 +282,35 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			sourceToken = await GetSecretAsync(BETTERSTACK_SOURCE_TOKEN_KEY, "Better Stack source token");
 #endif
 
-			_cachedBetterStackConfig = new BetterStackConfiguration
-			{
-				Endpoint = endpoint,
-				SourceToken = sourceToken
-			};
+			_cachedBetterStackConfig = FreedomSettings.Apply(
+				new BetterStackConfiguration
+				{
+					Endpoint = endpoint,
+					SourceToken = sourceToken
+				},
+				Managed);
 
 			return _cachedBetterStackConfig;
+		}
+
+		// =================================================================
+		// Freedom
+		// =================================================================
+
+		/// <summary>
+		/// The value Freedom holds for a key, or null when it holds none —
+		/// which every caller reads as "use what the tablet stored".
+		/// </summary>
+		private string? Managed(string key) => _freedom?.Get(key);
+
+		public bool IsManaged(string key) => Managed(key) is not null;
+
+		public void InvalidateCache()
+		{
+			_cachedSmtpConfig = null;
+			_cachedUnityConfig = null;
+			_cachedBetterStackConfig = null;
+			Logger.Information("Configuration cache cleared after Freedom changed a setting");
 		}
 
 		// =================================================================
@@ -971,6 +1011,9 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		{
 			get
 			{
+				if (Managed(FreedomSettings.ComplianceEmail) is { } managed)
+					return managed;
+
 #if USE_DEV_CREDENTIALS 
 				return "compliance@aa-bristol.org";
 #else
