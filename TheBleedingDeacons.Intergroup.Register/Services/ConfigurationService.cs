@@ -303,6 +303,8 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		/// </summary>
 		private string? Managed(string key) => _freedom?.Get(key);
 
+		private bool? ManagedFlag(string key) => FreedomSettings.Flag(Managed(key));
+
 		public bool IsManaged(string key) => Managed(key) is not null;
 
 		public void InvalidateCache()
@@ -328,6 +330,9 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		{
 			get
 			{
+				if (ManagedFlag(FreedomSettings.FeatureRegistrationLog) is bool managed)
+					return managed;
+
 				try
 				{
 					// Preferences has no first-class bool accessor, so we
@@ -375,6 +380,9 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		{
 			get
 			{
+				if (ManagedFlag(FreedomSettings.FeatureAutoRegisterPositions) is bool managed)
+					return managed;
+
 				try
 				{
 					var raw = Preferences.Get(AUTO_REGISTER_POSITIONS_KEY, string.Empty);
@@ -420,6 +428,9 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		{
 			get
 			{
+				if (ManagedFlag(FreedomSettings.FeatureComplianceLog) is bool managed)
+					return managed;
+
 				try
 				{
 					var raw = Preferences.Get(COMPLIANCE_LOG_ENABLED_KEY, string.Empty);
@@ -463,6 +474,9 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		{
 			get
 			{
+				if (ManagedFlag(FreedomSettings.FeatureSingleGsrShortcut) is bool managed)
+					return managed;
+
 				try
 				{
 					var raw = Preferences.Get(SINGLE_GSR_SHORTCUT_KEY, string.Empty);
@@ -508,6 +522,9 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		{
 			get
 			{
+				if (ManagedFlag(FreedomSettings.FeatureAddPositionHolder) is bool managed)
+					return managed;
+
 				try
 				{
 					var raw = Preferences.Get(ADD_POSITION_HOLDER_ENABLED_KEY, string.Empty);
@@ -554,6 +571,9 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		{
 			get
 			{
+				if (ManagedFlag(FreedomSettings.FeatureWelcomeEmail) is bool managed)
+					return managed;
+
 				try
 				{
 					var raw = Preferences.Get(WELCOME_EMAIL_ENABLED_KEY, string.Empty);
@@ -961,6 +981,9 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		{
 			get
 			{
+				if (ManagedFlag(FreedomSettings.FeatureComplianceAcceptanceEmail) is bool managed)
+					return managed;
+
 				try
 				{
 					var raw = Preferences.Get(COMPLIANCE_ACCEPTANCE_EMAIL_ENABLED_KEY, string.Empty);

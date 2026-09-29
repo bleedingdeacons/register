@@ -61,6 +61,14 @@ from **API Settings → Freedom**.
   `unity.api_key`, `betterstack.endpoint`, `betterstack.source_token`,
   `compliance.email`. Tick the password, API key and source token as
   **Secret** in the admin, so they arrive sealed to the tablet.
+- **The feature switches too**, each `true` or `false`:
+  `features.registration_log`, `features.auto_register_positions`,
+  `features.compliance_log`, `features.single_gsr_shortcut`,
+  `features.add_position_holder`, `features.welcome_email`,
+  `features.compliance_acceptance_email`. A switch the site sets is greyed out
+  on the Settings page. The compliance log and compliance acceptance email have
+  no switch on the tablet at all, so the site is the only way to change them.
+  The device label stays per tablet.
 - **Nothing waits on the network.** Each start reads what Freedom stored last
   time, then syncs in the background; a change is applied as it arrives — the
   email service and Better Stack sink are reconfigured, no restart needed.

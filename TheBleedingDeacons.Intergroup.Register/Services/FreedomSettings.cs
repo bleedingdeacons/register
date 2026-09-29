@@ -37,6 +37,16 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		public const string BetterStackSourceToken = "betterstack.source_token";
 		public const string ComplianceEmail = "compliance.email";
 
+		// The feature switches. Each is "true" or "false" on the site; a key
+		// the site does not set leaves the tablet's own switch in charge.
+		public const string FeatureRegistrationLog = "features.registration_log";
+		public const string FeatureAutoRegisterPositions = "features.auto_register_positions";
+		public const string FeatureComplianceLog = "features.compliance_log";
+		public const string FeatureSingleGsrShortcut = "features.single_gsr_shortcut";
+		public const string FeatureAddPositionHolder = "features.add_position_holder";
+		public const string FeatureWelcomeEmail = "features.welcome_email";
+		public const string FeatureComplianceAcceptanceEmail = "features.compliance_acceptance_email";
+
 		/// <summary>
 		/// The site, application and callback, from the "Freedom" section of
 		/// appsettings.json — none of them secret. Null when the build names no
@@ -63,6 +73,18 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 
 		/// <summary>The default callback: the app id, a <c>.freedom</c> suffix, host <c>auth</c>.</summary>
 		public const string FreedomCallbackUri = "com.thebleedingdeacons.intergroup.register.freedom://auth";
+
+		/// <summary>
+		/// A switch's value as the site set it: true/false, also yes/no, on/off
+		/// and 1/0, since an admin types it. Null for unset or unrecognised,
+		/// which leaves the tablet's own switch in charge rather than guessing.
+		/// </summary>
+		public static bool? Flag(string? value) => value?.Trim().ToLowerInvariant() switch
+		{
+			"true" or "yes" or "on" or "1" => true,
+			"false" or "no" or "off" or "0" => false,
+			_ => null,
+		};
 
 		public static SmtpConfiguration Apply(SmtpConfiguration config, Func<string, string?> managed)
 		{
