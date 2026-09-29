@@ -105,6 +105,8 @@ public static class MauiProgram
 #if DEBUG
 			DeveloperSinks = true,
 #endif
+			// Not the app name, which has a space in it: adb logcat -s Register:V
+			LogcatTag = "Register",
 			AppVersion = AppVersion,
 			Configure = cfg => cfg.ReadFrom.Configuration(builder.Configuration),
 		});
