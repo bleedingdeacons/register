@@ -229,6 +229,11 @@
                             Keyboard="Url"
                             Placeholder="e.g. https://in.logs.betterstack.com"
                             Text="{Binding BetterStackEndpoint}" />
+                        <Label
+                            FontSize="13"
+                            IsVisible="{Binding HasBetterStackEndpointProblem}"
+                            Text="{Binding BetterStackEndpointProblem}"
+                            TextColor="{AppThemeBinding Light=#C62828, Dark=#EF9A9A}" />
                     </VerticalStackLayout>
 
                     <VerticalStackLayout>
