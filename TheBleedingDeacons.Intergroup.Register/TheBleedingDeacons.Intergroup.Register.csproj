@@ -282,7 +282,7 @@
 			brings the Serilog sinks it uses. From the GitHub Packages feed in
 			nuget.config, like Freedom.
 		-->
-		<PackageReference Include="Inventory.Maui" Version="0.1.0" />
+		<PackageReference Include="Inventory.Maui" Version="0.1.1" />
 		<PackageReference Include="SonarAnalyzer.CSharp" Version="10.31.0.145097">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

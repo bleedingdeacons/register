@@ -105,10 +105,34 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 		[ObservableProperty]
 		private bool isBetterStackStatusError;
 
-		public bool IsBetterStackFormValid =>
-			!string.IsNullOrWhiteSpace(BetterStackSourceToken) &&
-			!string.IsNullOrWhiteSpace(BetterStackEndpoint) &&
-			Uri.TryCreate(BetterStackEndpoint, UriKind.Absolute, out _);
+		/// <summary>
+		/// The form as the log shipper would take it. Inventory's own rule
+		/// decides what is valid, so this page cannot accept an endpoint the
+		/// shipper would then silently refuse: a bare hostname — what Better
+		/// Stack's dashboard shows — gets https://, and http:// is refused,
+		/// because the source token travels as a bearer header with every
+		/// batch and would go in cleartext.
+		/// </summary>
+		private BetterStackConfiguration BetterStackForm => new()
+		{
+			SourceToken = (BetterStackSourceToken ?? string.Empty).Trim(),
+			Endpoint = (BetterStackEndpoint ?? string.Empty).Trim().TrimEnd('/'),
+		};
+
+		public bool IsBetterStackFormValid => BetterStackForm.IsValid();
+
+		/// <summary>
+		/// Why the endpoint is refused, when the reason is not obvious from an
+		/// empty field. The buttons are disabled while the form is invalid, so
+		/// without this an http:// address would just grey them out.
+		/// </summary>
+		public string BetterStackEndpointProblem =>
+			Uri.TryCreate(BetterStackForm.Endpoint, UriKind.Absolute, out var endpoint)
+			&& string.Equals(endpoint.Scheme, Uri.UriSchemeHttp, StringComparison.Ordinal)
+				? "Must be an https address: the source token is sent with every batch."
+				: string.Empty;
+
+		public bool HasBetterStackEndpointProblem => BetterStackEndpointProblem.Length != 0;
 
 		// ─── Unsaved-changes flag ─────────────────────────────────────────
 
@@ -236,12 +260,16 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 					return;
 				}
 
+				var form = BetterStackForm;
 				using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
 
 				httpClient.DefaultRequestHeaders.Authorization =
-					new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", BetterStackSourceToken.Trim());
+					new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", form.SourceToken);
 
-				var response = await httpClient.GetAsync(BetterStackEndpoint.Trim().TrimEnd('/'));
+				// The normalised endpoint, which IsBetterStackFormValid has
+				// already held to https — never the raw field, which could send
+				// the token in cleartext before anything is saved.
+				var response = await httpClient.GetAsync(form.Endpoint);
 
 				if (response.IsSuccessStatusCode)
 				{
@@ -289,11 +317,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 					return;
 				}
 
-				var config = new BetterStackConfiguration
-				{
-					SourceToken = BetterStackSourceToken.Trim(),
-					Endpoint = BetterStackEndpoint.Trim().TrimEnd('/')
-				};
+				var config = BetterStackForm;
 
 				// Persist first so that if the save fails, the running pipeline
 				// is untouched and a relaunch won't pick up partial state.
@@ -445,6 +469,8 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 		partial void OnBetterStackEndpointChanged(string value)
 		{
 			OnPropertyChanged(nameof(IsBetterStackFormValid));
+			OnPropertyChanged(nameof(BetterStackEndpointProblem));
+			OnPropertyChanged(nameof(HasBetterStackEndpointProblem));
 			RecomputeHasUnsavedChanges();
 		}
 	}
