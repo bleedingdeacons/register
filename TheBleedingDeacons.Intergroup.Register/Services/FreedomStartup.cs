@@ -2,6 +2,7 @@ using Serilog;
 using TheBleedingDeacons.Freedom.Client;
 using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Support;
+using TheBleedingDeacons.Inventory;
 #if ANDROID
 using TheBleedingDeacons.Freedom.Client.Maui;
 #endif
@@ -105,8 +106,8 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 
 				if (touched.Any(k => k.StartsWith("betterstack.", StringComparison.Ordinal)))
 				{
-					services.GetRequiredService<IBetterStackLoggerController>()
-						.Reconfigure(config.GetBetterStackConfiguration());
+					services.GetRequiredService<ILogShipper>()
+						.Ship(config.GetBetterStackConfiguration());
 				}
 
 				Logger.Information("Freedom changed {Keys}; applied", string.Join(", ", touched));

@@ -11,6 +11,7 @@ using TheBleedingDeacons.Intergroup.Register.Services;
 using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Support;
 using TheBleedingDeacons.Intergroup.Register.Views;
+using TheBleedingDeacons.Inventory;
 using TheBleedingDeacons.Unity.Intergroup.Data;
 
 namespace TheBleedingDeacons.Intergroup.Register.ViewModels
@@ -22,7 +23,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 		private readonly IConfigurationService _configService;
 		private readonly IDbContextFactory<UnityDbContext> _dbContextFactory;
 		private readonly RegistrationEventLog _eventLog;
-		private readonly IBetterStackLoggerController _betterStackController;
+		private readonly ILogShipper _logShipper;
 		private readonly IScrutinyClient _scrutinyClient;
 		private readonly IPrivacyPolicyCache _privacyPolicyCache;
 
@@ -163,14 +164,14 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 			IConfigurationService configService,
 			IDbContextFactory<UnityDbContext> dbContextFactory,
 			RegistrationEventLog eventLog,
-			IBetterStackLoggerController betterStackController,
+			ILogShipper logShipper,
 			IScrutinyClient scrutinyClient,
 			IPrivacyPolicyCache privacyPolicyCache)
 		{
 			_configService = configService;
 			_dbContextFactory = dbContextFactory;
 			_eventLog = eventLog;
-			_betterStackController = betterStackController;
+			_logShipper = logShipper;
 			_scrutinyClient = scrutinyClient;
 			_privacyPolicyCache = privacyPolicyCache;
 
@@ -207,10 +208,8 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 				_configService.SetDeviceLabel(DeviceLabel);
 
 				// Rebuild Log.Logger so the enricher picks up the new value.
-				// Reconfigure is a full rebuild from the base-logger factory,
-				// which re-reads Preferences on every invocation.
-				var bsConfig = _configService.GetBetterStackConfiguration();
-				_betterStackController.Reconfigure(bsConfig);
+				// Every rebuild re-reads the label from Preferences.
+				_logShipper.Ship(_configService.GetBetterStackConfiguration());
 
 				// Reflect what's actually in effect now (auto-default if the
 				// user cleared the field).

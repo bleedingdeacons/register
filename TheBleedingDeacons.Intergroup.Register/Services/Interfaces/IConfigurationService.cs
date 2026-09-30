@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using TheBleedingDeacons.Intergroup.Register.Models;
+using TheBleedingDeacons.Inventory;
 
 namespace TheBleedingDeacons.Intergroup.Register.Services.Interfaces
 {

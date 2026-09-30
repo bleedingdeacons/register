@@ -251,7 +251,6 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Ben.Demystifier" Version="0.4.1" />
 		<PackageReference Include="libphonenumber-csharp" Version="9.0.36" />
 		<PackageReference Include="MailKit" Version="4.17.0" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.10" />
@@ -276,20 +275,14 @@
 		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
 		<PackageReference Include="Serilog" Version="4.4.0" />
 		<PackageReference Include="Serilog.Settings.Configuration" Version="10.0.1" />
-		<PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
-		<PackageReference Include="Serilog.Sinks.Debug" Version="3.0.0" />
-		<PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
 		<!--
-			Durable HTTP sink replaces BetterStack.Logs.Serilog so that log
-			events survive loss of internet and hard app kills. Events are
-			written to a rolling on-disk buffer first, then shipped to
-			Better Stack in the background. If the device is offline the
-			buffer just grows until connectivity returns. See
-			Support/BetterStackDurable/*.cs for the thin glue layer
-			(auth header + NDJSON formatter).
+			Logging: the durable Better Stack sink, the holding buffer, flush on
+			error, the enrichers, the local files and the crash handlers, all
+			from Inventory (bleedingdeacons/inventory), shared with Link. It
+			brings the Serilog sinks it uses. From the GitHub Packages feed in
+			nuget.config, like Freedom.
 		-->
-		<PackageReference Include="Serilog.Sinks.Http" Version="9.2.1" />
-		<PackageReference Include="Serilog.Extensions.Logging" Version="10.0.0" />
+		<PackageReference Include="Inventory.Maui" Version="0.1.0" />
 		<PackageReference Include="SonarAnalyzer.CSharp" Version="10.31.0.145097">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

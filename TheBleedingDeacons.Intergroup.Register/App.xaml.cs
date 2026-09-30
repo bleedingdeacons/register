@@ -50,7 +50,7 @@ public partial class App : Application
 		// still on disk before the process exits. Bounded so a slow Better
 		// Stack response can't block window-destroy behind HttpClient.Timeout —
 		// anything left on disk ships on the next launch.
-		MauiProgram.TryFlushLogs();
+		TheBleedingDeacons.Inventory.CrashLogging.TryFlush();
 
 		base.CleanUp();
 	}

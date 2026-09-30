@@ -3,7 +3,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Serilog;
-using Serilog.Events;
 using System.Reflection;
 using TheBleedingDeacons.Intergroup.Register.Data;
 using TheBleedingDeacons.Intergroup.Register.Services;
@@ -12,6 +11,8 @@ using TheBleedingDeacons.Intergroup.Register.Models;
 using TheBleedingDeacons.Intergroup.Register.Support;
 using TheBleedingDeacons.Intergroup.Register.ViewModels;
 using TheBleedingDeacons.Intergroup.Register.Views;
+using TheBleedingDeacons.Inventory;
+using TheBleedingDeacons.Inventory.Maui;
 using TheBleedingDeacons.Unity.Client;
 using TheBleedingDeacons.Unity.Intergroup.Data;
 using TheBleedingDeacons.Unity.Intergroup.Entities;
@@ -26,12 +27,6 @@ public static class MauiProgram
 {
 	public const string UNITY_DATABASE_NAME = "unity.db";
 	public const string MAIL_DATABASE_NAME = "emails.db";
-
-	// Factory that produces a fresh base-logger configuration (file/console/debug
-	// sinks + enrichers). Captured during SetupSerilog so BetterStackLoggerController
-	// can rebuild the whole pipeline on demand when the user edits Better Stack
-	// settings at runtime. Null until SetupSerilog runs.
-	private static Func<LoggerConfiguration>? _baseLoggerFactory;
 
 	public static MauiApp CreateMauiApp()
 	{
@@ -91,15 +86,38 @@ public static class MauiProgram
 				fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
 			});
 
-		// Register logging service
-		SetupSerilog(builder);
+		// ── Logging ───────────────────────────────────────────────────
+		// Inventory (bleedingdeacons/inventory), shared with Link: the local
+		// files, the enrichers, the crash handlers, ILogger<T> routed through
+		// Serilog, and an ILogShipper that holds on disk until it is told
+		// where to ship — see the end of this method. First, so what goes
+		// wrong while the rest is built is on record.
+		//
+		// App:Name and App:Environment feed the enrichers and the log file
+		// name. appsettings.json is git-ignored and CI writes a `{}`
+		// placeholder, so a build without them is a real possibility; these
+		// fallbacks are the ones this file has always had.
+		var appName = builder.Configuration["App:Name"] ?? "Badi";
+		builder.UseInventory(new InventoryMauiOptions
+		{
+			Application = appName,
+			Environment = builder.Configuration["App:Environment"] ?? "Development",
+#if DEBUG
+			DeveloperSinks = true,
+#endif
+			// Not the app name, which has a space in it: adb logcat -s Register:V
+			LogcatTag = "Register",
+			AppVersion = AppVersion,
+			Configure = cfg => cfg.ReadFrom.Configuration(builder.Configuration),
+		});
 
-		// Bridge Serilog into Microsoft.Extensions.Logging so that
-		// ILogger<T> resolved from DI flows through the Serilog pipeline.
-		builder.Logging.AddSerilog();
-
-		// Ensure Serilog is flushed on unhandled / fatal errors
-		RegisterGlobalExceptionHandlers();
+		// Framework is its own property rather than folded into the message so
+		// Better Stack can filter on it — the quickest way to tell one runtime
+		// from another across a fleet of tablets.
+		Log.Information(
+			"Application {AppName} v{Version} (build {Build}, built {Built}) starting on {Platform} under {Framework}",
+			appName, BuildInfo.Version, BuildInfo.Build, BuildInfo.BuildTimestamp,
+			DeviceInfo.Platform, BuildInfo.Framework);
 
 		// Freedom: the tablet's settings from the site instead of the build,
 		// when this build names a Freedom site. See FreedomStartup.
@@ -132,48 +150,21 @@ public static class MauiProgram
 
 		// --- HttpClient ---
 		//
-		// Two singletons:
+		// The platform-native handler. Used for Unity API traffic and anything
+		// else that goes through the same WAF. Some shared-hosting edge WAFs
+		// fingerprint TLS (JA3/JA4) and block .NET's managed SocketsHttpHandler
+		// while allowing requests from the platform's native HTTP stack (the
+		// same stack the system browser uses).
 		//
-		//  1. The DEFAULT client (unkeyed) — platform-native handler. Used for
-		//     Unity API traffic and anything else that goes through the same WAF.
-		//     Some shared-hosting edge WAFs fingerprint TLS (JA3/JA4) and block
-		//     .NET's managed SocketsHttpHandler while allowing requests from the
-		//     platform's native HTTP stack (the same stack the system browser uses).
+		//   Windows       → WinHttpHandler         (schannel / WinHTTP)
+		//   Android       → AndroidMessageHandler  (OkHttp)
+		//   iOS / MacCat  → NSUrlSessionHandler    (NSURLSession)
+		//   Other         → HttpClientHandler      (managed fallback)
 		//
-		//       Windows       → WinHttpHandler         (schannel / WinHTTP)
-		//       Android       → AndroidMessageHandler  (OkHttp)
-		//       iOS / MacCat  → NSUrlSessionHandler    (NSURLSession)
-		//       Other         → HttpClientHandler      (managed fallback)
-		//
-		//  2. A keyed "betterstack" client — SocketsHttpHandler with an aggressive
-		//     PooledConnectionIdleTimeout. Better Stack isn't behind the fingerprinting
-		//     WAF, so we don't need the native handler there, and WinHttpHandler has
-		//     a known race (dotnet/runtime#22749, #121913) where a pooled keep-alive
-		//     connection closed server-side produces WinHttpException 12152
-		//     "The server returned an invalid or unrecognized response" on the next
-		//     reuse. That fires on CloseAndFlush during app shutdown, because the
-		//     sink has been idle during the edit session and its connection has
-		//     usually timed out server-side by then. Shortening the client-side
-		//     idle timeout below Better Stack's closes the pool first, avoiding
-		//     the race entirely.
+		// Better Stack is not behind that WAF, and log shipping uses a client of
+		// its own, tuned for a shipper that is idle most of the time — see
+		// Inventory's BetterStackHttp.
 		builder.Services.AddSingleton<HttpClient>(_ => CreateHttpClient());
-		builder.Services.AddKeyedSingleton<HttpClient>("betterstack", (_, _) => CreateBetterStackHttpClient());
-
-		// Better Stack logger controller — rebuilds the Serilog pipeline on
-		// demand when Better Stack settings change. Captures the base-logger
-		// factory from SetupSerilog so every reconfigure composes a fresh
-		// pipeline (base sinks + optional Better Stack sink) rather than
-		// stacking sinks on top of the previous configuration. Singleton so
-		// all callers share the serialisation lock inside the controller.
-		builder.Services.AddSingleton<IBetterStackLoggerController>(sp =>
-		{
-			if (_baseLoggerFactory is null)
-				throw new InvalidOperationException(
-					"Serilog base-logger factory was not captured. SetupSerilog must run before the DI container is built.");
-
-			var httpClient = sp.GetRequiredKeyedService<HttpClient>("betterstack");
-			return new BetterStackLoggerController(_baseLoggerFactory, httpClient);
-		});
 
 		// Unity REST client factory — always reads the latest credentials from config + SecureStorage.
 		// Used by UnitySyncService so each sync call gets a fresh client.
@@ -357,237 +348,16 @@ public static class MauiProgram
 		// token through ConfigurationService and so should see Freedom's.
 		FreedomStartup.Start(mauiapp.Services);
 
-		// ── Attach Better Stack sink using user-saved settings ────────
-		// SetupSerilog runs before DI is built, so it cannot read from
-		// ConfigurationService. Once the container is available we ask the
-		// IBetterStackLoggerController to layer the durable HTTP sink onto
-		// the base pipeline. The same controller is injected into
-		// BetterStackSettingsViewModel so runtime settings changes go through
-		// the same code path and tear down the previous sink cleanly.
-		//
-		// ConfigurationService handles the dev/prod split itself — dev builds
-		// read from the embedded devsettings.json, production builds read from
-		// user-saved settings.
-		using (var scope = mauiapp.Services.CreateScope())
-		{
-			var configService = scope.ServiceProvider.GetRequiredService<IConfigurationService>();
-			var betterStackConfig = configService.GetBetterStackConfiguration();
-			var controller = scope.ServiceProvider.GetRequiredService<IBetterStackLoggerController>();
-			controller.Reconfigure(betterStackConfig);
-		}
+		// ── Tell the log shipper where to ship ────────────────────────
+		// UseInventory started it holding, because nothing could be read
+		// before the container existed. Now it can: whatever was held since
+		// launch ships under these settings, with its own timestamps. The
+		// settings pages and FreedomStartup tell it again whenever the settings
+		// change. ConfigurationService handles the dev/prod split and lays
+		// Freedom's values over the tablet's own.
+		mauiapp.Services.GetRequiredService<ILogShipper>()
+			.Ship(mauiapp.Services.GetRequiredService<IConfigurationService>().GetBetterStackConfiguration());
 		return mauiapp;
-	}
-
-	private static void SetupSerilog(MauiAppBuilder builder)
-	{
-		var logPath = Path.Combine(FileSystem.AppDataDirectory, "logs");
-		Directory.CreateDirectory(logPath);
-
-		// Both feed Serilog enrichers, and appName also forms the log filename,
-		// so neither may be null. appsettings.json is git-ignored and CI writes a
-		// `{}` placeholder, so a build without a populated config is a real
-		// possibility rather than a theoretical one. These fallbacks are the
-		// defaults this file previously carried as commented-out constants.
-		var appName = builder.Configuration["App:Name"] ?? "Badi";
-		var environment = builder.Configuration["App:Environment"] ?? "Development";
-
-		// Capture the base-logger factory so the Better Stack controller can
-		// rebuild a fresh pipeline on demand. We capture `builder.Configuration`
-		// here because it won't be in scope once DI is built.
-		var configRef = builder.Configuration;
-		_baseLoggerFactory = () => BuildBaseLoggerConfiguration(configRef, logPath, appName, environment);
-
-		Log.Logger = _baseLoggerFactory().CreateLogger();
-
-		// Framework is logged as its own property rather than folded into the
-		// message so Better Stack can filter on it directly — the quickest way
-		// to tell a .NET 9 device from a .NET 10 one across a fleet of tablets.
-		Log.Information(
-			"Application {AppName} v{Version} (build {Build}, built {Built}) starting on {Platform} under {Framework}",
-			appName, BuildInfo.Version, BuildInfo.Build, BuildInfo.BuildTimestamp,
-			DeviceInfo.Platform, BuildInfo.Framework);
-	}
-
-	/// <summary>
-	/// Builds a fresh <see cref="LoggerConfiguration"/> containing only the
-	/// sinks that are fixed for the lifetime of the process — file, Debug, and
-	/// (on desktop) console — plus all standard enrichers. The durable Better
-	/// Stack sink is layered on separately by <see cref="BetterStackLoggerController"/>
-	/// because it can be toggled/reconfigured at runtime from the settings page.
-	///
-	/// Returning a configuration rather than a built logger lets the controller
-	/// chain <c>.WriteTo.DurableHttp...</c> before calling <c>CreateLogger()</c>,
-	/// giving one unified pipeline rather than nested ones.
-	/// </summary>
-	private static LoggerConfiguration BuildBaseLoggerConfiguration(
-		Microsoft.Extensions.Configuration.IConfiguration config,
-		string logPath,
-		string appName,
-		string environment)
-	{
-		var cfg = new LoggerConfiguration()
-			.ReadFrom.Configuration(config)
-			.Enrich.WithProperty("Application", appName)
-			.Enrich.WithProperty("Environment", environment)
-			.Enrich.WithProperty("Platform", DeviceInfo.Platform.ToString())
-			.Enrich.WithProperty("PlatformVersion", DeviceInfo.VersionString)
-			.Enrich.WithProperty("AppVersion", AppVersion())
-			.Enrich.WithProperty("DeviceModel", DeviceInfo.Model)
-			.Enrich.WithProperty("DeviceName", DeviceInfo.Name)
-			.Enrich.WithProperty("ProcessId", Environment.ProcessId)
-			// Replaces the previous Environment.MachineName enricher, which
-			// returned "localhost" on Android and a sandbox name on iOS.
-			// ResolveDeviceLabel() reads a user-set label from Preferences and
-			// falls back to a platform-aware default, so each device shows up
-			// distinctly in the Better Stack live tail.
-			.Enrich.WithProperty("DeviceLabel", ResolveDeviceLabel())
-			.Enrich.With<ExceptionEnricher>();
-
-#if DEBUG
-		cfg = cfg
-			.WriteTo.File(Path.Combine(logPath, $"{appName.ToLower()}-debug-.log"),
-				rollingInterval: RollingInterval.Day,
-				retainedFileCountLimit: 21)
-			.WriteTo.Debug();
-
-		// The Serilog console sink calls Console.set_ForegroundColor to apply its
-		// colour theme, which throws PlatformNotSupportedException on Android and
-		// iOS (System.Console has no ANSI terminal there). Every log event then
-		// hits SelfLog with a stack trace, drowning real diagnostics.
-		//
-		// On mobile the Debug sink above already surfaces logs to the IDE's
-		// output window, so Console adds nothing. Scope it to desktop only.
-#if WINDOWS || MACCATALYST
-		cfg = cfg.WriteTo.Console();
-#endif
-#else
-        cfg = cfg.WriteTo.File(Path.Combine(logPath, $"{appName.ToLower()}-.log"),
-            rollingInterval: RollingInterval.Day,
-            retainedFileCountLimit: 7,
-            restrictedToMinimumLevel: LogEventLevel.Information);
-#endif
-
-		return cfg;
-	}
-
-	// Mirrors ConfigurationService.DeviceLabel but reads Preferences directly
-	// so SetupSerilog can call it before the DI container has been built.
-	// BetterStackLoggerController.Reconfigure rebuilds the whole pipeline via
-	// the captured factory, so any saved label change picks up on the very
-	// next reconfigure — no app restart needed.
-	private const string DEVICE_LABEL_PREFERENCE_KEY = "device_label";
-
-	private static string ResolveDeviceLabel()
-	{
-		try
-		{
-			var stored = Preferences.Get(DEVICE_LABEL_PREFERENCE_KEY, string.Empty);
-			if (!string.IsNullOrWhiteSpace(stored))
-				return stored;
-		}
-		catch
-		{
-			// Preferences unavailable — fall through to the auto-default.
-		}
-
-		try
-		{
-			var platform = DeviceInfo.Platform;
-
-			if (platform == DevicePlatform.WinUI || platform == DevicePlatform.MacCatalyst)
-			{
-				var machine = Environment.MachineName;
-				if (!string.IsNullOrWhiteSpace(machine) &&
-					!string.Equals(machine, "localhost", StringComparison.OrdinalIgnoreCase))
-				{
-					return machine;
-				}
-			}
-
-			var manufacturer = (DeviceInfo.Manufacturer ?? string.Empty).Trim();
-			var model = (DeviceInfo.Model ?? string.Empty).Trim();
-			var osName = platform.ToString();
-			var osVer = (DeviceInfo.VersionString ?? string.Empty).Trim();
-
-			var hardware = !string.IsNullOrEmpty(manufacturer) &&
-						   !model.StartsWith(manufacturer, StringComparison.OrdinalIgnoreCase)
-				? $"{manufacturer} {model}".Trim()
-				: model;
-
-			if (string.IsNullOrWhiteSpace(hardware))
-				hardware = "Device";
-
-			return string.IsNullOrWhiteSpace(osVer)
-				? $"{hardware} ({osName})"
-				: $"{hardware} ({osName} {osVer})";
-		}
-		catch
-		{
-			return "UnknownDevice";
-		}
-	}
-
-	private static void RegisterGlobalExceptionHandlers()
-	{
-		// Logging from a crash path must itself be crash-proof. If Log.Fatal
-		// throws (e.g. the pipeline is already disposed, or an enricher faults
-		// on this specific exception), we must not replace the original crash
-		// with a logger crash. Belt and braces: Serilog already swallows most
-		// internal errors to SelfLog, but this is a crash path — defence in
-		// depth is essentially free.
-
-		// .NET unhandled exceptions — background threads, async void, etc.
-		AppDomain.CurrentDomain.UnhandledException += (_, args) =>
-		{
-			try
-			{
-				if (args.ExceptionObject is Exception ex)
-					Log.Fatal(ex, "Unhandled AppDomain exception (IsTerminating={IsTerminating})", args.IsTerminating);
-				else
-					Log.Fatal("Unhandled AppDomain exception: {ExceptionObject}", args.ExceptionObject);
-			}
-			catch { /* never throw from a crash handler */ }
-
-			TryFlushLogs();
-		};
-
-		// Unobserved Task exceptions — app usually survives, so log but don't close
-		TaskScheduler.UnobservedTaskException += (_, args) =>
-		{
-			try { Log.Error(args.Exception, "Unobserved task exception"); }
-			catch { /* never throw from a crash handler */ }
-		};
-
-#if ANDROID
-		// Android-specific: Java-side unhandled exceptions bridged into .NET
-		Android.Runtime.AndroidEnvironment.UnhandledExceptionRaiser += (_, args) =>
-		{
-			try { Log.Fatal(args.Exception, "Unhandled Android exception"); }
-			catch { /* never throw from a crash handler */ }
-
-			TryFlushLogs();
-		};
-#endif
-	}
-
-	/// <summary>
-	/// Close and flush all Serilog sinks with a bounded wait, never throwing.
-	/// <c>Log.CloseAndFlush()</c> is synchronous and has no timeout; if the
-	/// durable HTTP sink's final POST is slow or the endpoint is unreachable,
-	/// it can block shutdown for up to <see cref="HttpClient.Timeout"/>. Anything
-	/// still on disk after the cap will ship on the next process launch — that's
-	/// the durable sink's entire purpose.
-	/// </summary>
-	internal static void TryFlushLogs(TimeSpan? timeout = null)
-	{
-		try
-		{
-			Task.Run(() => Log.CloseAndFlush()).Wait(timeout ?? TimeSpan.FromSeconds(5));
-		}
-		catch
-		{
-			// Never throw from a shutdown / crash path.
-		}
 	}
 
 	/// <summary>
@@ -631,47 +401,6 @@ public static class MauiProgram
 		return new HttpClient(handler, disposeHandler: true)
 		{
 			Timeout = TimeSpan.FromSeconds(100),
-		};
-	}
-
-	/// <summary>
-	/// Creates the HttpClient used exclusively by the Better Stack log sink.
-	/// Unlike <see cref="CreateHttpClient"/>, this uses the managed
-	/// <see cref="SocketsHttpHandler"/> on every platform — Better Stack's
-	/// ingest endpoint isn't behind the TLS-fingerprinting WAF that the
-	/// platform-native handler exists to work around, and SocketsHttpHandler
-	/// exposes the connection-pool knobs we need.
-	///
-	/// <para><b>PooledConnectionIdleTimeout = 30s</b> is the important one.
-	/// Without it the client holds idle keep-alive connections until the server
-	/// closes them, which on Windows with WinHttpHandler surfaces as a
-	/// WinHttpException 12152 ("The server returned an invalid or unrecognized
-	/// response") when the sink's periodic POST lands on a half-closed socket
-	/// (dotnet/runtime#22749). The typical trigger is <c>Log.CloseAndFlush()</c>
-	/// at shutdown after a long idle period. Closing client-side first makes
-	/// the next request open a fresh connection.</para>
-	///
-	/// <para><b>PooledConnectionLifetime = 5min</b> additionally recycles
-	/// connections so intermediaries that silently drop long-lived sockets
-	/// (mobile NATs, corporate proxies) don't cause the same symptom.</para>
-	/// </summary>
-	private static HttpClient CreateBetterStackHttpClient()
-	{
-		var handler = new SocketsHttpHandler
-		{
-			PooledConnectionIdleTimeout = TimeSpan.FromSeconds(30),
-			PooledConnectionLifetime = TimeSpan.FromMinutes(5),
-			AutomaticDecompression = System.Net.DecompressionMethods.GZip
-				| System.Net.DecompressionMethods.Deflate
-				| System.Net.DecompressionMethods.Brotli,
-		};
-
-		return new HttpClient(handler, disposeHandler: true)
-		{
-			// Tighter than the default app client — we'd rather fail fast and
-			// let the durable sink retry from its on-disk buffer than block
-			// shutdown behind a slow Better Stack response.
-			Timeout = TimeSpan.FromSeconds(30),
 		};
 	}
 
