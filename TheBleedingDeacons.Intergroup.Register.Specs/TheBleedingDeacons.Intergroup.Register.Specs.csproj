@@ -1,0 +1,70 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!--
+		The executable specification for Register.
+
+		Same tooling as Link's and Hand's: Reqnroll over xUnit v3, with
+		Shouldly for the assertions. The feature files are the readable half —
+		what a tablet at an intergroup meeting is supposed to do — and the step
+		definitions under Steps/ bind them to Register.Core.
+
+		It sits beside Register.Tests rather than replacing it. The xUnit
+		suite is where the edges live (a torn log line, a refused password, a
+		Scrutiny that answers HTML) and it is what the coverage badge measures;
+		this is where the behaviour lives, in the words a meeting would use for
+		it. Both run over the same library.
+
+		It references Register.Core for the reason Core exists at all: nothing
+		can reference the app, whose only target frameworks are platform heads.
+
+		Like Link, and unlike Hand, there is no TimeProvider.Testing here.
+		Nothing a scenario says depends on what time it is: the timestamps
+		that are written (an acceptance, a log line) are asserted as present,
+		not as values.
+
+		Scenarios tagged @manual @ignore are on-device acceptance criteria —
+		Freedom's sign-in through the callback activity, a Reset Device that
+		deletes both logs, a Yes button that actually greys out. Reqnroll's
+		@ignore keeps them out of the automated run; they are written down
+		because no test host can reach any of them.
+	-->
+
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<RootNamespace>TheBleedingDeacons.Intergroup.Register.Specs</RootNamespace>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<!-- xUnit v3 test projects are executables that host Microsoft.Testing.Platform. -->
+		<OutputType>Exe</OutputType>
+		<IsPackable>false</IsPackable>
+		<IsTestProject>true</IsTestProject>
+		<!-- Run through Microsoft.Testing.Platform (not VSTest) under `dotnet test`. -->
+		<TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
+		<UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
+		<!--
+			Test project: exempt from the repo's strict analyzer gate, as
+			Register.Tests is. Reqnroll also generates a .feature.cs behind
+			every feature file, and generated code has no business failing a
+			style rule nobody can edit it to satisfy.
+		-->
+		<RunAnalyzers>false</RunAnalyzers>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Reqnroll.xunit.v3" Version="3.3.4" />
+		<PackageReference Include="Shouldly" Version="4.3.0" />
+		<PackageReference Include="xunit.v3" Version="3.2.2" />
+		<PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+		<!-- The tablet's two databases, in memory, as Register.Tests does. -->
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.10" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Using Include="Xunit" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\TheBleedingDeacons.Intergroup.Register.Core\TheBleedingDeacons.Intergroup.Register.Core.csproj" />
+	</ItemGroup>
+
+</Project>

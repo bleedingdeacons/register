@@ -464,3 +464,9 @@ Properties/launchSettings.json
 *.jks
 *.p12
 *.pfx
+
+# Reqnroll generates a .feature.cs beside every .feature file in
+# Register.Specs. It is build output, regenerated from the feature file on
+# every build, and committing it would put a large generated diff next to
+# every three-line change to a scenario. Link ignores it for the same reason.
+*.feature.cs
