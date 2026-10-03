@@ -12,8 +12,9 @@ name: CI
 #                    are invisible to the Ubuntu job. Without this the Windows
 #                    head can rot unnoticed, which is exactly what happened to the
 #                    iOS and MacCatalyst heads.
-#  * test          — run the xUnit v3 test suite (on Microsoft.Testing.Platform) with
-#                    Coverlet coverage and upload the report to Coveralls.
+#  * test          — run both xUnit v3 suites (on Microsoft.Testing.Platform) —
+#                    Unity.Intergroup.Tests and Register.Tests — under Coverlet,
+#                    merge the two runs into one report and upload it to Coveralls.
 
 # The build/** push trigger exists so a long-lived branch that is deliberately
 # not merged — the .NET 10 upgrade, which is kept switchable against a .NET 9
@@ -196,24 +197,33 @@ jobs:
       - name: Restore local tools (coverlet.console)
         run: dotnet tool restore
 
-      # Unity.Intergroup and its tests are net10.0 — no MAUI workload needed.
+      # Unity.Intergroup, Register.Core and their tests are net10.0 — no MAUI
+      # workload needed. That is the whole reason Register.Core exists.
       - name: Build tests
-        run: >
-          dotnet build TheBleedingDeacons.Unity.Intergroup.Tests/TheBleedingDeacons.Unity.Intergroup.Tests.csproj
-          -c Debug
+        run: |
+          dotnet build TheBleedingDeacons.Unity.Intergroup.Tests/TheBleedingDeacons.Unity.Intergroup.Tests.csproj -c Debug
+          dotnet build TheBleedingDeacons.Intergroup.Register.Tests/TheBleedingDeacons.Intergroup.Register.Tests.csproj -c Debug
 
-      # xUnit v3 runs on Microsoft.Testing.Platform, so the test project is an
-      # executable. coverlet.console instruments the register-owned assembly and
-      # runs the test host, producing a Cobertura report. (coverlet's collector /
-      # msbuild integrations hook VSTest, which MTP doesn't use — hence the tool.)
+      # xUnit v3 runs on Microsoft.Testing.Platform, so each test project is an
+      # executable. coverlet.console instruments the register-owned assemblies and
+      # runs the test host. (coverlet's collector / msbuild integrations hook
+      # VSTest, which MTP doesn't use — hence the tool.)
+      #
+      # Two suites, one report: the first run writes coverlet's own JSON, and
+      # the second merges into it and writes the Cobertura file Coveralls reads.
+      # Both runs include both assemblies, so a line either suite reaches counts.
+      #
+      # The figure dropped when Register.Core joined it — from ~92% of
+      # Unity.Intergroup alone to ~46% of both — because Core was being
+      # measured for the first time, not because anything got worse.
       - name: Test with coverage
-        run: >
-          dotnet coverlet TheBleedingDeacons.Unity.Intergroup.Tests/bin/Debug/net10.0/TheBleedingDeacons.Unity.Intergroup.Tests.dll
-          --target dotnet
-          --targetargs "TheBleedingDeacons.Unity.Intergroup.Tests/bin/Debug/net10.0/TheBleedingDeacons.Unity.Intergroup.Tests.dll"
-          --format cobertura
-          --output coverage/coverage.cobertura.xml
-          --include "[TheBleedingDeacons.Unity.Intergroup]*"
+        run: |
+          U=TheBleedingDeacons.Unity.Intergroup.Tests/bin/Debug/net10.0/TheBleedingDeacons.Unity.Intergroup.Tests.dll
+          R=TheBleedingDeacons.Intergroup.Register.Tests/bin/Debug/net10.0/TheBleedingDeacons.Intergroup.Register.Tests.dll
+          INCLUDE=(--include "[TheBleedingDeacons.Unity.Intergroup]*" --include "[TheBleedingDeacons.Intergroup.Register.Core]*")
+          dotnet coverlet "$U" --target dotnet --targetargs "$U" "${INCLUDE[@]}" --format json --output coverage/coverage.json
+          dotnet coverlet "$R" --target dotnet --targetargs "$R" "${INCLUDE[@]}" \
+            --merge-with coverage/coverage.json --format cobertura --output coverage/coverage.cobertura.xml
 
       - name: Upload coverage to Coveralls
         uses: coverallsapp/github-action@v2

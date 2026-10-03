@@ -39,6 +39,7 @@ mapping.
 | `…Intergroup.Register.Core` | Plain net10.0. Attendance and compliance, the two event logs, the snapshot and reconcile, the email queue and its templates, the Freedom overlay. |
 | `…Unity.Intergroup` | The local SQLite replica of Unity's data, its repositories, and the sync that fills it. |
 | `…Unity.Intergroup.Tests` | xUnit v3 over Unity.Intergroup. |
+| `…Intergroup.Register.Tests` | xUnit v3 over Register.Core — the edges: torn logs, refused passwords, answers that are not JSON. |
 
 **Core exists because a test project cannot reference a MAUI app.** The
 app's target frameworks are platform heads; a `net10.0` test host has no
@@ -55,6 +56,17 @@ client factory, and the temporary id counter takes a store. Each seam is
 the one a platform detail would otherwise have been welded across, and the
 one a test drives. What stayed in the app, and why, is listed in Core's
 project file.
+
+Both test projects run in CI under Coverlet, merged into the one report
+the Coveralls badge reads:
+
+```bash
+dotnet test TheBleedingDeacons.Intergroup.Register.Tests
+```
+
+The figure fell when Register.Core joined it, from about 92% of
+Unity.Intergroup alone to about 46% of both. That is Core being measured
+for the first time, not anything getting worse.
 
 ## Settings from Freedom
 
