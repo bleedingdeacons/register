@@ -2,6 +2,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Serilog;
+using TheBleedingDeacons.Intergroup.Register.Services;
 using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Support;
 using TheBleedingDeacons.Intergroup.Register.Views;
@@ -34,8 +35,8 @@ public partial class VerifyPositionViewModel : BaseViewModel
 	private readonly IAttendanceRegistration<Position> _attendanceRegistration;
 	private readonly IPositionRepository _positionRepository;
 	private readonly IPopupNotification _popupService;
-	private readonly IComplianceRegistration _complianceRegistration;
 	private readonly IPrivacyPolicyCache _privacyPolicyCache;
+	private readonly ConsentRound _consentRound;
 
 	[ObservableProperty]
 	private Position? position;
@@ -97,14 +98,14 @@ public partial class VerifyPositionViewModel : BaseViewModel
 		IAttendanceRegistration<Position> attendanceRegistration,
 		IPositionRepository positionRepository,
 		IPopupNotification popupService,
-		IComplianceRegistration complianceRegistration,
-		IPrivacyPolicyCache privacyPolicyCache)
+		IPrivacyPolicyCache privacyPolicyCache,
+		ConsentRound consentRound)
 	{
 		_attendanceRegistration = attendanceRegistration;
 		_positionRepository = positionRepository;
 		_popupService = popupService;
-		_complianceRegistration = complianceRegistration;
 		_privacyPolicyCache = privacyPolicyCache;
+		_consentRound = consentRound;
 	}
 
 	#region Query Attributes Handling
@@ -223,32 +224,17 @@ public partial class VerifyPositionViewModel : BaseViewModel
 
 		try
 		{
-			// GDPR gate. Any active holder who has not previously accepted
-			// the privacy policy — OR whose recorded acceptance is for an
-			// earlier version than the currently cached active policy —
-			// must do so now before their data is committed as a registered
-			// attendance. The popup is shown once per holder with that
-			// holder's name in the title (mirrors VerifyGroupViewModel) —
-			// declining for any holder aborts the registration silently.
-			// Accepting records (or refreshes) that holder's acceptance at
-			// the current version before moving on to the next.
-			//
-			// The cached version comparison is intentionally an inequality
-			// check, not a "less than" check: PrivacyPolicy.Version is
-			// free-form text per the Scrutiny contract, so any differing
-			// recorded version is treated as out-of-date for the purposes
-			// of re-prompting. If the cache is missing, fall back to the
-			// "never accepted" filter only — PromptForComplianceAsync's
-			// own null-cache guard will then surface the right error.
+			// GDPR gate. Any active holder who has not accepted the current
+			// version of the privacy policy is asked, by name, before their
+			// data is committed as a registered attendance (mirrors
+			// VerifyGroupViewModel) — declining for any holder aborts the
+			// registration silently. Who needs asking is
+			// RegistrationGate.NeedingConsent; the asking is ConsentRound.
 			var cachedVersion = _privacyPolicyCache.GetCached()?.Version;
-			var unaccepted = ActiveHolders.Where(m =>
-				m.GdprAccepted != true
-				|| (!string.IsNullOrWhiteSpace(cachedVersion)
-					&& !string.Equals(m.GdprAcceptanceVersion, cachedVersion, StringComparison.Ordinal)))
-				.ToList();
+			var unaccepted = RegistrationGate.NeedingConsent(ActiveHolders, cachedVersion);
 			if (unaccepted.Count > 0)
 			{
-				var consentGiven = await PromptForComplianceAsync(unaccepted);
+				var consentGiven = await _consentRound.AskAsync(unaccepted, _popupService, "this position holder");
 				if (!consentGiven)
 				{
 					Logger.Information(
@@ -290,133 +276,6 @@ public partial class VerifyPositionViewModel : BaseViewModel
 	#endregion
 
 	#region Private Methods
-
-	/// <summary>
-	/// Shows the compliance popup once per supplied position holder, with
-	/// that holder's name in the title so it's unambiguous whose consent
-	/// is being captured. Each acceptance is recorded individually via
-	/// <see cref="IComplianceRegistration.RecordAcceptance"/> as soon as
-	/// it's given. Returns <c>true</c> only when every holder accepted;
-	/// returns <c>false</c> as soon as any holder declines (or the popup
-	/// is dismissed without an explicit choice), without prompting the
-	/// remaining holders — the overall registration cannot proceed.
-	///
-	/// Per-holder acceptance timestamps are captured at the moment the
-	/// user clicks Accept for that holder, rather than sharing a single
-	/// batch timestamp, so the audit trail reflects the actual sequence
-	/// of consent events. Mirrors the per-member pattern in
-	/// <see cref="VerifyGroupViewModel"/>.
-	/// </summary>
-	private async Task<bool> PromptForComplianceAsync(IEnumerable<Member> members)
-	{
-		// Read the cached active policy first. The sync-stage gate
-		// guarantees this is populated before a meeting can start, so
-		// reaching this method with an empty cache means the sync was
-		// bypassed or a sync cleared the cache because Scrutiny had
-		// no active policy. Either way, refuse to record consent —
-		// recording an acceptance with no version would corrupt the
-		// audit trail. (See VerifyGroupViewModel for the equivalent
-		// guard on the group-registration flow.)
-		var cachedPolicy = _privacyPolicyCache.GetCached();
-		if (cachedPolicy is null)
-		{
-			Logger.Error(
-				"No cached privacy policy on device; refusing to prompt for consent. " +
-				"This indicates the sync-stage gate was bypassed.");
-			await _popupService.ShowErrorAsync(
-				"Cannot record consent",
-				"This device has no active privacy policy on record. " +
-				"Re-sync from the Admin page before continuing.");
-			return false;
-		}
-
-		// The body shown in the popup comes from the cached upstream
-		// policy now that the bundled Terms.txt has been retired. An
-		// empty body means the upstream policy was published without
-		// prose filled in — surfacing an empty popup with an "I Agree"
-		// button would be the worst possible audit-trail outcome
-		// ("agreed to nothing"), so refuse to prompt and route the
-		// operator to a re-sync, mirroring the missing-cache branch.
-		// (Same guard as VerifyGroupViewModel.)
-		if (string.IsNullOrWhiteSpace(cachedPolicy.Policy))
-		{
-			Logger.Error(
-				"Cached privacy policy {PolicyId} v{Version} has empty body; refusing to prompt for consent",
-				cachedPolicy.Id, cachedPolicy.Version);
-			await _popupService.ShowErrorAsync(
-				"Cannot record consent",
-				"The cached privacy policy has no body text on record. " +
-				"Re-sync from the Admin page before continuing.");
-			return false;
-		}
-
-		var policyBody = cachedPolicy.Policy;
-
-		foreach (var member in members)
-		{
-			// Compose a per-holder title so the user can see which
-			// holder's consent the popup is asking for. Both the title
-			// and the body come from the cached Scrutiny record —
-			// Scrutiny is the single source of truth for everything the
-			// user sees, the audit trail records, and the confirmation
-			// email quotes. Mirrors the per-member title pattern in
-			// VerifyGroupViewModel so the position flow is consistent
-			// with the group flow.
-			string memberName = !string.IsNullOrWhiteSpace(member.AnonymousName)
-				? member.AnonymousName
-				: "this position holder";
-			string perMemberTitle = $"{cachedPolicy.Title} — {memberName}";
-
-			bool accepted = await _popupService.ShowTerms(perMemberTitle, policyBody);
-			if (!accepted)
-			{
-				Logger.Information(
-					"GDPR consent declined for holder {MemberId} ({Name}); aborting position registration",
-					member.Id, member.AnonymousName);
-				return false;
-			}
-
-			// Record this holder's acceptance immediately. Per-holder
-			// timestamps mean each row in the audit log carries the
-			// real moment the user clicked Accept for that holder,
-			// rather than a single shared batch timestamp.
-			//
-			// Version is the cached Scrutiny version. The `statement`
-			// parameter is no longer used by ComplianceService (it
-			// sources the wording from the cache itself) but is kept
-			// on the call for ABI continuity. See the equivalent block
-			// in VerifyGroupViewModel for the full rationale.
-			var ts = DateTime.UtcNow;
-			try
-			{
-				await _complianceRegistration.RecordAcceptance(
-					member,
-					version: cachedPolicy.Version,
-					statement: policyBody,
-					method: "register-app",
-					acceptedAtUtc: ts);
-
-				// Mirror the in-memory entity so the page's bindings reflect
-				// the new state immediately — ComplianceService updates a
-				// freshly-loaded Member instance, not the one the VM holds.
-				member.GdprAccepted = true;
-				member.GdprAcceptedAt = ts;
-			}
-			catch (Exception ex)
-			{
-				// Per-holder persistence failure is logged but doesn't
-				// abort the loop — the DB write inside ComplianceService
-				// already swallows its own errors, so a throw here would
-				// be unusual. The user did consent in the UI, so we still
-				// honour that and continue prompting the remaining holders.
-				Logger.Warning(ex,
-					"Failed to record GDPR acceptance for holder {MemberId} ({Name})",
-					member.Id, member.AnonymousName);
-			}
-		}
-
-		return true;
-	}
 
 	private async Task LoadPositionAsync(int positionId)
 	{
@@ -503,10 +362,8 @@ public partial class VerifyPositionViewModel : BaseViewModel
 
 	private void UpdateCanRegister()
 	{
-		// At least one active holder must have required contact fields
-		CanRegister = ActiveHolders.Any(h =>
-			!string.IsNullOrEmpty(h.AnonymousName) &&
-			(!string.IsNullOrEmpty(h.MobileNumber) || !string.IsNullOrEmpty(h.PersonalEmail)));
+		// At least one active holder must be contactable.
+		CanRegister = RegistrationGate.CanRegisterPosition(ActiveHolders);
 	}
 
 	/// <summary>
@@ -515,12 +372,8 @@ public partial class VerifyPositionViewModel : BaseViewModel
 	/// [NotifyCanExecuteChangedFor(nameof(YesCommand))] on CanRegister, so any change
 	/// re-runs this automatically and the button's Disabled visual state updates.
 	/// </summary>
-	private bool CanExecuteYes()
-	{
-		return ActiveHolders.Any(h =>
-			!string.IsNullOrEmpty(h.AnonymousName) &&
-			(!string.IsNullOrEmpty(h.MobileNumber) || !string.IsNullOrEmpty(h.PersonalEmail)));
-	}
+	private bool CanExecuteYes() =>
+		RegistrationGate.CanRegisterPosition(ActiveHolders);
 
 	#endregion
 }
