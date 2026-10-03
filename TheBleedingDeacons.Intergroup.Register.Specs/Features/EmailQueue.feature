@@ -22,16 +22,37 @@ Feature: The email queue
     Then the email to "ann@example.org" is waiting
     And nothing reached the mail server
 
-  # Found, not chosen. The connection is made once for the whole batch, and
-  # a refused password fails it before any email is tried — so no attempt
-  # is counted, and the run reports itself the way an offline run does.
-  # The background loop reads that as "offline" too, which is why a wrong
-  # password can never trip the circuit breaker. See specs/domain-model.md.
+  # The connection is made once for the whole batch, and a refused password
+  # fails it before any email is tried, so no attempt is counted against the
+  # email. It is the password that is wrong, not the email.
   Scenario: A refused password leaves the email waiting, untried
     Given the mail server refuses the password
     When the queue runs
     Then the email to "ann@example.org" is waiting, after 0 attempts
     And the queue run reported that it did not run
+
+  # Until register#53 a refused password could never pause anything: the run
+  # reported itself the way an offline run does, and the background read
+  # that as "offline". Now the background sees the refusal itself.
+  Scenario: Three refused passwords in a row pause background sending
+    Given the mail server refuses the password
+    When the queue runs in the background 3 times
+    Then background sending is paused
+    And the email to "ann@example.org" is waiting, after 0 attempts
+
+  # A server the tablet cannot reach is the venue's network, not the
+  # tablet's settings. Pausing for it would hold emails back after the
+  # network came back.
+  Scenario: An unreachable mail server never pauses background sending
+    Given the mail server cannot be reached
+    When the queue runs in the background 3 times
+    Then background sending is not paused
+
+  Scenario: Offline, background sending is never paused
+    Given the tablet is offline
+    When the queue runs in the background 3 times
+    Then background sending is not paused
+    And nothing reached the mail server
 
   Scenario: The last allowed attempt marks the email failed
     Given the email to "ann@example.org" has already failed twice

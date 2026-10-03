@@ -78,6 +78,17 @@ public sealed class FakeSmtpClient : SmtpClient
 		_connected = false;
 		return Task.CompletedTask;
 	}
+
+	public int Disposals { get; private set; }
+
+	// MailKit's client closes its socket on Dispose. This one is handed out
+	// again for the next connection, so it has to forget the last one too.
+	protected override void Dispose(bool disposing)
+	{
+		Disposals++;
+		_connected = false;
+		base.Dispose(disposing);
+	}
 }
 
 /// <summary>A database factory over one in-memory SQLite connection, kept open for the test.</summary>

@@ -52,6 +52,27 @@ public sealed class EmailSteps(World world)
 	[Then(@"^the queue run reported that it did not run$")]
 	public void DidNotRun() => _queueRan.ShouldBe(false);
 
+	// The background timer's tick, run directly: the timer's first run is a
+	// minute away, and the circuit breaker lives only in its callback.
+	[When(@"^the queue runs in the background (\d+) times?$")]
+	public async Task RunsInBackground(int times)
+	{
+		for (var i = 0; i < times; i++)
+		{
+			await world.Email.ProcessQueueInBackground();
+		}
+	}
+
+	[Then(@"^background sending is paused$")]
+	public void Paused() => world.Email.IsCircuitOpen.ShouldBeTrue();
+
+	[Then(@"^background sending is not paused$")]
+	public void NotPaused()
+	{
+		world.Email.IsCircuitOpen.ShouldBeFalse();
+		world.Email.ConsecutiveQueueFailures.ShouldBe(0, "no run counted as a failure");
+	}
+
 	[Then(@"^the email to ""([^""]*)"" has been sent$")]
 	public async Task HasBeenSent(string address)
 	{
@@ -85,6 +106,10 @@ public sealed class EmailSteps(World world)
 	[Given(@"^the mail server refuses the password$")]
 	public void RefusesPassword() =>
 		world.Smtp.RefusePassword = new MailKit.Security.AuthenticationException("535 5.7.8 Authentication credentials invalid");
+
+	[Given(@"^the mail server cannot be reached$")]
+	public void Unreachable() =>
+		world.Smtp.RefuseConnections = new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.HostUnreachable);
 
 	[Given(@"^the mail server refuses every message$")]
 	public void RefusesMessages() => world.Smtp.RefuseMessages = new IOException("Connection reset by peer");
