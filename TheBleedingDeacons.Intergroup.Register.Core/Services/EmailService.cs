@@ -23,6 +23,14 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		private readonly SemaphoreSlim _configSemaphore = new(1, 1);
 		private readonly Timer _backgroundTimer;
 
+		// The two things this service used to take from the platform. The
+		// probe was Connectivity.Current, which is MAUI; the factory was a
+		// bare `new SmtpClient()`. Both are injected so the service can live
+		// in Register.Core and a test can stand in for the network and the
+		// SMTP server.
+		private readonly Func<bool> _isNetworkAvailable;
+		private readonly Func<ISmtpClient> _smtpClientFactory;
+
 		// Configuration
 		private string _smtpHost;
 		private int _smtpPort;
@@ -95,11 +103,32 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 
 		#region Constructor
 
+		/// <param name="dbContextFactory">The queue's database.</param>
+		/// <param name="isNetworkAvailable">
+		/// Whether the device has internet access. Required rather than
+		/// defaulted: a default of "yes" would quietly turn offline holding
+		/// into a stream of failed sends that count toward the breaker.
+		/// </param>
+		/// <param name="smtpHost">SMTP host.</param>
+		/// <param name="smtpPort">SMTP port.</param>
+		/// <param name="username">SMTP user name.</param>
+		/// <param name="password">SMTP password.</param>
+		/// <param name="enableSsl">Whether to use TLS.</param>
+		/// <param name="timeoutSeconds">Per-operation timeout.</param>
+		/// <param name="maxRetries">Attempts before an email is marked failed.</param>
+		/// <param name="smtpClientFactory">
+		/// Makes each SMTP client, unconfigured and unconnected. Defaults to
+		/// MailKit's own.
+		/// </param>
 		public EmailService(IDbContextFactory<MailDbContext> dbContextFactory,
+			Func<bool> isNetworkAvailable,
 			string smtpHost, int smtpPort, string username, string password, bool enableSsl = true,
-			int timeoutSeconds = 30, int maxRetries = 10)
+			int timeoutSeconds = 30, int maxRetries = 10,
+			Func<ISmtpClient>? smtpClientFactory = null)
 		{
 			_dbContextFactory = dbContextFactory ?? throw new ArgumentNullException(nameof(dbContextFactory));
+			_isNetworkAvailable = isNetworkAvailable ?? throw new ArgumentNullException(nameof(isNetworkAvailable));
+			_smtpClientFactory = smtpClientFactory ?? (static () => new SmtpClient());
 
 			_smtpHost = smtpHost ?? throw new ArgumentNullException(nameof(smtpHost));
 			_smtpPort = smtpPort;
@@ -270,7 +299,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 				var message = CreateMimeMessage(queuedEmail);
 
 				Logger.Debug("[{OperationId}] Creating SMTP client", operationId);
-				using var client = new SmtpClient();
+				using var client = _smtpClientFactory();
 
 				// Configure client settings
 				client.Timeout = _timeoutSeconds * 1000; // MailKit timeout in milliseconds
@@ -381,15 +410,13 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		/// Creates, connects, and authenticates a new SmtpClient.
 		/// Used by both single-send and batch-send paths.
 		/// </summary>
-		private async Task<SmtpClient> ConnectSmtpClientAsync(
+		private async Task<ISmtpClient> ConnectSmtpClientAsync(
 			string host, int port, string username, string password,
 			SecureSocketOptions secureSocketOptions)
 		{
-			var client = new SmtpClient
-			{
-				Timeout = _timeoutSeconds * 1000,
-				CheckCertificateRevocation = false // Set to false to avoid issues with certain servers; handle TLS errors in IsRetryableException instead
-			};
+			var client = _smtpClientFactory();
+			client.Timeout = _timeoutSeconds * 1000;
+			client.CheckCertificateRevocation = false; // Set to false to avoid issues with certain servers; handle TLS errors in IsRetryableException instead
 
 			using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(_timeoutSeconds + 10));
 			await client.ConnectAsync(host, port, secureSocketOptions, cts.Token);
@@ -403,7 +430,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		/// Sends a single email using an already-connected SmtpClient (for batch processing).
 		/// Falls back to the per-message TrySendEmailWithMailKitAsync on connection-level errors.
 		/// </summary>
-		private async Task<bool> TrySendEmailWithSharedClientAsync(SmtpClient client, QueuedEmail queuedEmail)
+		private async Task<bool> TrySendEmailWithSharedClientAsync(ISmtpClient client, QueuedEmail queuedEmail)
 		{
 			var operationId = Guid.NewGuid().ToString("N")[..8];
 			var stopwatch = Stopwatch.StartNew();
@@ -670,7 +697,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 				// This avoids N connect/auth handshakes (each ~2s) for N emails.
 				var (host, port, username, password, enableSsl) = await GetCurrentConfigAsync();
 				var secureSocketOptions = ResolveSecureSocketOptions(enableSsl, port);
-				SmtpClient? sharedClient = null;
+				ISmtpClient? sharedClient = null;
 
 				try
 				{
@@ -1182,7 +1209,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 
 			try
 			{
-				using var client = new SmtpClient();
+				using var client = _smtpClientFactory();
 				client.Timeout = config.TimeoutSeconds * 1000;
 				client.SslProtocols = System.Security.Authentication.SslProtocols.Tls12;
 				client.CheckCertificateRevocation = false;
@@ -1261,7 +1288,8 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 					SmtpReachabilityKind.Other,
 					"SMTP configuration is incomplete.");
 
-			using var client = new SmtpClient { Timeout = config.TimeoutSeconds * 1000 };
+			using var client = _smtpClientFactory();
+			client.Timeout = config.TimeoutSeconds * 1000;
 
 			// Hard ceiling on total probe time. +5s over the SmtpClient timeout
 			// to allow the inner timeout to surface its own diagnostic error.
@@ -1327,11 +1355,11 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			}
 		}
 
-		private static Task<bool> IsNetworkAvailableAsync()
+		private Task<bool> IsNetworkAvailableAsync()
 		{
 			try
 			{
-				var isAvailable = Connectivity.Current.NetworkAccess == NetworkAccess.Internet;
+				var isAvailable = _isNetworkAvailable();
 				return Task.FromResult(isAvailable);
 			}
 			catch (Exception ex)

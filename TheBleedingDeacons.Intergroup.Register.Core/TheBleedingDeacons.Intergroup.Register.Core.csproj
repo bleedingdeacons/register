@@ -1,0 +1,107 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!--
+		The half of Register that has nothing to do with MAUI.
+
+		Everything here is plain .NET: attendance and compliance, the two
+		append-only event logs, the snapshot and the reconcile against it,
+		the email queue and its templates, the Freedom overlay. It exists as
+		its own net10.0 library for one reason - a test project cannot
+		reference the app. The app's target frameworks are platform heads
+		(android, ios, maccatalyst, windows); a net10.0 test host has no
+		compatible framework to resolve against, and there is no such thing
+		as a net10.0 head of a MAUI app. So the testable code has to live
+		somewhere a test project can actually see it, and this is that
+		somewhere. Link and Hand reached the same arrangement for the same
+		reason.
+
+		<b>What may live here: anything that does not touch MAUI.</b> The
+		line is not stylistic - the moment a file references Preferences,
+		SecureStorage, FileSystem, Connectivity, MainThread or any
+		Microsoft.Maui type it stops compiling here, because those
+		assemblies come from the MAUI workload and this project does not
+		have it.
+
+		That constraint is why three seams exist. The event logs take the
+		directory they write to rather than reaching for FileSystem; the
+		email service takes a network probe rather than asking Connectivity,
+		and an SMTP client factory rather than newing one up; the temporary
+		id counter takes a store rather than writing to Preferences. Each of
+		those is the seam a platform detail would otherwise have been
+		welded across, and each is the one a test drives.
+
+		What deliberately stayed in the app:
+
+		  * ConfigurationService     - Preferences, SecureStorage, and the
+		                               embedded appsettings/devsettings.
+		  * PrivacyPolicyCache       - a Preferences blob. Its interface is here.
+		  * PopupNotificationService - MAUI popups, and IPopupNotification.
+		  * FreedomStartup           - Freedom.Client.Maui's sign-in.
+		  * BuildInfo                - reads the build stamp from its own
+		                               assembly, which has to be the app's.
+		  * the value converters, Views, ViewModels, Controls, MauiProgram.
+
+		The two email templates are embedded here, not in the app, because
+		EmailTemplateService reads them from its own assembly. RootNamespace
+		matches the app's so the resource names did not change in the move.
+	-->
+
+	<PropertyGroup>
+		<!--
+			The same frameworks as Unity.Intergroup, for the same reason it has
+			them: the app's Windows head resolves the -windows build of each
+			reference, and Core sits between the two. Were Core net10.0 only,
+			the Windows head would get Unity.Intergroup's -windows build
+			directly and its net10.0 build through Core - one assembly name,
+			two builds. Tests and specs resolve net10.0.
+		-->
+		<TargetFrameworks>net10.0</TargetFrameworks>
+		<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net10.0-windows10.0.19041.0</TargetFrameworks>
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
+		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
+		<RootNamespace>TheBleedingDeacons.Intergroup.Register</RootNamespace>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<IsPackable>false</IsPackable>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<EmbeddedResource Include="Templates\ComplianceAcceptanceEmail.html" />
+		<EmbeddedResource Include="Templates\WelcomeEmail.html" />
+	</ItemGroup>
+
+	<!--
+		The same package versions the app pins. They are not inherited -
+		this project is referenced by the app, so a lower version here would
+		be lifted by the app's own reference and a higher one would silently
+		raise the app's. Keeping them written out means a bump has to be
+		made in both places on purpose rather than happening as a side
+		effect, and NuGet says so if they ever disagree.
+	-->
+	<ItemGroup>
+		<PackageReference Include="EPPlus" Version="8.6.3" />
+		<PackageReference Include="libphonenumber-csharp" Version="9.0.36" />
+		<PackageReference Include="MailKit" Version="4.17.0" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.10" />
+		<PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="10.0.10" />
+		<PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.10" />
+		<PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.10" />
+		<PackageReference Include="Serilog" Version="4.4.0" />
+		<!-- Logging: CurrentLogger, ILogShipper and BetterStackConfiguration,
+		     shared with Link. The app references Inventory.Maui at the same
+		     version. -->
+		<PackageReference Include="Inventory" Version="0.1.1" />
+		<!-- The managed-values overlay. The app references Freedom.Client.Maui
+		     at the same version, on Android. -->
+		<PackageReference Include="Freedom.Client" Version="0.1.1" />
+		<PackageReference Include="SonarAnalyzer.CSharp" Version="10.31.0.145097">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\TheBleedingDeacons.Unity.Intergroup\TheBleedingDeacons.Unity.Intergroup.csproj" />
+	</ItemGroup>
+
+</Project>

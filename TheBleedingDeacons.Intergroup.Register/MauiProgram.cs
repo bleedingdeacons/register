@@ -128,8 +128,14 @@ public static class MauiProgram
 		builder.Services.AddSingleton<IConfigurationService>(sp =>
 			new ConfigurationService(sp.GetService<TheBleedingDeacons.Freedom.Client.FreedomClient>()));
 
-		builder.Services.AddSingleton<RegistrationEventLog>();
-		builder.Services.AddSingleton<ComplianceEventLog>();
+		// Both logs in the one directory; see EventLogDirectory for where and why.
+		var eventLogDirectory = EventLogDirectory.Resolve();
+		builder.Services.AddSingleton(_ => new RegistrationEventLog(Path.Combine(eventLogDirectory, RegistrationEventLog.FileName)));
+		builder.Services.AddSingleton(_ => new ComplianceEventLog(Path.Combine(eventLogDirectory, ComplianceEventLog.FileName)));
+
+		// Before anything can create a member: until this runs the temporary
+		// id counter lives in memory only. See TemporaryIdGenerator.
+		TemporaryIdGenerator.Use(new PreferencesTemporaryIdStore());
 
 		builder.Services.AddSingleton<SqlitePragmaInterceptor>();
 
@@ -258,6 +264,7 @@ public static class MauiProgram
 
 			return new EmailService(
 				dbContextFactory,
+				() => Connectivity.Current.NetworkAccess == NetworkAccess.Internet,
 				smtpConfig.Host,
 				smtpConfig.Port,
 				smtpConfig.Username,

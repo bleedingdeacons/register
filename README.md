@@ -31,6 +31,31 @@ The Freedom packages (`Freedom.Client`, and `Freedom.Client.Maui` on
 Android) come from the same feed with the same token; `Freedom.*` is in the
 mapping.
 
+## Project layout
+
+| Project | What |
+| --- | --- |
+| `…Intergroup.Register` | The MAUI app: views, view models, and everything that touches the platform. |
+| `…Intergroup.Register.Core` | Plain net10.0. Attendance and compliance, the two event logs, the snapshot and reconcile, the email queue and its templates, the Freedom overlay. |
+| `…Unity.Intergroup` | The local SQLite replica of Unity's data, its repositories, and the sync that fills it. |
+| `…Unity.Intergroup.Tests` | xUnit v3 over Unity.Intergroup. |
+
+**Core exists because a test project cannot reference a MAUI app.** The
+app's target frameworks are platform heads; a `net10.0` test host has no
+compatible framework to resolve against, and there is no such thing as a
+`net10.0` head of a MAUI app. So the code worth testing has to live
+somewhere a test project can see it. Link and Hand reached the same
+arrangement for the same reason.
+
+The line is not stylistic: the moment a file references `Preferences`,
+`SecureStorage`, `FileSystem`, `Connectivity` or any `Microsoft.Maui` type,
+it stops compiling in Core. That constraint is why the event logs take the
+path they write to, the email service takes a network probe and an SMTP
+client factory, and the temporary id counter takes a store. Each seam is
+the one a platform detail would otherwise have been welded across, and the
+one a test drives. What stayed in the app, and why, is listed in Core's
+project file.
+
 ## Settings from Freedom
 
 A tablet can take its SMTP, Unity, Better Stack and compliance settings from
