@@ -21,20 +21,39 @@
 /// their negative IDs never meet.
 ///
 /// <para><b>Persistence:</b></para>
-/// The counter is persisted to <see cref="Preferences"/> on every increment.
+/// The counter is persisted to the <see cref="ITemporaryIdStore"/> given to
+/// <see cref="Use"/> on every increment — Preferences, in the app.
 /// This is intentional: if the app crashes after generating a temp ID but
 /// before the member row is saved to SQLite, the next launch must not reissue
 /// the same ID — an orphan row from the crashed session may still be in the
 /// database and would cause a primary-key collision. Synchronous persistence
 /// is cheap at the rate these are generated (handful per meeting).
+///
+/// <para><b>The store is handed in</b> because this class lives in
+/// Register.Core, which cannot see Preferences. Until <see cref="Use"/> is
+/// called the counter lives in memory only, starting from zero — which is
+/// exactly the crash-and-reissue hazard above, so the app calls it at
+/// startup before anything can create a member.</para>
 /// </summary>
 public static class TemporaryIdGenerator
 {
-	private const string CounterKey = "temp_id_counter";
+	private static ITemporaryIdStore? _store;
 
 	// Counter decreases monotonically: first call returns -1, next -2, etc.
-	// Initial value loaded from Preferences so we resume where we left off.
-	private static int _counter = LoadCounter();
+	// Initial value loaded from the store so we resume where we left off.
+	private static int _counter;
+
+	/// <summary>
+	/// Persists the counter to <paramref name="store"/> from now on, resuming
+	/// from whatever it last held.
+	/// </summary>
+	public static void Use(ITemporaryIdStore store)
+	{
+		ArgumentNullException.ThrowIfNull(store);
+
+		_store = store;
+		Interlocked.Exchange(ref _counter, LoadCounter(store));
+	}
 
 	/// <summary>
 	/// Returns the next unique negative temporary ID for this device.
@@ -48,11 +67,11 @@ public static class TemporaryIdGenerator
 		// reissue an ID still referenced by an orphaned row.
 		try
 		{
-			Preferences.Default.Set(CounterKey, next);
+			_store?.Set(next);
 		}
 		catch
 		{
-			// Preferences write failed (rare — disk full, etc). Counter
+			// Store write failed (rare — disk full, etc). Counter
 			// continues in memory; worst case a crash + relaunch reissues
 			// an ID that collides with an orphan, which surfaces as a
 			// SQLite PK violation the caller can handle. Silent retry on
@@ -79,7 +98,7 @@ public static class TemporaryIdGenerator
 		Interlocked.Exchange(ref _counter, 0);
 		try
 		{
-			Preferences.Default.Set(CounterKey, 0);
+			_store?.Set(0);
 		}
 		catch
 		{
@@ -87,11 +106,11 @@ public static class TemporaryIdGenerator
 		}
 	}
 
-	private static int LoadCounter()
+	private static int LoadCounter(ITemporaryIdStore store)
 	{
 		try
 		{
-			var stored = Preferences.Default.Get(CounterKey, 0);
+			var stored = store.Get();
 			// Guard against positive values ending up in the pref (e.g. from
 			// an older version or corrupt prefs). Counter must start at 0 or
 			// below — Next() always decrements, so a positive seed would hand

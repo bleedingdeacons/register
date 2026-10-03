@@ -22,7 +22,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services;
 /// the <c>Registered</c> flags on the local entities so reconciliation can
 /// push them to Unity normally.
 ///
-/// File lives at <see cref="GetDefaultLogPath"/> — the user's Documents folder
+/// File lives wherever the host puts it — the app puts it in the user's Documents folder
 /// on desktop platforms, or a sensible platform-appropriate equivalent elsewhere.
 /// Callers must invoke <see cref="PurgeAsync"/> only AFTER a successful
 /// reconciliation — never before.
@@ -50,11 +50,19 @@ public sealed class RegistrationEventLog : IAsyncDisposable
 	// thread pool so the lock is not paranoia.
 	private readonly SemaphoreSlim _writeLock = new(1, 1);
 
-	public RegistrationEventLog()
-		: this(GetDefaultLogPath()) { }
+	/// <summary>The log's file name, inside whatever directory the host chooses.</summary>
+	public const string FileName = "registrations.log";
 
-	// Constructor overload for tests / non-MAUI hosts.
-	internal RegistrationEventLog(string logPath)
+	/// <summary>
+	/// Opens the log at <paramref name="logPath"/>.
+	///
+	/// <para>The host chooses where. The app resolves the device's Documents
+	/// folder, with the app data directory as the fallback (see
+	/// <c>EventLogDirectory</c> in the app); a test passes a temporary
+	/// file. That choice used to be made here, and it was the one thing
+	/// in this class that needed MAUI.</para>
+	/// </summary>
+	public RegistrationEventLog(string logPath)
 	{
 		_logPath = logPath;
 	}
@@ -65,51 +73,6 @@ public sealed class RegistrationEventLog : IAsyncDisposable
 	/// the file without duplicating the path logic.
 	/// </summary>
 	public string LogPath => _logPath;
-
-	/// <summary>
-	/// Resolves the log file path on the user's Documents folder, creating
-	/// the directory if it doesn't yet exist. Placing the log in Documents
-	/// (rather than <see cref="FileSystem.AppDataDirectory"/>) makes it
-	/// visible to the user for inspection and to IT support for collection,
-	/// and keeps it outside the app's sandbox-scoped data directory so
-	/// uninstalling the app doesn't take the crash log with it.
-	/// </summary>
-	private static string GetDefaultLogPath()
-	{
-		// Environment.SpecialFolder.MyDocuments resolves to:
-		//   • Windows  → %USERPROFILE%\Documents
-		//   • macOS    → ~/Documents
-		//   • iOS      → the app's Documents directory (sandbox; still the
-		//                right place — it's user-visible via the Files app)
-		//   • Android  → the app's private files dir; the public Documents
-		//                folder is not directly available through
-		//                Environment.SpecialFolder, so we fall back below.
-		var documents = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-
-		if (string.IsNullOrEmpty(documents))
-		{
-			// Last-resort fallback for platforms where MyDocuments isn't
-			// mapped. Keeps the app functional rather than crashing at
-			// first registration.
-			documents = FileSystem.AppDataDirectory;
-		}
-
-		try
-		{
-			Directory.CreateDirectory(documents);
-		}
-		catch (Exception ex)
-		{
-			// If we can't create or access the Documents folder for any
-			// reason (permissions, read-only volume), fall back to the
-			// app data directory rather than fail hard — the log is a
-			// durability aid, not a feature the app can't start without.
-			Logger.Warning(ex, "Could not prepare Documents folder {Path}; falling back to AppDataDirectory", documents);
-			documents = FileSystem.AppDataDirectory;
-		}
-
-		return Path.Combine(documents, "registrations.log");
-	}
 
 	// ────────────────────────────────────────────────────────────────
 	// Record shape

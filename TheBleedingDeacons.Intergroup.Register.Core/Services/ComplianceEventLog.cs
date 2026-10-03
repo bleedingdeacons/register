@@ -37,11 +37,19 @@ public sealed class ComplianceEventLog : IAsyncDisposable
 	private readonly string _logPath;
 	private readonly SemaphoreSlim _writeLock = new(1, 1);
 
-	public ComplianceEventLog()
-		: this(GetDefaultLogPath()) { }
+	/// <summary>The log's file name, inside whatever directory the host chooses.</summary>
+	public const string FileName = "compliance.log";
 
-	// Constructor overload for tests / non-MAUI hosts.
-	internal ComplianceEventLog(string logPath)
+	/// <summary>
+	/// Opens the log at <paramref name="logPath"/>.
+	///
+	/// <para>The host chooses where. The app resolves the device's Documents
+	/// folder, with the app data directory as the fallback (see
+	/// <c>EventLogDirectory</c> in the app); a test passes a temporary
+	/// file. That choice used to be made here, and it was the one thing
+	/// in this class that needed MAUI.</para>
+	/// </summary>
+	public ComplianceEventLog(string logPath)
 	{
 		_logPath = logPath;
 	}
@@ -52,33 +60,6 @@ public sealed class ComplianceEventLog : IAsyncDisposable
 	/// the file without duplicating the path logic.
 	/// </summary>
 	public string LogPath => _logPath;
-
-	/// <summary>
-	/// Resolves the log file path on the user's Documents folder, creating
-	/// the directory if it doesn't yet exist. See
-	/// <see cref="RegistrationEventLog"/> for the platform-by-platform
-	/// rationale; this method follows the identical fallback ladder so
-	/// both logs always end up in the same directory.
-	/// </summary>
-	private static string GetDefaultLogPath()
-	{
-		var documents = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-
-		if (string.IsNullOrEmpty(documents))
-			documents = FileSystem.AppDataDirectory;
-
-		try
-		{
-			Directory.CreateDirectory(documents);
-		}
-		catch (Exception ex)
-		{
-			Logger.Warning(ex, "Could not prepare Documents folder {Path}; falling back to AppDataDirectory", documents);
-			documents = FileSystem.AppDataDirectory;
-		}
-
-		return Path.Combine(documents, "compliance.log");
-	}
 
 	// ────────────────────────────────────────────────────────────────
 	// Record shape

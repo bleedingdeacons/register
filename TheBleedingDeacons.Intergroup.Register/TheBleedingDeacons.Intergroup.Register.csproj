@@ -233,12 +233,11 @@
 
 	<ItemGroup>
 		<None Remove="Platforms\Android\Resources\xml\file_paths.xml" />
-		<None Remove="Templates\ComplianceAcceptanceEmail.html" />
 	</ItemGroup>
 
 	<ItemGroup>
-		<EmbeddedResource Include="Templates\ComplianceAcceptanceEmail.html" />
-		<EmbeddedResource Include="Templates\WelcomeEmail.html" />
+		<!-- The email templates are embedded in Register.Core, beside the
+		     EmailTemplateService that reads them from its own assembly. -->
 		<EmbeddedResource Include="appsettings.json" />
 		<None Remove="appsettings.json" />
 	</ItemGroup>
@@ -352,11 +351,12 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<Folder Include="Data\Configurations\" />
 		<Folder Include="Resources\Raw\" />
 	</ItemGroup>
 
 	<ItemGroup>
+		<!-- Everything that does not touch MAUI; see its project file for the line. -->
+		<ProjectReference Include="..\TheBleedingDeacons.Intergroup.Register.Core\TheBleedingDeacons.Intergroup.Register.Core.csproj" />
 		<ProjectReference Include="..\TheBleedingDeacons.Unity.Intergroup\TheBleedingDeacons.Unity.Intergroup.csproj" />
 	</ItemGroup>
 
