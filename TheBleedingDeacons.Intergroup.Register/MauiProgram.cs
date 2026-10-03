@@ -235,6 +235,9 @@ public static class MauiProgram
 		// services share one disposal policy.
 		builder.Services.AddScoped<ComplianceService>();
 		builder.Services.AddScoped<IComplianceRegistration>(sp => sp.GetRequiredService<ComplianceService>());
+		// The consent round the Verify pages run before registering. Transient,
+		// because IComplianceRegistration above is scoped.
+		builder.Services.AddTransient<ConsentRound>();
 
 		builder.Services.AddScoped<DataService>();
 		builder.Services.AddMemoryCache();
