@@ -40,6 +40,7 @@ mapping.
 | `…Unity.Intergroup` | The local SQLite replica of Unity's data, its repositories, and the sync that fills it. |
 | `…Unity.Intergroup.Tests` | xUnit v3 over Unity.Intergroup. |
 | `…Intergroup.Register.Tests` | xUnit v3 over Register.Core — the edges: torn logs, refused passwords, answers that are not JSON. |
+| `…Intergroup.Register.Specs` | Reqnroll over Register.Core — the behaviour, in the words a meeting would use for it. |
 
 **Core exists because a test project cannot reference a MAUI app.** The
 app's target frameworks are platform heads; a `net10.0` test host has no
@@ -57,16 +58,42 @@ the one a platform detail would otherwise have been welded across, and the
 one a test drives. What stayed in the app, and why, is listed in Core's
 project file.
 
-Both test projects run in CI under Coverlet, merged into the one report
-the Coveralls badge reads:
+### Tests and the specification
+
+They are not duplicates and none replaces another. Register.Tests and
+Unity.Intergroup.Tests are where the edges live: a torn log line, an SMTP
+server that refuses the password, a Scrutiny that answers HTML. They are
+what the coverage badge measures, merged into one report by Coverlet.
+Register.Specs is where the behaviour lives, written as sentences: a group
+brings its officers with it, the last thing said about a group is what
+counts, a refused registration keeps the logs for next time.
 
 ```bash
 dotnet test TheBleedingDeacons.Intergroup.Register.Tests
 ```
 
-The figure fell when Register.Core joined it, from about 92% of
-Unity.Intergroup alone to about 46% of both. That is Core being measured
-for the first time, not anything getting worse.
+```bash
+dotnet test TheBleedingDeacons.Intergroup.Register.Specs
+```
+
+All three run in CI. The specs are a gate, not a contribution to the
+badge: folding them into the coverage run would quietly change what the
+number means. That number fell when Register.Core joined it, from about
+92% of Unity.Intergroup alone to about 46% of both. That is Core being
+measured for the first time, not anything getting worse.
+
+The narrative behind the feature files, and the glossary they use, is
+[`specs/domain-model.md`](specs/domain-model.md). It was written by
+reading the code: the app came first and the specification was
+reverse-engineered from it, so where the two disagree the feature files
+are what runs. It also lists the behaviour found while writing them that
+is pinned rather than fixed. The sharpest: a wrong SMTP password never
+trips the email circuit breaker.
+
+**Scenarios tagged `@manual @ignore` are on-device acceptance criteria**
+and Reqnroll skips them: the Yes button greying out, Freedom's sign-in
+through its callback, Reset Device deleting both logs. No test host can
+reach any of them.
 
 ## Settings from Freedom
 
