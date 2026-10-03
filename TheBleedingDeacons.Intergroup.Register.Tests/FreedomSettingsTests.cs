@@ -107,9 +107,25 @@ public sealed class FreedomSettingsTests
 	[InlineData("")]
 	[InlineData("   ")]
 	[InlineData("not a url")]
-	[InlineData("/amber")]
 	public void NoUsableSiteLeavesFreedomOff(string? baseUrl) =>
 		Assert.Null(FreedomSettings.OptionsFrom(Config(("Freedom:BaseUrl", baseUrl))));
+
+	/// <summary>
+	/// Found, not chosen, and platform-dependent: on Windows a rooted path
+	/// is not an absolute URI, but on Linux — and so on Android — it parses
+	/// as <c>file:///amber</c>, and OptionsFrom hands back options for it.
+	/// Freedom's own IsConfigured refuses a file URI, so the tablet never
+	/// talks to it; what this pins is that nothing usable comes out on
+	/// either platform. OptionsFrom checking the scheme would make the
+	/// first branch the only one.
+	/// </summary>
+	[Fact]
+	public void ARootedPathIsNeverAUsableSite()
+	{
+		var options = FreedomSettings.OptionsFrom(Config(("Freedom:BaseUrl", "/amber")));
+
+		Assert.True(options is null || !options.IsConfigured);
+	}
 
 	[Fact]
 	public void ASiteAloneGetsTheDefaults()
