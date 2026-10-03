@@ -8,7 +8,8 @@ namespace TheBleedingDeacons.Intergroup.Register.Utilities;
 /// <summary>
 /// Converts standard Markdown to valid HTML.
 /// Supports: # headings, - bullet lists, --- horizontal rules,
-/// *italic*, **bold**, [text](url), bare URLs, and paragraphs.
+/// *italic*, **bold**, [text](url) to http, https or mailto targets,
+/// bare URLs, and paragraphs.
 /// </summary>
 public static class BasicMarkdownConverter
 {
@@ -102,9 +103,14 @@ public static class BasicMarkdownConverter
     {
         text = EscapeHtml(text.Trim());
 
-        // Markdown links: [text](url)
+        // Markdown links: [text](url). Only a web or mail target becomes a
+        // link; anything else (javascript:, data:, vbscript:, a relative
+        // path) is rendered as its text alone.
         text = Regex.Replace(text, @"\[(.+?)\]\((.+?)\)",
-            m => $"<a href=\"{m.Groups[2].Value}\">{m.Groups[1].Value}</a>", RegexOptions.None, RegexTimeout);
+            m => IsLinkableTarget(m.Groups[2].Value)
+                ? $"<a href=\"{m.Groups[2].Value}\">{m.Groups[1].Value}</a>"
+                : m.Groups[1].Value,
+            RegexOptions.None, RegexTimeout);
 
         // Bare URLs (not already inside href="")
         text = Regex.Replace(text, @"(?<!href="")https?://[^\s<]+",
@@ -118,6 +124,16 @@ public static class BasicMarkdownConverter
 
         return text;
     }
+
+    /// <summary>
+    /// True when <paramref name="url"/> is an absolute http, https or mailto
+    /// URI. The raw text must itself begin with that scheme, so nothing
+    /// <see cref="Uri"/> trims or tolerates in front of it can reach the href.
+    /// </summary>
+    private static bool IsLinkableTarget(string url) =>
+        Uri.TryCreate(url, UriKind.Absolute, out var uri)
+        && uri.Scheme is "http" or "https" or "mailto"
+        && url.StartsWith(uri.Scheme + ":", StringComparison.OrdinalIgnoreCase);
 
     private static string EscapeHtml(string text) =>
         text.Replace("&", "&amp;")

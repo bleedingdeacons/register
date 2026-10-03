@@ -35,6 +35,36 @@ public sealed class BasicMarkdownConverterTests
 	}
 
 	[Theory]
+	[InlineData("[click](javascript:alert(1))")]
+	[InlineData("[click](JavaScript:alert(1))")]
+	[InlineData("[click](data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==)")]
+	[InlineData("[click](vbscript:msgbox(1))")]
+	[InlineData("[click]( javascript:alert(1))")]
+	public void ALinkToAnythingButTheWebOrMailIsOnlyItsText(string markdown)
+	{
+		var html = BasicMarkdownConverter.Convert(markdown);
+
+		Assert.DoesNotContain("<a", html, StringComparison.Ordinal);
+		Assert.DoesNotContain("script:", html, StringComparison.OrdinalIgnoreCase);
+		Assert.DoesNotContain("data:", html, StringComparison.OrdinalIgnoreCase);
+		Assert.StartsWith("<p>click", html, StringComparison.Ordinal);
+	}
+
+	[Theory]
+	[InlineData("[policy](javascript:void)")]
+	[InlineData("[policy](/privacy)")]
+	public void TheTextOfARefusedLinkIsKept(string markdown) =>
+		Assert.Equal("<p>policy</p>", BasicMarkdownConverter.Convert(markdown));
+
+	[Theory]
+	[InlineData("https://example.org/privacy")]
+	[InlineData("http://example.org")]
+	[InlineData("HTTPS://example.org")]
+	[InlineData("mailto:privacy@example.org")]
+	public void ALinkToTheWebOrToMailStillWorks(string url) =>
+		Assert.Equal($"<p><a href=\"{url}\">click</a></p>", BasicMarkdownConverter.Convert($"[click]({url})"));
+
+	[Theory]
 	[InlineData("**bold without an end")]
 	[InlineData("*italic without an end")]
 	[InlineData("[text without a target]")]
