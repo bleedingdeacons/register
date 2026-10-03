@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Serilog;
 using TheBleedingDeacons.Intergroup.Register.Extensions;
+using TheBleedingDeacons.Intergroup.Register.Services;
 using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Support;
 using TheBleedingDeacons.Intergroup.Register.Views;
@@ -37,8 +38,8 @@ public partial class VerifyGroupViewModel : BaseViewModel
 	private readonly IPositionRepository _positionRepository;
 	private readonly IPopupNotification _popupService;
 	private readonly IConfigurationService _configService;
-	private readonly IComplianceRegistration _complianceRegistration;
 	private readonly IPrivacyPolicyCache _privacyPolicyCache;
+	private readonly ConsentRound _consentRound;
 
 	[ObservableProperty]
 	private Group? group;
@@ -113,16 +114,16 @@ public partial class VerifyGroupViewModel : BaseViewModel
 		IPositionRepository positionRepository,
 		IPopupNotification popupService,
 		IConfigurationService configService,
-		IComplianceRegistration complianceRegistration,
-		IPrivacyPolicyCache privacyPolicyCache)
+		IPrivacyPolicyCache privacyPolicyCache,
+		ConsentRound consentRound)
 	{
 		_attendanceRegistration = attendanceRegistration;
 		_groupRepository = groupRepository;
 		_positionRepository = positionRepository;
 		_popupService = popupService;
 		_configService = configService;
-		_complianceRegistration = complianceRegistration;
 		_privacyPolicyCache = privacyPolicyCache;
+		_consentRound = consentRound;
 	}
 
 	#region Query Attributes Handling
@@ -281,35 +282,18 @@ public partial class VerifyGroupViewModel : BaseViewModel
 
 		try
 		{
-			// GDPR gate. Each active GSR who has not previously accepted
-			// the privacy policy — OR whose recorded acceptance is for an
-			// earlier version than the currently cached active policy —
-			// must be asked individually before their data is committed
-			// as a registered attendance. The popup is shown once per
-			// outstanding GSR with that GSR's name in the title, so it's
-			// clear whose consent is being captured. If any GSR declines,
-			// the entire group registration is aborted — we cannot register
-			// a group whose members haven't all consented to the current
-			// version. GSRs who accept have their acceptance recorded
-			// individually as the loop progresses, which updates their
-			// stored version to match the cached one.
-			//
-			// The cached version comparison is intentionally an inequality
-			// check, not a "less than" check: PrivacyPolicy.Version is
-			// free-form text per the Scrutiny contract, so any differing
-			// recorded version is treated as out-of-date for the purposes
-			// of re-prompting. If the cache is missing, fall back to the
-			// "never accepted" filter only — PromptForComplianceAsync's
-			// own null-cache guard will then surface the right error.
+			// GDPR gate. Each active GSR who has not accepted the current
+			// version of the privacy policy is asked individually, by name,
+			// before their data is committed as a registered attendance. If
+			// any GSR declines, the entire group registration is aborted —
+			// we cannot register a group whose members haven't all consented
+			// to the current version. Who needs asking is
+			// RegistrationGate.NeedingConsent; the asking is ConsentRound.
 			var cachedVersion = _privacyPolicyCache.GetCached()?.Version;
-			var unaccepted = ActiveGsrs.Where(m =>
-				m.GdprAccepted != true
-				|| (!string.IsNullOrWhiteSpace(cachedVersion)
-					&& !string.Equals(m.GdprAcceptanceVersion, cachedVersion, StringComparison.Ordinal)))
-				.ToList();
+			var unaccepted = RegistrationGate.NeedingConsent(ActiveGsrs, cachedVersion);
 			if (unaccepted.Count > 0)
 			{
-				var consentGiven = await PromptForComplianceAsync(unaccepted);
+				var consentGiven = await _consentRound.AskAsync(unaccepted, _popupService, "this GSR");
 				if (!consentGiven)
 				{
 					Logger.Information(
@@ -330,41 +314,12 @@ public partial class VerifyGroupViewModel : BaseViewModel
 			// the verify-position flow captures consent there instead.
 			if (_configService.IsAutoRegisterPositionsOnGroupEnabled)
 			{
-				// Collect position IDs held by the registering GSRs. If a GSR
-				// also holds an intergroup position, that position is
-				// auto-registered as a cascade. Any co-holders of those
-				// positions who haven't yet accepted the current policy must be
-				// prompted before the registration is committed.
-				// GSRs who accepted in the gate above already have their
-				// acceptance written to the DB, so they will be naturally
-				// excluded by the version check when loaded fresh here.
-				var positionIds = ActiveGsrs
-					.Where(m => m.IntergroupPositionId.HasValue)
-					.Select(m => m.IntergroupPositionId!.Value)
-					.Distinct()
-					.ToList();
-
-				var otherHoldersNeedingConsent = new List<Member>();
-				foreach (var positionId in positionIds)
-				{
-					var position = await _positionRepository.GetByIdWithHoldersAsync(positionId);
-					if (position?.Holders == null) continue;
-
-					foreach (var holder in position.Holders)
-					{
-						// Skip members who have already accepted the current version.
-						if (holder.GdprAccepted == true
-							&& (string.IsNullOrWhiteSpace(cachedVersion)
-								|| string.Equals(holder.GdprAcceptanceVersion, cachedVersion, StringComparison.Ordinal)))
-							continue;
-
-						otherHoldersNeedingConsent.Add(holder);
-					}
-				}
+				var otherHoldersNeedingConsent = await RegistrationGate.CascadedHoldersNeedingConsentAsync(
+					ActiveGsrs, _positionRepository, cachedVersion);
 
 				if (otherHoldersNeedingConsent.Count > 0)
 				{
-					var consentGiven = await PromptForComplianceAsync(otherHoldersNeedingConsent);
+					var consentGiven = await _consentRound.AskAsync(otherHoldersNeedingConsent, _popupService, "this GSR");
 					if (!consentGiven)
 					{
 						Logger.Information(
@@ -413,133 +368,6 @@ public partial class VerifyGroupViewModel : BaseViewModel
 	#endregion
 
 	#region Private Methods
-
-	/// <summary>
-	/// Shows the compliance popup once per supplied GSR, with that GSR's
-	/// name in the title so it's unambiguous whose consent is being
-	/// captured. Each acceptance is recorded individually via
-	/// <see cref="IComplianceRegistration.RecordAcceptance"/> as soon as
-	/// it's given. Returns <c>true</c> only when every GSR accepted;
-	/// returns <c>false</c> as soon as any GSR declines (or the popup is
-	/// dismissed without an explicit choice), without prompting the
-	/// remaining GSRs — the overall registration cannot proceed.
-	///
-	/// Per-member acceptance timestamps are captured at the moment the
-	/// user clicks Accept for that member, rather than sharing a single
-	/// batch timestamp, so the audit trail reflects the actual sequence
-	/// of consent events.
-	/// </summary>
-	private async Task<bool> PromptForComplianceAsync(IEnumerable<Member> members)
-	{
-		// Read the cached active policy first. The sync-stage gate
-		// guarantees this is populated before a meeting can start, so
-		// reaching this method with an empty cache means either (a) the
-		// device hasn't synced at all (unusual but possible if the
-		// flow is reached via a code path that bypassed sync), or
-		// (b) the cache was cleared by a sync that found "no active
-		// policy". Either way, the right behaviour is to refuse to
-		// record consent — recording an acceptance with no version
-		// would corrupt the audit trail.
-		var cachedPolicy = _privacyPolicyCache.GetCached();
-		if (cachedPolicy is null)
-		{
-			Logger.Error(
-				"No cached privacy policy on device; refusing to prompt for consent. " +
-				"This indicates the sync-stage gate was bypassed.");
-			await _popupService.ShowErrorAsync(
-				"Cannot record consent",
-				"This device has no active privacy policy on record. " +
-				"Re-sync from the Admin page before continuing.");
-			return false;
-		}
-
-		// The body shown in the popup comes from the cached upstream
-		// policy now that the bundled Terms.txt has been retired. An
-		// empty body means the upstream policy was published without
-		// prose filled in — surfacing an empty popup with an "I Agree"
-		// button would be the worst possible audit-trail outcome
-		// ("agreed to nothing"), so refuse to prompt and route the
-		// operator to a re-sync, mirroring the missing-cache branch.
-		if (string.IsNullOrWhiteSpace(cachedPolicy.Policy))
-		{
-			Logger.Error(
-				"Cached privacy policy {PolicyId} v{Version} has empty body; refusing to prompt for consent",
-				cachedPolicy.Id, cachedPolicy.Version);
-			await _popupService.ShowErrorAsync(
-				"Cannot record consent",
-				"The cached privacy policy has no body text on record. " +
-				"Re-sync from the Admin page before continuing.");
-			return false;
-		}
-
-		var policyBody = cachedPolicy.Policy;
-
-		foreach (var member in members)
-		{
-			// Compose a per-GSR title so the user can see which member's
-			// consent the popup is asking for. Both the title and the
-			// body now come from the cached Scrutiny record — Scrutiny
-			// is the single source of truth for everything the user
-			// sees, the audit trail records, and the confirmation
-			// email quotes.
-			string memberName = !string.IsNullOrWhiteSpace(member.AnonymousName)
-				? member.AnonymousName
-				: "this GSR";
-			string perMemberTitle = $"{cachedPolicy.Title} — {memberName}";
-
-			bool accepted = await _popupService.ShowTerms(perMemberTitle, policyBody);
-			if (!accepted)
-			{
-				Logger.Information(
-					"GDPR consent declined for member {MemberId} ({Name}); aborting group registration",
-					member.Id, member.AnonymousName);
-				return false;
-			}
-
-			// Record this member's acceptance immediately. Per-member
-			// timestamps mean each row in the audit log carries the
-			// real moment the user clicked Accept for that GSR, rather
-			// than a single shared batch timestamp.
-			//
-			// Version is the cached Scrutiny version. The `statement`
-			// parameter is no longer used by ComplianceService (it
-			// sources the wording from the cache itself, see the
-			// IComplianceRegistration param doc) — kept on the call
-			// for ABI continuity. Empty would be equally correct; we
-			// pass the popup body for symmetry with what the user
-			// just saw, in case a future change starts honouring it
-			// again.
-			var ts = DateTime.UtcNow;
-			try
-			{
-				await _complianceRegistration.RecordAcceptance(
-					member,
-					version: cachedPolicy.Version,
-					statement: policyBody,
-					method: "register-app",
-					acceptedAtUtc: ts);
-
-				// Mirror the in-memory entity so the page's bindings reflect
-				// the new state immediately — ComplianceService updates a
-				// freshly-loaded Member instance, not the one the VM holds.
-				member.GdprAccepted = true;
-				member.GdprAcceptedAt = ts;
-			}
-			catch (Exception ex)
-			{
-				// Per-member persistence failure is logged but doesn't
-				// abort the loop — the DB write inside ComplianceService
-				// already swallows its own errors, so a throw here would
-				// be unusual. The user did consent in the UI, so we still
-				// honour that and continue prompting the remaining GSRs.
-				Logger.Warning(ex,
-					"Failed to record GDPR acceptance for member {MemberId} ({Name})",
-					member.Id, member.AnonymousName);
-			}
-		}
-
-		return true;
-	}
 
 	private async Task LoadGroupAsync(int groupId)
 	{
@@ -625,16 +453,8 @@ public partial class VerifyGroupViewModel : BaseViewModel
 
 	private void UpdateCanRegister()
 	{
-		// At least one active GSR must have required contact fields
-		bool hasValidGsr = ActiveGsrs.Any(g =>
-			!string.IsNullOrEmpty(g.AnonymousName) &&
-			(!string.IsNullOrEmpty(g.MobileNumber) || !string.IsNullOrEmpty(g.PersonalEmail)));
-
-		// If the user is marking themselves as standing in, they must enter a name.
-		// When StandingIn is unticked, StandinName is not required.
-		bool standInOk = !StandingIn || !string.IsNullOrWhiteSpace(StandinName);
-
-		CanRegister = hasValidGsr && standInOk;
+		// A contactable GSR, and a name when someone is standing in.
+		CanRegister = RegistrationGate.CanRegisterGroup(ActiveGsrs, StandingIn, StandinName);
 	}
 
 	/// <summary>
@@ -645,16 +465,8 @@ public partial class VerifyGroupViewModel : BaseViewModel
 	/// Wired via [NotifyCanExecuteChangedFor(nameof(YesCommand))] on StandingIn and
 	/// StandinName, so any change to either re-runs this automatically.
 	/// </summary>
-	private bool CanExecuteYes()
-	{
-		bool hasValidGsr = ActiveGsrs.Any(g =>
-			!string.IsNullOrEmpty(g.AnonymousName) &&
-			(!string.IsNullOrEmpty(g.MobileNumber) || !string.IsNullOrEmpty(g.PersonalEmail)));
-
-		bool standInOk = !StandingIn || !string.IsNullOrWhiteSpace(StandinName);
-
-		return hasValidGsr && standInOk;
-	}
+	private bool CanExecuteYes() =>
+		RegistrationGate.CanRegisterGroup(ActiveGsrs, StandingIn, StandinName);
 
 	#endregion
 }
