@@ -14,7 +14,10 @@ name: CI
 #                    iOS and MacCatalyst heads.
 #  * test          — run both xUnit v3 suites (on Microsoft.Testing.Platform) —
 #                    Unity.Intergroup.Tests and Register.Tests — under Coverlet,
-#                    merge the two runs into one report and upload it to Coveralls.
+#                    merge the two runs into one report and upload it to Coveralls,
+#                    then run the Reqnroll specification (Register.Specs) as a
+#                    gate of its own. The specs are not part of the coverage
+#                    figure, deliberately.
 
 # The build/** push trigger exists so a long-lived branch that is deliberately
 # not merged — the .NET 10 upgrade, which is kept switchable against a .NET 9
@@ -224,6 +227,19 @@ jobs:
           dotnet coverlet "$U" --target dotnet --targetargs "$U" "${INCLUDE[@]}" --format json --output coverage/coverage.json
           dotnet coverlet "$R" --target dotnet --targetargs "$R" "${INCLUDE[@]}" \
             --merge-with coverage/coverage.json --format cobertura --output coverage/coverage.cobertura.xml
+
+      # The executable specification (Register.Specs): Reqnroll over the same
+      # Register.Core the xUnit suites cover. It is a gate in its own right
+      # and deliberately not part of the coverage run, so the Coveralls figure
+      # goes on meaning what the README says it means: how well the xUnit
+      # suites cover Unity.Intergroup and Register.Core.
+      #
+      # Scenarios tagged @manual @ignore are on-device acceptance criteria.
+      # Reqnroll skips them; nothing here has to filter them out.
+      - name: Run the executable specification
+        run: >
+          dotnet test TheBleedingDeacons.Intergroup.Register.Specs/TheBleedingDeacons.Intergroup.Register.Specs.csproj
+          -c Debug
 
       - name: Upload coverage to Coveralls
         uses: coverallsapp/github-action@v2
