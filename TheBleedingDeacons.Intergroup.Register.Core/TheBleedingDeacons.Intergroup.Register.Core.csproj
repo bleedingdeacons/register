@@ -104,4 +104,15 @@
 		<ProjectReference Include="..\TheBleedingDeacons.Unity.Intergroup\TheBleedingDeacons.Unity.Intergroup.csproj" />
 	</ItemGroup>
 
+	<!--
+		EmailService's background tick is internal, not public: nothing in
+		the app should call it, but the circuit breaker lives only there,
+		and the tests and the specification have to be able to run it
+		without waiting a minute for the timer.
+	-->
+	<ItemGroup>
+		<InternalsVisibleTo Include="TheBleedingDeacons.Intergroup.Register.Tests" />
+		<InternalsVisibleTo Include="TheBleedingDeacons.Intergroup.Register.Specs" />
+	</ItemGroup>
+
 </Project>

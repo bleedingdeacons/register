@@ -415,15 +415,26 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			SecureSocketOptions secureSocketOptions)
 		{
 			var client = _smtpClientFactory();
-			client.Timeout = _timeoutSeconds * 1000;
-			client.CheckCertificateRevocation = false; // Set to false to avoid issues with certain servers; handle TLS errors in IsRetryableException instead
+			try
+			{
+				client.Timeout = _timeoutSeconds * 1000;
+				client.CheckCertificateRevocation = false; // Set to false to avoid issues with certain servers; handle TLS errors in IsRetryableException instead
 
-			using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(_timeoutSeconds + 10));
-			await client.ConnectAsync(host, port, secureSocketOptions, cts.Token);
-			await client.AuthenticateAsync(username, password, cts.Token);
+				using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(_timeoutSeconds + 10));
+				await client.ConnectAsync(host, port, secureSocketOptions, cts.Token);
+				await client.AuthenticateAsync(username, password, cts.Token);
 
-			Logger.Debug("SMTP client connected and authenticated to {Host}:{Port}", host, port);
-			return client;
+				Logger.Debug("SMTP client connected and authenticated to {Host}:{Port}", host, port);
+				return client;
+			}
+			catch
+			{
+				// The caller never sees a client that failed here, so it is
+				// ours to close. A refused password leaves the connection up,
+				// and every background run would otherwise strand another.
+				client.Dispose();
+				throw;
+			}
 		}
 
 		/// <summary>
@@ -648,7 +659,32 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 
 		#region Queue Management Methods
 
+		/// <summary>
+		/// Works through one batch of the queue. True when the batch ran,
+		/// even if some of its emails failed; false when it did not run,
+		/// either because it was skipped (offline, no network, another run
+		/// in progress) or because the batch itself failed, such as a
+		/// connection the server refused. Never throws.
+		/// </summary>
 		public async Task<bool> ProcessQueueAsync()
+		{
+			try
+			{
+				return await RunQueueAsync();
+			}
+			catch (Exception ex)
+			{
+				Logger.Error(ex, "Error during MailKit queue processing");
+				return false;
+			}
+		}
+
+		/// <summary>
+		/// One pass over the queue. False means it was skipped; a failure of
+		/// the batch itself is thrown, not returned, so the background loop
+		/// can tell a refused password from a tablet that is offline.
+		/// </summary>
+		private async Task<bool> RunQueueAsync()
 		{
 			if (_isOfflineMode)
 			{
@@ -705,15 +741,19 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 
 					foreach (var email in pendingEmails)
 					{
+						// Reconnect if the shared client was disconnected by a
+						// previous failure. Outside the per-email catch on purpose:
+						// a connection the server refuses is the batch's failure,
+						// not this email's, and has to reach the background loop
+						// the same way a refused first connection does.
+						if (sharedClient == null || !sharedClient.IsConnected)
+						{
+							sharedClient?.Dispose();
+							sharedClient = await ConnectSmtpClientAsync(host, port, username, password, secureSocketOptions);
+						}
+
 						try
 						{
-							// Reconnect if the shared client was disconnected by a previous failure
-							if (sharedClient == null || !sharedClient.IsConnected)
-							{
-								sharedClient?.Dispose();
-								sharedClient = await ConnectSmtpClientAsync(host, port, username, password, secureSocketOptions);
-							}
-
 							if (await TrySendEmailWithSharedClientAsync(sharedClient, email))
 							{
 								processedCount++;
@@ -776,18 +816,17 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 
 				return true;
 			}
-			catch (Exception ex)
-			{
-				Logger.Error(ex, "Error during MailKit queue processing");
-				return false;
-			}
 			finally
 			{
 				_queueSemaphore.Release();
 			}
 		}
 
-		private async Task ProcessQueueInBackground()
+		/// <summary>
+		/// The background timer's tick. Internal so a test can run one without
+		/// waiting a minute for the timer.
+		/// </summary>
+		internal async Task ProcessQueueInBackground()
 		{
 			// Guard against timer callbacks firing after Dispose() has been called.
 			// The Timer can enqueue one final callback between _backgroundTimer.Dispose()
@@ -806,12 +845,12 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 
 			try
 			{
-				var success = await ProcessQueueAsync();
+				var success = await RunQueueAsync();
 
 				if (success)
 				{
 					// Reset on any successful run (even if some individual emails failed —
-					// ProcessQueueAsync returns true when the SMTP connection itself worked).
+					// RunQueueAsync returns true when the SMTP connection itself worked).
 					var previousFailures = Interlocked.Exchange(ref _consecutiveQueueFailures, 0);
 					if (previousFailures > 0)
 					{
@@ -823,11 +862,11 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 				}
 				else
 				{
-					// ProcessQueueAsync returned false. The three documented causes
-					// (offline mode, no network, semaphore contention) are all
-					// transient and NOT our SMTP config's fault — they should not
-					// count toward tripping the breaker. Log at Debug so we still
-					// have the trail if something weird happens.
+					// RunQueueAsync returned false, which it does only for its
+					// three skips (offline mode, no network, semaphore contention).
+					// All are transient and NOT our SMTP config's fault — they
+					// should not count toward tripping the breaker. A failure of
+					// the batch itself is thrown and lands in the catch below.
 					Logger.Debug("Background queue processing skipped (offline, no network, or concurrent run)");
 				}
 			}
@@ -838,7 +877,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			}
 			catch (Exception ex)
 			{
-				// ProcessQueueAsync threw after passing the offline/network guards.
+				// RunQueueAsync threw after passing the offline/network guards.
 				// Probe reachability to decide whether this is "the network died
 				// mid-send" (transient — don't trip the breaker) vs "SMTP is
 				// broken" (persistent — do trip it). The probe is cheap — one
@@ -860,7 +899,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		}
 
 		/// <summary>
-		/// Decides whether a ProcessQueueAsync exception should count toward
+		/// Decides whether a RunQueueAsync exception should count toward
 		/// tripping the circuit breaker. Returns true for failures that indicate
 		/// the user's SMTP configuration is actually broken (auth, TLS, etc.)
 		/// and false for transient network issues (captive portal, intermittent

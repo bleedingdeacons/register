@@ -109,21 +109,16 @@ Nobody without an email address is emailed, and that is normal. The queue
 tries each email a limited number of times before marking it failed. While
 offline it does not run at all.
 
+Three background runs in a row that fail for the tablet's own reasons, such
+as a refused password or a TLS mismatch, pause background sending until the
+settings change or someone resumes it. A mail server the tablet cannot reach
+never counts: that is the venue's network, and it comes back on its own.
+
 ## Findings: behaviour pinned rather than changed
 
 These were found while writing the specification. Each is pinned by a
 scenario or a test so that changing it is a decision. None was fixed here.
 
-- **A refused password never trips the circuit breaker.** `ProcessQueueAsync`
-  connects once per batch. A refused password throws before any email is
-  tried, so no attempt is counted. The method catches the exception and
-  returns `false`, which is how an offline run reports itself. The background
-  loop reads `false` as "offline, not SMTP's fault", and its classifier, which
-  would count an authentication failure towards the breaker, sits in a
-  `catch` that `ProcessQueueAsync` never lets anything reach. The result: a
-  tablet with the wrong SMTP password leaves its emails waiting forever and
-  never shows the breaker open. (`EmailQueue.feature`; the timer itself is
-  out of a test host's reach, so the breaker half is read from the code.)
 - **A consent record Unity refuses is a warning, and the logs are cleared
   anyway.** The same is true of a refused member update. Only errors keep the
   logs. An acceptance Unity never stored is gone from the tablet after Finish
@@ -145,6 +140,19 @@ scenario or a test so that changing it is a decision. None was fixed here.
   - The registration log writes `EntityKind` as a number.
   - `FreedomSettings.OptionsFrom` reads `/amber` as `file:///amber` on Linux
     and Android.
+
+Fixed since:
+
+- **A refused password never tripped the circuit breaker** (register#53).
+  The batch connects once, and a refused password threw before any email
+  was tried. `ProcessQueueAsync` caught it and returned `false`, which is how
+  an offline run reports itself, so the background loop read it as "offline"
+  and its classifier never saw it. The background now runs an inner pass
+  that throws a failure of the batch itself, and the classifier counts auth
+  and TLS failures while leaving an unreachable server uncounted.
+  `ProcessQueueAsync` still returns `false` and never throws, for the Email
+  Status page. The email itself is still left untried, on purpose.
+  (`EmailQueue.feature`)
 
 ## Locked design decisions
 
@@ -175,8 +183,9 @@ scenario or a test so that changing it is a decision. None was fixed here.
 - The cascade reads membership from the database, but welcome-email
   recipients come from the group the Verify page loaded. The two agree today
   because the page loads the group fresh.
-- The circuit breaker is assumed to protect against a misconfigured SMTP
-  server. As written, it cannot open at all. `ProcessQueueAsync` catches
-  every exception after its guards, and each email's own failure is caught
-  inside its loop, so the method never throws. The only path that would
-  count a failure towards the breaker sits in a `catch` around that method.
+- Only the background timer counts towards the circuit breaker. A run
+  started from the Email Status page that fails is reported there and not
+  counted, so pressing Process Queue repeatedly never pauses anything.
+- A timeout reaching the mail server is assumed to be the network, and is
+  not counted. A server that always times out would therefore never pause
+  background sending.
