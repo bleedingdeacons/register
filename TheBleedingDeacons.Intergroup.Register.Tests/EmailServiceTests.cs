@@ -16,8 +16,8 @@ namespace TheBleedingDeacons.Intergroup.Register.Tests;
 /// with no network. The background timer is left alone — its first run is
 /// a minute away and every test disposes the service long before then.
 ///
-/// <para>The circuit breaker is not covered here: it lives only in the
-/// timer's callback, which nothing can reach without waiting for it.</para>
+/// <para>The circuit breaker lives only in the timer's callback, so its
+/// tests run that callback directly rather than waiting for the timer.</para>
 /// </summary>
 public sealed class EmailServiceTests : IDisposable
 {
@@ -26,6 +26,7 @@ public sealed class EmailServiceTests : IDisposable
 	private bool _online = true;
 	private readonly EmailService _service;
 	private readonly List<EmailFailedEventArgs> _failures = [];
+	private readonly List<CircuitStateChangedEventArgs> _breaker = [];
 
 	public EmailServiceTests()
 	{
@@ -36,6 +37,7 @@ public sealed class EmailServiceTests : IDisposable
 			maxRetries: 3,
 			smtpClientFactory: () => _smtp);
 		_service.EmailFailed += (_, e) => _failures.Add(e);
+		_service.CircuitStateChanged += (_, e) => _breaker.Add(e);
 	}
 
 	public void Dispose()
@@ -198,6 +200,154 @@ public sealed class EmailServiceTests : IDisposable
 	{
 		Assert.True(await _service.ProcessQueueAsync());
 		Assert.Empty(_smtp.Connections);
+	}
+
+	[Fact]
+	public async Task ARefusedPasswordIsReportedAsNotRunWithoutTryingAnEmail()
+	{
+		await _service.QueueEmailAsync("dave@example.org", "Welcome", "Hello");
+		_smtp.FailOnAuthenticate = new MailKit.Security.AuthenticationException("535 bad credentials");
+
+		Assert.False(await _service.ProcessQueueAsync());
+
+		var email = Assert.Single(await _service.GetQueuedEmailsAsync());
+		Assert.Equal(EmailStatus.Pending, email.Status);
+		Assert.Equal(0, email.AttemptCount);
+	}
+
+	[Fact]
+	public async Task ARefusedPasswordClosesTheConnectionItOpened()
+	{
+		await _service.QueueEmailAsync("dave@example.org", "Welcome", "Hello");
+		_smtp.FailOnAuthenticate = new MailKit.Security.AuthenticationException("535 bad credentials");
+
+		await _service.ProcessQueueAsync();
+
+		Assert.Single(_smtp.Connections);
+		Assert.False(_smtp.IsConnected);
+		Assert.Equal(1, _smtp.Disposals);
+	}
+
+	[Fact]
+	public async Task ThreeRefusedPasswordsInARowOpenTheBreaker()
+	{
+		await _service.QueueEmailAsync("dave@example.org", "Welcome", "Hello");
+		_smtp.FailOnAuthenticate = new MailKit.Security.AuthenticationException("535 bad credentials");
+
+		await Tick(2);
+
+		Assert.False(_service.IsCircuitOpen);
+		Assert.Equal(2, _service.ConsecutiveQueueFailures);
+
+		await Tick();
+
+		Assert.True(_service.IsCircuitOpen);
+		Assert.Equal("535 bad credentials", _service.LastQueueError);
+		var opened = Assert.Single(_breaker);
+		Assert.True(opened.IsOpen);
+		Assert.Equal(3, opened.ConsecutiveFailures);
+		Assert.Equal(0, Assert.Single(await _service.GetQueuedEmailsAsync()).AttemptCount);
+	}
+
+	[Fact]
+	public async Task AnOpenBreakerStopsTheBackgroundConnecting()
+	{
+		await _service.QueueEmailAsync("dave@example.org", "Welcome", "Hello");
+		_smtp.FailOnAuthenticate = new MailKit.Security.AuthenticationException("535 bad credentials");
+		await Tick(3);
+		var connections = _smtp.Connections.Count;
+
+		await Tick();
+
+		Assert.Equal(connections, _smtp.Connections.Count);
+	}
+
+	[Fact]
+	public async Task ATlsFailureCountsTowardTheBreaker()
+	{
+		await _service.QueueEmailAsync("dave@example.org", "Welcome", "Hello");
+		_smtp.FailOnConnect = new System.Security.Authentication.AuthenticationException("bad certificate");
+
+		await Tick();
+
+		Assert.Equal(1, _service.ConsecutiveQueueFailures);
+	}
+
+	public static TheoryData<Exception> NetworkFailures => new()
+	{
+		new SocketException((int)SocketError.HostUnreachable),
+		new IOException("connection reset"),
+	};
+
+	[Theory]
+	[MemberData(nameof(NetworkFailures))]
+	public async Task AnUnreachableServerNeverCountsTowardTheBreaker(Exception failure)
+	{
+		await _service.QueueEmailAsync("dave@example.org", "Welcome", "Hello");
+		_smtp.FailOnConnect = failure;
+
+		await Tick(3);
+
+		Assert.False(_service.IsCircuitOpen);
+		Assert.Equal(0, _service.ConsecutiveQueueFailures);
+		Assert.Empty(_breaker);
+	}
+
+	[Fact]
+	public async Task OfflineTheBackgroundNeitherConnectsNorCounts()
+	{
+		await _service.QueueEmailAsync("dave@example.org", "Welcome", "Hello");
+		_online = false;
+
+		await Tick(3);
+
+		Assert.Equal(0, _service.ConsecutiveQueueFailures);
+		Assert.Empty(_smtp.Connections);
+	}
+
+	[Fact]
+	public async Task ARunThatConnectsClearsTheCount()
+	{
+		await _service.QueueEmailAsync("dave@example.org", "Welcome", "Hello");
+		_smtp.FailOnAuthenticate = new MailKit.Security.AuthenticationException("535 bad credentials");
+		await Tick(2);
+
+		_smtp.FailOnAuthenticate = null;
+		await Tick();
+
+		Assert.Equal(0, _service.ConsecutiveQueueFailures);
+		Assert.Null(_service.LastQueueError);
+		Assert.Equal(EmailStatus.Sent, Assert.Single(await _service.GetQueuedEmailsAsync()).Status);
+	}
+
+	[Fact]
+	public async Task APasswordRefusedOnReconnectingCountsToo()
+	{
+		await _service.QueueEmailAsync("dave@example.org", "Welcome", "Hello");
+		await _service.QueueEmailAsync("ann@example.org", "Welcome", "Hello");
+
+		// The first send drops the connection; by the time the batch
+		// reconnects for the second email, the server refuses the password.
+		_smtp.FailOnSend = new IOException("connection reset");
+		_service.EmailFailed += (_, _) =>
+		{
+			_smtp.FailOnSend = null;
+			_smtp.FailOnAuthenticate = new MailKit.Security.AuthenticationException("535 bad credentials");
+			_smtp.DisconnectAsync(true).GetAwaiter().GetResult();
+		};
+
+		await Tick();
+
+		Assert.Equal(1, _service.ConsecutiveQueueFailures);
+		Assert.Equal([0, 1], (await _service.GetQueuedEmailsAsync()).Select(e => e.AttemptCount).Order());
+	}
+
+	private async Task Tick(int times = 1)
+	{
+		for (var i = 0; i < times; i++)
+		{
+			await _service.ProcessQueueInBackground();
+		}
 	}
 
 	[Fact]
