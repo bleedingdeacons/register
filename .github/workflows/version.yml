@@ -35,6 +35,14 @@ permissions:
 # Serialise. Two merges landing close together must not race to compute the
 # same next version. Deliberately not cancel-in-progress: a cancelled run would
 # drop a bump entirely.
+#
+# Serialising alone was not enough. Each run used to check out the commit its
+# own push carried and bump from that push's commits; when merges landed close
+# together, a run's version commit was rejected because main had moved on, and
+# the run after it saw only its own commits. On 2026-10-04 three merges in a
+# minute lost #54's feat: and shipped 1.4.8 where 1.5.0 was due. So each run now
+# checks out main's tip and bumps from everything since the last version commit
+# (see the steps below).
 concurrency:
   group: version-main
   cancel-in-progress: false
@@ -48,8 +56,11 @@ jobs:
       - name: Checkout main
         uses: actions/checkout@v5
         with:
-          # Full history: the bump is derived by walking the commits this push
-          # brought in.
+          # The tip of main, not the commit this push carried: an earlier merge
+          # whose run lost the race must still be covered by this one.
+          ref: main
+          # Full history: the bump is derived by walking the commits since the
+          # last version commit.
           fetch-depth: 0
 
       - name: Compute and apply the bump
@@ -58,17 +69,18 @@ jobs:
         # Windows, where git frequently does not record the executable bit, and
         # a missing +x would fail the run for a reason nothing in the diff shows.
         #
-        # github.event.before is the tip main had before this push. It is
-        # all-zeros on a branch's first push, and can point at a commit this
-        # clone does not have after a force-push, so fall back to HEAD~1.
+        # Everything since the last version commit, not just this push. The
+        # first run to go covers every merge so far; the runs queued behind it
+        # find HEAD is already a version commit and stop (bump-version.sh). A
+        # merge that lands mid-run, and makes this run's push fail, is covered
+        # by its own run, which counts from the same place.
         run: |
-          before="${{ github.event.before }}"
-          if [ -z "$before" ] || [ "$before" = "0000000000000000000000000000000000000000" ] \
-             || ! git cat-file -e "${before}^{commit}" 2>/dev/null; then
-            echo "No usable github.event.before; falling back to HEAD~1."
-            before="HEAD~1"
+          last="$(git log -1 --format=%H --grep='^chore: version ' HEAD)"
+          if [ -z "$last" ]; then
+            echo "No version commit in history; falling back to HEAD~1."
+            last="HEAD~1"
           fi
-          bash .github/scripts/bump-version.sh "${before}..HEAD"
+          bash .github/scripts/bump-version.sh "${last}..HEAD"
 
       - name: Commit the new version
         if: steps.bump.outputs.changed == 'true'
