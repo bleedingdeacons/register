@@ -17,6 +17,14 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 
 		public bool IsFreedomAvailable => _freedom is not null;
 
+		/// <summary>
+		/// The Freedom site and application this build asks — the one setting
+		/// the build still carries, from appsettings.json, and the one that
+		/// decides test or live. Shown so nobody has to guess which site a
+		/// tablet is taking its settings from.
+		/// </summary>
+		public string FreedomSite { get; }
+
 		[ObservableProperty]
 		[NotifyPropertyChangedFor(nameof(IsFreedomIdle))]
 		private bool isFreedomBusy;

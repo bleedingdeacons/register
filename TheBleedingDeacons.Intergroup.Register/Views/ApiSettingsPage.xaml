@@ -44,6 +44,10 @@
                         FontSize="18"
                         Text="Freedom" />
                     <Label FontSize="13" Text="Sign this tablet in with a Google account the intergroup has set up (a tablet account or your own). Its mail, Unity and logging settings come from the site and nowhere else." />
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="20">
+                        <Label FontAttributes="Bold" Text="Site" />
+                        <Label Grid.Column="1" Text="{Binding FreedomSite}" />
+                    </Grid>
                     <Label Text="{Binding FreedomStatus}" />
                     <HorizontalStackLayout Spacing="10">
                         <Button
@@ -67,7 +71,10 @@
                 BackgroundColor="{AppThemeBinding Light=#FFF3E0, Dark=#4E342E}"
                 BorderColor="{AppThemeBinding Light=#FB8C00, Dark=#FFB74D}"
                 IsVisible="{Binding IsFreedomAvailable, Converter={StaticResource InvertedBoolConverter}}">
-                <Label Text="This build names no Freedom site, so the tablet has no Unity or logging settings. Settings come only from Freedom: the build's appsettings.json needs a Freedom section." />
+                <VerticalStackLayout Spacing="6">
+                    <Label Text="This build names no Freedom site, so the tablet has no Unity or logging settings. Settings come only from Freedom: the build's appsettings.json needs a Freedom section." />
+                    <Label FontAttributes="Bold" Text="{Binding FreedomSite}" />
+                </VerticalStackLayout>
             </Frame>
 
             <!--

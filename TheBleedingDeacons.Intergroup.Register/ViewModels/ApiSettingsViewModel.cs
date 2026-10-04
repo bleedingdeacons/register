@@ -30,10 +30,14 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 
 		public ApiSettingsViewModel(
 			IConfigurationService configService,
-			TheBleedingDeacons.Freedom.Client.FreedomClient? freedom = null)
+			TheBleedingDeacons.Freedom.Client.FreedomClient? freedom = null,
+			TheBleedingDeacons.Freedom.Client.FreedomOptions? freedomOptions = null)
 		{
 			_configService = configService;
 			_freedom = freedom;
+			FreedomSite = freedomOptions is null
+				? "None: this build names no Freedom site"
+				: $"{freedomOptions.BaseUrl.ToString().TrimEnd('/')} (application \"{freedomOptions.Application}\")";
 			RefreshFreedomStatus();
 			LoadConfigurationAsync().SafeFireAndForget("LoadApiSettingsConfig");
 		}
