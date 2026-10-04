@@ -2,39 +2,23 @@ using System.Globalization;
 using Microsoft.Extensions.Configuration;
 using Reqnroll;
 using Shouldly;
-using TheBleedingDeacons.Intergroup.Register.Models;
 using TheBleedingDeacons.Intergroup.Register.Services;
 using TheBleedingDeacons.Intergroup.Register.Specs.Support;
 using TheBleedingDeacons.Inventory;
 
 namespace TheBleedingDeacons.Intergroup.Register.Specs.Steps;
 
-/// <summary>The Freedom overlay and the Better Stack guard.</summary>
+/// <summary>
+/// Where credentials and endpoints come from (Freedom, and nowhere else),
+/// and the Better Stack guard.
+/// </summary>
 [Binding]
 public sealed class SettingsSteps
 {
-	private readonly SmtpConfiguration _tablet = new() { Host = "smtp.tablet.example", Port = 587, EnableSsl = true };
 	private readonly Dictionary<string, string> _managed = new(StringComparer.Ordinal);
 	private readonly RecordingLogShipper _shipper = new();
 	private bool _optionsRead;
 	private object? _options;
-
-	[Given(@"^the tablet's own SMTP (host|port|TLS) is ""([^""]*)""$")]
-	public void TabletOwn(string setting, string value)
-	{
-		switch (setting)
-		{
-			case "host":
-				_tablet.Host = value;
-				break;
-			case "port":
-				_tablet.Port = int.Parse(value, CultureInfo.InvariantCulture);
-				break;
-			default:
-				_tablet.EnableSsl = bool.Parse(value);
-				break;
-		}
-	}
 
 	[Given(@"^Freedom holds ""([^""]*)"" for ""([^""]*)""$")]
 	public void FreedomHolds(string value, string key) => _managed[key] = value;
@@ -45,7 +29,7 @@ public sealed class SettingsSteps
 	[Then(@"^the SMTP (host|port|TLS) in use is ""([^""]*)""$")]
 	public void InUse(string setting, string expected)
 	{
-		var config = FreedomSettings.Apply(_tablet, key => _managed.GetValueOrDefault(key));
+		var config = FreedomSettings.Smtp(Managed);
 
 		var actual = setting switch
 		{
@@ -56,6 +40,18 @@ public sealed class SettingsSteps
 
 		actual.ShouldBe(expected);
 	}
+
+	[Then(@"^SMTP is not set up$")]
+	public void SmtpNotSetUp() => FreedomSettings.Smtp(Managed).IsValid().ShouldBeFalse();
+
+	[Then(@"^the Unity site in use is ""([^""]*)""$")]
+	public void UnitySite(string expected) => FreedomSettings.Unity(Managed).BaseUrl.ShouldBe(expected);
+
+	[Then(@"^Better Stack is not set up$")]
+	public void BetterStackNotSetUp() => FreedomSettings.BetterStack(Managed).IsValid().ShouldBeFalse();
+
+	[Then(@"^the compliance contact in use is ""([^""]*)""$")]
+	public void ComplianceContact(string expected) => FreedomSettings.Compliance(Managed).ShouldBe(expected);
 
 	[Given(@"^a build that names no Freedom site$")]
 	public void NoSite()
@@ -88,4 +84,6 @@ public sealed class SettingsSteps
 			configured.ShouldBeNull();
 		}
 	}
+
+	private string? Managed(string key) => _managed.GetValueOrDefault(key);
 }

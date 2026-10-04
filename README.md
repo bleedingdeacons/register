@@ -97,12 +97,13 @@ reach any of them.
 
 ## Settings from Freedom
 
-A tablet can take its SMTP, Unity, Better Stack and compliance settings from
-the site instead of from this build or from what was typed in on it — see
+**Every credential and endpoint comes from the site, and from nowhere
+else**: SMTP, Unity, Better Stack and the compliance contact. Nothing is built
+into the app and nothing can be typed in on the tablet — see
 [freedom-sharp](https://github.com/bleedingdeacons/freedom-sharp) and the
-Freedom WordPress plugin. **Android only for now**, and **off unless the build
-names a site**: add a `Freedom` section to the git-ignored `appsettings.json`
-before building.
+Freedom WordPress plugin. The build names only *which* Freedom site to ask, in
+the git-ignored `appsettings.json`, alongside the logging level. That choice is
+the test-or-live choice: `/amber` is the test bed.
 
 ```json
 "Freedom": {
@@ -115,11 +116,13 @@ before building.
 `com.thebleedingdeacons.intergroup.register.freedom://auth`, which is what
 `Platforms/Android/FreedomCallbackActivity.cs` catches; the Freedom admin's
 `register` application must have the same Callback URI. Then sign the tablet in
-from **API Settings → Freedom**.
+from **API Settings → Freedom**. **Android only**: the Windows head builds, but
+has no Freedom sign-in and so runs with no settings.
 
-- **Freedom wins where it holds a value, and only there.** A key the site has
-  not set falls through to the tablet's own setting, so a tablet set up by hand
-  keeps working. The keys are in `Services/FreedomSettings.cs`: `smtp.host`,
+- **A key the site has not set is not set at all.** Mail Settings and API
+  Settings show it as "Not set", keep their Test buttons, and point at the
+  sign-in. Only the shape of a connection has a default (port 587, TLS on).
+  The keys are in `Register.Core/Services/FreedomSettings.cs`: `smtp.host`,
   `smtp.port`, `smtp.username`, `smtp.password`, `smtp.enable_ssl`,
   `smtp.from_display_name`, `smtp.timeout_seconds`, `unity.base_url`,
   `unity.api_key`, `betterstack.endpoint`, `betterstack.source_token`,
@@ -128,8 +131,17 @@ from **API Settings → Freedom**.
 - **Nothing waits on the network.** Each start reads what Freedom stored last
   time, then syncs in the background; a change is applied as it arrives — the
   email service and Better Stack sink are reconfigured, no restart needed.
-- **`devsettings.json` is untouched.** Dev builds still embed it; once the
-  `register` application's values are set on the site, it can go.
+- **There is no `devsettings.json` any more**, and no `UseDevCredentials`
+  switch. A Debug build used to embed one — whose Unity address was the live
+  site, which is how a test tablet ended up synced from live. Any copies left
+  in a working tree are git-ignored and unused; delete them.
+- **The feature switches stay on the tablet**: both event logs, auto-register
+  positions, the single-GSR shortcut, add position holder, welcome and
+  acceptance emails, and the device label. So does the active meeting.
+- **An upgraded tablet forgets what was typed in.** The first start of a build
+  without the fallback removes the SMTP password, Unity key and Better Stack
+  token from SecureStorage, the three settings files and the compliance
+  address, once (`Services/LegacySettings.cs`).
 
 ### Tokens in CI
 
@@ -140,4 +152,4 @@ from **API Settings → Freedom**.
 `GITHUB_TOKEN` cannot substitute: the package belongs to the integrity-sharp
 repository, and a workflow token cannot read a package owned by a different
 repository. It remains configured as a fallback in case the package is later
-granted access to this repository under its *Manage Actions access* settings.
+granted access to this repository under its *Manage Actions access* settings.

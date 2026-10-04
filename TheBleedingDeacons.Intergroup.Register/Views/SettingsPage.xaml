@@ -576,15 +576,9 @@
 
                     <!--
                         Compliance email. Lives inside the Privacy Policy
-                        card because it's the recipient address used by
-                        the compliance service for audit-trail copies of
-                        acceptance / revocation events tied to the policy
-                        shown above. Empty value = no recipient configured;
-                        the send is silently skipped. The Save button
-                        validates with EmailAddressAttribute before
-                        persisting — a validation failure surfaces in the
-                        status label below in red and leaves the stored
-                        value untouched.
+                        card because it is the Reply-To on the acceptance
+                        confirmations that quote the policy shown above.
+                        Read-only: it comes from Freedom (compliance.email).
                     -->
                     <BoxView
                         Margin="0,8,0,0"
@@ -600,47 +594,11 @@
                     <Label
                         FontSize="13"
                         LineBreakMode="WordWrap"
-                        Text="The address the compliance service uses as the recipient for audit-trail copies of acceptance and revocation events. Leave blank to disable — sends with no recipient configured are silently skipped."
+                        Text="Replies to an acceptance confirmation go here. It comes from the site, through Freedom; change it there."
                         TextColor="{AppThemeBinding Light={StaticResource Gray600},
                                                     Dark={StaticResource Gray300}}" />
 
-                    <Entry
-                        ClearButtonVisibility="WhileEditing"
-                        Keyboard="Email"
-                        Placeholder="compliance@example.org"
-                        Text="{Binding ComplianceEmail, Mode=TwoWay}" />
-
-                    <Button
-                        BackgroundColor="{AppThemeBinding Light={StaticResource Primary},
-                                                          Dark={StaticResource PrimaryDark}}"
-                        Command="{Binding SaveComplianceEmailCommand}"
-                        CornerRadius="8"
-                        FontSize="16"
-                        HeightRequest="44"
-                        HorizontalOptions="End"
-                        Text="Save Email"
-                        TextColor="White"
-                        WidthRequest="160" />
-
-                    <Label
-                        FontSize="13"
-                        IsVisible="{Binding IsComplianceEmailStatusVisible}"
-                        Text="{Binding ComplianceEmailStatusMessage}">
-                        <Label.Triggers>
-                            <DataTrigger
-                                Binding="{Binding IsComplianceEmailStatusError}"
-                                TargetType="Label"
-                                Value="True">
-                                <Setter Property="TextColor" Value="{AppThemeBinding Light=#D32F2F, Dark=#EF5350}" />
-                            </DataTrigger>
-                            <DataTrigger
-                                Binding="{Binding IsComplianceEmailStatusError}"
-                                TargetType="Label"
-                                Value="False">
-                                <Setter Property="TextColor" Value="{AppThemeBinding Light=#388E3C, Dark=#66BB6A}" />
-                            </DataTrigger>
-                        </Label.Triggers>
-                    </Label>
+                    <Label FontSize="16" Text="{Binding ComplianceEmail}" />
                 </StackLayout>
             </Border>
 

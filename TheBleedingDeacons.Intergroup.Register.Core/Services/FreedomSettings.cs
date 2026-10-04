@@ -6,16 +6,24 @@ using TheBleedingDeacons.Inventory;
 namespace TheBleedingDeacons.Intergroup.Register.Services
 {
 	/// <summary>
-	/// The settings Freedom can manage for Register, and how a managed value
-	/// is laid over the one stored on the tablet.
+	/// The settings Freedom manages for Register: every credential and
+	/// endpoint the tablet uses.
 	///
-	/// <para><b>Freedom wins where it holds a value, and nothing else
-	/// changes.</b> A key Freedom does not hold — because the site has not
-	/// set it, the tablet has not signed in, or the build has no Freedom
-	/// settings at all — falls through to exactly what the tablet stored
-	/// before, so a tablet set up by hand keeps working and one moved over to
-	/// Freedom stops needing anything typed in. That is what lets this ship
-	/// ahead of the site being configured.</para>
+	/// <para><b>Freedom is the only source.</b> Nothing is built into the app
+	/// and nothing can be typed in on the tablet. A key Freedom does not hold
+	/// — because the site has not set it, or the tablet has not signed in, or
+	/// the build names no Freedom site — is simply absent: an empty host, an
+	/// empty key. Only the non-secret shape of a connection has a default
+	/// (port 587, TLS on, a 30-second timeout), from the models themselves,
+	/// so a site that sets just a host and a password still works. The
+	/// <see cref="Smtp"/>, <see cref="BetterStack"/>, <see cref="Unity"/> and
+	/// <see cref="Compliance"/> methods are the whole of how the tablet
+	/// reads them.</para>
+	///
+	/// <para>Until 2026-10-04 a managed value was laid over one the tablet
+	/// stored, or one a dev build embedded from devsettings.json. Both are
+	/// gone: a dev build that silently pointed at the live site was exactly
+	/// the kind of mistake this rules out.</para>
 	///
 	/// <para>The keys are the contract with the Freedom admin: an
 	/// application called <c>register</c> with these names. Secret ones —
@@ -65,6 +73,35 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		/// <summary>The default callback: the app id, a <c>.freedom</c> suffix, host <c>auth</c>.</summary>
 		public const string FreedomCallbackUri = "com.thebleedingdeacons.intergroup.register.freedom://auth";
 
+		/// <summary>The SMTP settings Freedom holds, over the model's defaults.</summary>
+		public static SmtpConfiguration Smtp(Func<string, string?> managed) =>
+			Apply(new SmtpConfiguration(), managed);
+
+		/// <summary>The Better Stack settings Freedom holds; empty, and so not shipping, without them.</summary>
+		public static BetterStackConfiguration BetterStack(Func<string, string?> managed) =>
+			Apply(new BetterStackConfiguration(), managed);
+
+		/// <summary>The Unity site and API key Freedom holds; empty strings without them.</summary>
+		public static (string BaseUrl, string ApiKey) Unity(Func<string, string?> managed)
+		{
+			ArgumentNullException.ThrowIfNull(managed);
+
+			return (managed(UnityBaseUrl) ?? string.Empty, managed(UnityApiKey) ?? string.Empty);
+		}
+
+		/// <summary>The compliance contact Freedom holds; empty without one.</summary>
+		public static string Compliance(Func<string, string?> managed)
+		{
+			ArgumentNullException.ThrowIfNull(managed);
+
+			return managed(ComplianceEmail) ?? string.Empty;
+		}
+
+		/// <summary>
+		/// Lays what Freedom holds over <paramref name="config"/>, in place.
+		/// <see cref="Smtp"/> is how the app calls it; this stays public for
+		/// the edge tests that pin how a value that will not parse is treated.
+		/// </summary>
 		public static SmtpConfiguration Apply(SmtpConfiguration config, Func<string, string?> managed)
 		{
 			config.Host = managed(SmtpHost) ?? config.Host;
@@ -82,6 +119,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			return config;
 		}
 
+		/// <summary>Lays what Freedom holds over <paramref name="config"/>, in place.</summary>
 		public static BetterStackConfiguration Apply(BetterStackConfiguration config, Func<string, string?> managed)
 		{
 			config.Endpoint = managed(BetterStackEndpoint) ?? config.Endpoint;

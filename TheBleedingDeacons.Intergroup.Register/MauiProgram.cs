@@ -57,25 +57,10 @@ public static class MauiProgram
 			}
 		}
 
-		// ── Layer devsettings.json on top, if present ─────────────────
-		// devsettings.json is only embedded when the build was invoked
-		// with UseDevCredentials=true (see csproj). When present it
-		// overrides values from appsettings.json — most notably
-		// App:Environment, which flips from "Production" to
-		// "Development" so log entries are tagged correctly. Production
-		// builds skip this section because the resource doesn't exist
-		// in the assembly.
-		using (var stream = assembly.GetManifestResourceStream(
-			"TheBleedingDeacons.Intergroup.Register.devsettings.json"))
-		{
-			if (stream is not null)
-			{
-				var devConfig = new ConfigurationBuilder()
-					.AddJsonStream(stream)
-					.Build();
-				builder.Configuration.AddConfiguration(devConfig);
-			}
-		}
+		// There is no devsettings.json any more. Credentials and endpoints
+		// come from Freedom and nowhere else (see FreedomSettings); what
+		// appsettings.json carries is the Freedom site, the logging level and
+		// the App name and environment the log enrichers stamp.
 
 		builder
 			.UseMauiApp<App>()
@@ -183,7 +168,7 @@ public static class MauiProgram
 			{
 				var config = await configService.LoadUnityConfigurationAsync();
 				if (!config.IsValid())
-					throw new InvalidOperationException("Unity API is not configured.");
+					throw new InvalidOperationException("Unity is not set up for this tablet: sign it in to Freedom under Settings, API Settings.");
 				Log.Logger.Debug(
 					"UnityRestSharp factory — BaseUrl: {BaseUrl}, ApiKey: {ApiKeyStatus}",
 					config.BaseUrl,
@@ -427,4 +412,4 @@ public static class MauiProgram
 			return AppInfo.VersionString;
 		}
 	}
-}
+}

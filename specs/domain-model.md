@@ -63,8 +63,9 @@ sync ─▶ snapshot ─▶ register / accept (local DB + fsync'd log) ─▶ fi
   then attendance.
 - **Error / warning**: a refusal during reconcile. Only *errors* keep the logs
   for another attempt; see the findings below.
-- **Managed value**: a setting held by the site's Freedom plugin, laid over
-  the tablet's own setting.
+- **Managed value**: a setting held by the site's Freedom plugin. For
+  credentials and endpoints it is the only value there is: nothing is built
+  in and nothing is typed in on the tablet.
 
 ## Local first, Unity last
 
@@ -136,7 +137,7 @@ scenario or a test so that changing it is a decision. None was fixed here.
 - Also pinned in Register.Tests, not here:
   - `EmailValidator` accepts a space in the local part.
   - A missing template placeholder renders as nothing.
-  - An empty string from Freedom wins over the tablet's value.
+  - An empty string from Freedom is taken as the value, not as "not set".
   - The registration log writes `EntityKind` as a number.
   - `FreedomSettings.OptionsFrom` reads `/amber` as `file:///amber` on Linux
     and Android.
@@ -169,8 +170,10 @@ Fixed since:
 - **The cascade only adds.** An officer may be present in their own right,
   and an unregistration that silently removed them would erase intent the
   tablet cannot reconstruct.
-- **Freedom wins only where it holds a value.** A tablet set up by hand keeps
-  working when the site holds nothing.
+- **Credentials and endpoints come from Freedom and nowhere else.** The build
+  names only which Freedom site to ask. A Debug build that embedded the live
+  site's settings, and a tablet whose typed-in values outlived the site's,
+  were both ways of being quietly pointed somewhere else.
 - **Better Stack is https or nothing.** The source token is a bearer
   credential (register#47).
 

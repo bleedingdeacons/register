@@ -151,11 +151,6 @@
 		<Platforms>AnyCPU</Platforms>
 	</PropertyGroup>
 
-	<PropertyGroup>
-		<UseDevCredentials Condition="'$(UseDevCredentials)' == ''">true</UseDevCredentials>
-		<DefineConstants Condition="'$(UseDevCredentials)' == 'true'">$(DefineConstants);USE_DEV_CREDENTIALS</DefineConstants>
-	</PropertyGroup>
-
 	<!--
 		Ship one ABI.
 
@@ -242,12 +237,14 @@
 		<None Remove="appsettings.json" />
 	</ItemGroup>
 
-	<!-- Dev credentials: only embedded when UseDevCredentials=true (the default).
-	     Production builds pass -p:UseDevCredentials=false so this file is never
-	     touched and cannot leak into the APK. -->
-	<ItemGroup Condition="'$(UseDevCredentials)' == 'true'">
-		<EmbeddedResource Include="devsettings.json" />
-	</ItemGroup>
+	<!--
+		No devsettings.json, and no UseDevCredentials switch. Every credential
+		and endpoint comes from Freedom (see FreedomSettings); a Debug build
+		that silently embedded the live site's SMTP password and Unity key was
+		the kind of mistake that removing the switch rules out. appsettings.json
+		above carries only the Freedom site, the logging level and the App name
+		and environment.
+	-->
 
 	<ItemGroup>
 		<PackageReference Include="libphonenumber-csharp" Version="9.0.36" />
@@ -377,4 +374,4 @@
 		</Compile>
 	</ItemGroup>
 
-</Project>
+</Project>

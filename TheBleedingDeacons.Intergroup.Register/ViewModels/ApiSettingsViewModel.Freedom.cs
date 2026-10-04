@@ -7,14 +7,23 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 {
 	/// <summary>
 	/// The Freedom section of the API settings page: sign the tablet in,
-	/// check for changes now, or sign it out. Absent — the section hidden —
-	/// when the build names no Freedom site.
+	/// check for changes now, or sign it out. Every credential and endpoint
+	/// the tablet uses comes through here; without it the tablet has none.
+	/// Absent — the section hidden — when the build names no Freedom site.
 	/// </summary>
 	public partial class ApiSettingsViewModel
 	{
 		private readonly FreedomClient? _freedom;
 
 		public bool IsFreedomAvailable => _freedom is not null;
+
+		/// <summary>
+		/// The Freedom site and application this build asks — the one setting
+		/// the build still carries, from appsettings.json, and the one that
+		/// decides test or live. Shown so nobody has to guess which site a
+		/// tablet is taking its settings from.
+		/// </summary>
+		public string FreedomSite { get; }
 
 		[ObservableProperty]
 		[NotifyPropertyChangedFor(nameof(IsFreedomIdle))]
@@ -46,7 +55,10 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 				};
 
 				if (result.Succeeded)
+				{
+					_configService.InvalidateCache();
 					await LoadConfigurationAsync();
+				}
 			}
 			finally
 			{
@@ -64,6 +76,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 			try
 			{
 				FreedomStatus = Describe(await FreedomStartup.SyncAsync(_freedom)) ?? FreedomStatus;
+				_configService.InvalidateCache();
 				await LoadConfigurationAsync();
 			}
 			finally
@@ -82,7 +95,8 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 			try
 			{
 				await _freedom.SignOutAsync();
-				FreedomStatus = "Signed out. The settings typed in on this tablet apply.";
+				FreedomStatus = "Signed out. This tablet has no mail, Unity or logging settings until it signs in again.";
+				_configService.InvalidateCache();
 				await LoadConfigurationAsync();
 			}
 			finally

@@ -32,8 +32,8 @@
 
 		What deliberately stayed in the app:
 
-		  * ConfigurationService     - Preferences, SecureStorage, and the
-		                               embedded appsettings/devsettings.
+		  * ConfigurationService     - reads Freedom for credentials, and
+		                               Preferences for the tablet's switches.
 		  * PrivacyPolicyCache       - a Preferences blob. Its interface is here.
 		  * PopupNotificationService - MAUI popups, and IPopupNotification.
 		  * FreedomStartup           - Freedom.Client.Maui's sign-in.

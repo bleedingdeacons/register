@@ -148,8 +148,8 @@ public sealed class TempDirectory : IDisposable
 }
 
 /// <summary>
-/// Configuration with every switch a field. The real one is MAUI —
-/// Preferences and SecureStorage — and stays in the app.
+/// Configuration with every switch a field. The real one reads
+/// credentials from Freedom and switches from Preferences, and stays in the app.
 /// </summary>
 public sealed class FakeConfigurationService : IConfigurationService
 {
@@ -179,19 +179,7 @@ public sealed class FakeConfigurationService : IConfigurationService
 
 	public SmtpConfiguration GetSmtpConfiguration() => Smtp;
 
-	public Task SaveSmtpConfigurationAsync(SmtpConfiguration config)
-	{
-		Smtp = config;
-		return Task.CompletedTask;
-	}
-
 	public Task<SmtpConfiguration> LoadSmtpConfigurationAsync() => Task.FromResult(Smtp);
-
-	public Task SaveUnityConfigurationAsync(UnityConfiguration config)
-	{
-		Unity = config;
-		return Task.CompletedTask;
-	}
 
 	public Task<UnityConfiguration> LoadUnityConfigurationAsync() => Task.FromResult(Unity);
 
@@ -202,12 +190,6 @@ public sealed class FakeConfigurationService : IConfigurationService
 	}
 
 	public BetterStackConfiguration GetBetterStackConfiguration() => BetterStack;
-
-	public Task SaveBetterStackConfigurationAsync(BetterStackConfiguration config)
-	{
-		BetterStack = config;
-		return Task.CompletedTask;
-	}
 
 	public Task<BetterStackConfiguration> LoadBetterStackConfigurationAsync() => Task.FromResult(BetterStack);
 
@@ -226,10 +208,6 @@ public sealed class FakeConfigurationService : IConfigurationService
 	public void SetDeviceLabel(string? label) => DeviceLabel = label ?? string.Empty;
 
 	public void SetComplianceAcceptanceEmailEnabled(bool enabled) => IsComplianceAcceptanceEmailEnabled = enabled;
-
-	public void SetComplianceEmail(string? email) => ComplianceEmail = email ?? string.Empty;
-
-	public bool IsManaged(string key) => false;
 
 	public void InvalidateCache()
 	{

@@ -1,6 +1,5 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using CommunityToolkit.Mvvm.Messaging;
 using Serilog;
 using TheBleedingDeacons.Intergroup.Register.Models;
 using TheBleedingDeacons.Intergroup.Register.Services;
@@ -9,6 +8,15 @@ using TheBleedingDeacons.Intergroup.Register.Support;
 
 namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 {
+	/// <summary>
+	/// The SMTP settings this tablet is using, and a way to test them.
+	///
+	/// <para>Read-only. Every value comes from Freedom (see
+	/// <see cref="FreedomSettings"/>), so there is nothing to type and nothing
+	/// to save: a change is made on the site and arrives with the next sync.
+	/// What is left here is what an operator at the door actually needs — to
+	/// see which server the tablet is pointed at, and whether it answers.</para>
+	/// </summary>
 	public partial class MailSettingsViewModel : BaseViewModel
 	{
 		private static readonly ILogger Logger = AppLogger.ForContext<MailSettingsViewModel>();
@@ -28,7 +36,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 		private string host = string.Empty;
 
 		[ObservableProperty]
-		private string port = "587";
+		private string port = string.Empty;
 
 		[ObservableProperty]
 		private string username = string.Empty;
@@ -37,31 +45,28 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 		private string password = string.Empty;
 
 		[ObservableProperty]
-		private bool enableSsl = true;
+		private string security = string.Empty;
 
 		[ObservableProperty]
 		private string fromDisplayName = string.Empty;
 
 		[ObservableProperty]
-		private bool isTestingConnection = false;
+		[NotifyPropertyChangedFor(nameof(IsNotConfigured))]
+		private bool isConfigured;
+
+		public bool IsNotConfigured => !IsConfigured;
 
 		[ObservableProperty]
-		private bool isSaving = false;
+		private bool isTestingConnection;
 
 		[ObservableProperty]
 		private string statusMessage = string.Empty;
 
 		[ObservableProperty]
-		private bool isStatusVisible = false;
+		private bool isStatusVisible;
 
 		[ObservableProperty]
-		private bool isStatusError = false;
-
-		// Computed properties for validation
-		public bool IsFormValid => !string.IsNullOrWhiteSpace(Host) &&
-								  !string.IsNullOrWhiteSpace(Username) &&
-								  !string.IsNullOrWhiteSpace(Password) &&
-								  int.TryParse(Port, out var portNum) && portNum > 0;
+		private bool isStatusError;
 
 		[RelayCommand]
 		private async Task TestConnectionAsync()
@@ -71,14 +76,14 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 				IsTestingConnection = true;
 				HideStatus();
 
-				if (!IsFormValid)
+				var config = await LoadConfigurationAsync();
+				if (!config.IsValid())
 				{
-					ShowStatus("Please fill in all required fields", true);
+					ShowStatus("SMTP is not set up on the site for this tablet. Sign in to Freedom under API Settings.", true);
 					return;
 				}
 
-				var tempConfig = CreateConfigFromForm();
-				var testResult = await _emailService.TestSmtpConnectionAsync(tempConfig);
+				var testResult = await _emailService.TestSmtpConnectionAsync(config);
 
 				if (testResult)
 				{
@@ -86,11 +91,12 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 				}
 				else
 				{
-					ShowStatus("❌ Could not connect to SMTP server. Please check your settings.", true);
+					ShowStatus("❌ Could not connect to the SMTP server. Check the settings on the site.", true);
 				}
 			}
 			catch (Exception ex)
 			{
+				Logger.Warning(ex, "SMTP connection test failed");
 				ShowStatus($"❌ Test failed: {ex.Message}", true);
 			}
 			finally
@@ -99,107 +105,22 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 			}
 		}
 
-		[RelayCommand]
-		private async Task SaveSettingsAsync()
-		{
-			try
-			{
-				IsSaving = true;
-				HideStatus();
-
-				if (!IsFormValid)
-				{
-					ShowStatus("Please fill in all required fields", true);
-					return;
-				}
-
-				var config = CreateConfigFromForm();
-
-				// Persist first — if this fails, the running EmailService is untouched
-				// and the user's old settings remain in effect.
-				await _configService.SaveSmtpConfigurationAsync(config);
-
-				// Push the new config into the running singleton so it takes effect
-				// immediately instead of waiting for app restart. UpdateConfigurationAsync
-				// also resets the circuit breaker (see EmailService) so the next
-				// queue tick will attempt delivery with the fresh credentials.
-				await _emailService.UpdateConfigurationAsync(config);
-
-				Logger.Information("SMTP configuration updated for {Host}:{Port}",
-					config.ToLogSafe().Host, config.ToLogSafe().Port);
-
-				ShowStatus("✅ SMTP settings saved successfully!", false);
-
-				// Notify any subscribers (e.g. status pages) that settings changed.
-				WeakReferenceMessenger.Default.Send(new SettingsSavedMessage { Configuration = config });
-			}
-			catch (Exception ex)
-			{
-				Logger.Error(ex, "Failed to save SMTP settings");
-				ShowStatus($"❌ Failed to save settings: {ex.Message}", true);
-			}
-			finally
-			{
-				IsSaving = false;
-			}
-		}
-
-		[RelayCommand]
-		private void SetGmailDefaults()
-		{
-			Host = "smtp.gmail.com";
-			Port = "587";
-			EnableSsl = true;
-			ShowStatus("📧 Gmail settings applied. Don't forget to use an App Password!", false);
-		}
-
-		[RelayCommand]
-		private void SetOutlookDefaults()
-		{
-			Host = "smtp-mail.outlook.com";
-			Port = "587";
-			EnableSsl = true;
-			ShowStatus("📧 Outlook settings applied!", false);
-		}
-
-		[RelayCommand]
-		private void SetYahooDefaults()
-		{
-			Host = "smtp.mail.yahoo.com";
-			Port = "587";
-			EnableSsl = true;
-			ShowStatus("📧 Yahoo settings applied!", false);
-		}
-
-		private async Task LoadConfigurationAsync()
+		private async Task<SmtpConfiguration> LoadConfigurationAsync()
 		{
 			var config = await _configService.LoadSmtpConfigurationAsync();
 
-			// Use SetProperty to trigger PropertyChanged notifications
-			SetProperty(ref host, config.Host, nameof(Host));
-			SetProperty(ref port, config.Port.ToString(), nameof(Port));
-			SetProperty(ref username, config.Username, nameof(Username));
-			SetProperty(ref password, config.Password, nameof(Password));
-			SetProperty(ref enableSsl, config.EnableSsl, nameof(EnableSsl));
-			SetProperty(ref fromDisplayName, config.FromDisplayName, nameof(FromDisplayName));
+			Host = Shown(config.Host);
+			Port = config.Port.ToString(System.Globalization.CultureInfo.InvariantCulture);
+			Username = Shown(config.Username);
+			Password = string.IsNullOrEmpty(config.Password) ? "Not set" : "Set";
+			Security = config.EnableSsl ? "TLS" : "None";
+			FromDisplayName = Shown(config.FromDisplayName);
+			IsConfigured = config.IsValid();
 
-			// Trigger validation check
-			OnPropertyChanged(nameof(IsFormValid));
+			return config;
 		}
 
-		private SmtpConfiguration CreateConfigFromForm()
-		{
-			return new SmtpConfiguration
-			{
-				Host = Host.Trim(),
-				Port = int.TryParse(Port, out int parsedPort) ? parsedPort : 587,
-				Username = Username.Trim(),
-				Password = Password,
-				EnableSsl = EnableSsl,
-				FromDisplayName = FromDisplayName.Trim(),
-				TimeoutSeconds = 30
-			};
-		}
+		private static string Shown(string? value) => string.IsNullOrWhiteSpace(value) ? "Not set" : value;
 
 		private void ShowStatus(string message, bool isError)
 		{
@@ -219,17 +140,5 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 			IsStatusVisible = false;
 			StatusMessage = string.Empty;
 		}
-
-		// Property change notifications for validation
-		partial void OnHostChanged(string value) => OnPropertyChanged(nameof(IsFormValid));
-		partial void OnUsernameChanged(string value) => OnPropertyChanged(nameof(IsFormValid));
-		partial void OnPasswordChanged(string value) => OnPropertyChanged(nameof(IsFormValid));
-		partial void OnPortChanged(string value) => OnPropertyChanged(nameof(IsFormValid));
-	}
-
-	// Message for notifying when settings are saved
-	public class SettingsSavedMessage
-	{
-		public SmtpConfiguration? Configuration { get; set; }
 	}
 }

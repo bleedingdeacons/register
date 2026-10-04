@@ -8,21 +8,30 @@ using TheBleedingDeacons.Inventory;
 
 namespace TheBleedingDeacons.Intergroup.Register.Services.Interfaces
 {
+	/// <summary>
+	/// The tablet's settings.
+	///
+	/// <para><b>Credentials and endpoints come from Freedom and nowhere
+	/// else</b>: SMTP, Unity, Better Stack and the compliance address. Nothing
+	/// is built into the app and nothing can be typed in on the tablet; a
+	/// tablet that is not signed in to Freedom has none of them, and says so.
+	/// See FreedomSettings for the keys.</para>
+	///
+	/// <para>The switches below, the device label and the active meeting
+	/// are the tablet's own, kept in Preferences.</para>
+	/// </summary>
 	public interface IConfigurationService
 	{
 
 		SmtpConfiguration GetSmtpConfiguration();
-		Task SaveSmtpConfigurationAsync(SmtpConfiguration config);
 		Task<SmtpConfiguration> LoadSmtpConfigurationAsync();
 
-		Task SaveUnityConfigurationAsync(UnityConfiguration config);
 		Task<UnityConfiguration> LoadUnityConfigurationAsync();
 
 		/// <summary>Persists only the active intergroup meeting ID, leaving all other settings untouched.</summary>
 		Task SaveActiveIntergroupMeetingAsync(int? meetingId);
 
 		BetterStackConfiguration GetBetterStackConfiguration();
-		Task SaveBetterStackConfigurationAsync(BetterStackConfiguration config);
 		Task<BetterStackConfiguration> LoadBetterStackConfigurationAsync();
 
 		/// <summary>
@@ -179,37 +188,18 @@ namespace TheBleedingDeacons.Intergroup.Register.Services.Interfaces
 		void SetComplianceAcceptanceEmailEnabled(bool enabled);
 
 		/// <summary>
-		/// The email address used by the compliance service — typically
-		/// the data-protection / compliance contact who should receive
-		/// audit-trail copies of acceptance and revocation events. Read
-		/// per-call from Preferences so flipping the value in Settings
-		/// takes effect on the next compliance action without an app
-		/// restart. Returns an empty string when no value has been set,
-		/// which callers should treat as "no compliance recipient
-		/// configured" and skip any send that would otherwise target it.
+		/// The compliance contact, from Freedom (<c>compliance.email</c>) —
+		/// used as the Reply-To on acceptance confirmations. Empty when
+		/// Freedom holds none, which callers treat as "no compliance contact"
+		/// and leave the header off.
 		/// </summary>
 		string ComplianceEmail { get; }
 
 		/// <summary>
-		/// Persists the compliance email address. Pass an empty / whitespace
-		/// string to clear the value (no compliance recipient configured).
-		/// The address is trimmed before storage; validity is the caller's
-		/// responsibility — the Settings page validates with
-		/// <see cref="System.ComponentModel.DataAnnotations.EmailAddressAttribute"/>
-		/// before invoking this setter.
-		/// </summary>
-		void SetComplianceEmail(string? email);
-
-		/// <summary>
-		/// Whether Freedom supplies this key, so a value typed in on the
-		/// tablet is overridden. See FreedomSettings for the keys.
-		/// </summary>
-		bool IsManaged(string key);
-
-		/// <summary>
 		/// Forget the cached SMTP, Unity and Better Stack settings, so the
-		/// next read picks up what a Freedom sync just changed.
+		/// next read picks up what a Freedom sync, sign-in or sign-out just
+		/// changed.
 		/// </summary>
 		void InvalidateCache();
 	}
-}
+}
