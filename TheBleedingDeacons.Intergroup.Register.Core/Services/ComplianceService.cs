@@ -47,9 +47,9 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 	/// The email path mirrors the welcome-email path almost exactly:
 	///   • Feature-gated by <see cref="IConfigurationService.IsComplianceAcceptanceEmailEnabled"/>;
 	///     off by default, no surprises on fresh installs.
-	///   • Members without a <c>PersonalEmail</c> on file are skipped silently —
-	///     the consent gate accepts a phone-only member, so a missing email
-	///     is normal, not an error.
+	///   • Members without a <c>PersonalEmail</c> on file are skipped silently.
+	///     Unity and the tablet's member form both require one, so this is
+	///     a guard rather than a case anyone meets.
 	///   • Per-recipient failures are warning-logged and swallowed so a bad
 	///     address can't undo a recorded acceptance.
 	/// </summary>
@@ -316,9 +316,9 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 				return;
 			}
 
-			// Email is optional at the consent gate — phone-only members
-			// pass the gate but can't be emailed. This is normal, not an
-			// error.
+			// Guard: Unity and the tablet's member form both require a
+			// personal email, so a member without one should not reach
+			// here. Skip rather than fail if one does.
 			var to = member.PersonalEmail?.Trim();
 			if (string.IsNullOrEmpty(to))
 			{

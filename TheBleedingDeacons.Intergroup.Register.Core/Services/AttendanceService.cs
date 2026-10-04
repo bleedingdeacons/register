@@ -283,18 +283,18 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		//     never propagate up into Register() and cause the registration
 		//     to look like it failed. The DB row already says Registered=true.
 		//
-		//   • Skip silently when a recipient has no email on file. The
-		//     verify-page gate accepts a member with just a phone number,
-		//     so a missing PersonalEmail is a normal and expected case,
-		//     not an error.
+		//   • Skip silently when a recipient has no email on file. Unity
+		//     requires a personal email and so does the tablet's own member
+		//     form, so this should not happen; the skip is a guard against
+		//     a record that slipped through, not a case anyone meets.
 
 		/// <summary>
 		/// Queue a welcome email for each member in <paramref name="members"/>
-		/// who has a non-empty <c>PersonalEmail</c>. Members without an email
-		/// on file are skipped silently — phone-only contact is permitted by
-		/// the registration gate. Per-recipient failures are logged and
-		/// swallowed so a bad address can't block the rest of the batch or
-		/// the registration that triggered them.
+		/// who has a non-empty <c>PersonalEmail</c>. Every member should have
+		/// one — Unity and the tablet's member form both require it — so a
+		/// member without one is skipped silently, as a guard. Per-recipient
+		/// failures are logged and swallowed so a bad address can't block the
+		/// rest of the batch or the registration that triggered them.
 		/// </summary>
 		/// <param name="members">
 		/// The set of recipients. Already deduped by the caller for the
@@ -331,7 +331,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			{
 				if (member is null) continue;
 
-				// Email is optional at the gate — only emit when present.
+				// Guard: every member should have an email, but only emit when present.
 				var to = member.PersonalEmail?.Trim();
 				if (string.IsNullOrEmpty(to)) continue;
 

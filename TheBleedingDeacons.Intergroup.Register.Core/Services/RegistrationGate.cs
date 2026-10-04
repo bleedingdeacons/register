@@ -22,9 +22,14 @@ public static class RegistrationGate
 	/// <summary>
 	/// True when at least one of <paramref name="holders"/> can be
 	/// contacted: an anonymous name, and a mobile number or a personal
-	/// email. Either contact is enough — phone-only is a normal case, which
-	/// is why the welcome email skips members with no address rather than
-	/// failing.
+	/// email.
+	///
+	/// <para><b>In practice it is the email that counts.</b> Unity requires
+	/// a personal email on every member and so does the tablet's own member
+	/// form, so a holder with only a phone does not occur; the rule accepts
+	/// one because it was written that way, not because the case is met.
+	/// What does happen is a group with no GSR at all, and then there is
+	/// nobody to reach and this is false.</para>
 	///
 	/// <para>Empty, not whitespace, is what counts as missing. A name of a
 	/// single space passes. That is how the view models behaved, and moving

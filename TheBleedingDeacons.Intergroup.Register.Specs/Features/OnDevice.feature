@@ -4,11 +4,18 @@ Feature: On the tablet
   they are written down because no test host can reach any of them, and
   several are exactly where a change to the app would go wrong unnoticed.
 
+  # Every member has an email, so "nobody can be reached" means a group
+  # with no GSR. Checked on the TB330FU on 2026-10-04.
   Scenario: The Yes button greys out when nobody can be reached
-    Given a group whose only GSR has neither phone nor email
+    Given a group with no GSR
     When the volunteer opens the group to verify it
     Then Yes is disabled
-    And ticking "standing in" without a name keeps it disabled
+    And the left button reads Sign-up rather than No
+
+  Scenario: A stand-in must give a name
+    Given a group with a GSR
+    When "standing in" is ticked and the name left empty
+    Then Yes is disabled
     And typing a name enables it
 
   Scenario: The consent popup names the person being asked

@@ -35,7 +35,8 @@ Feature: Recording consent
     Then "Ann B" has accepted version "2.1"
     And nobody is emailed
 
-  Scenario: A member with only a phone number is recorded and not emailed
+  # A guard: Unity and the tablet's member form both require an email.
+  Scenario: A member with no email on record is recorded, and not emailed
     Given "Dee E" is a GSR of "Monday Step"
     When "Dee E" accepts the privacy policy
     Then "Dee E" has accepted version "2.1"

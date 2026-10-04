@@ -69,9 +69,11 @@ Feature: Registering attendance
   Rule: Everyone registered is emailed once
 
     The welcome email is queued, never sent while the volunteer waits: the
-    mail server is the queue's business (see EmailQueue.feature). A member
-    with no email address is normal — a phone number is enough to register —
-    and is simply not emailed.
+    mail server is the queue's business (see EmailQueue.feature). Every
+    member has an email address — Unity requires one, and so does the
+    tablet's member form — so the scenario without one below is a guard,
+    not a case anyone meets: such a member would be registered and simply
+    not emailed.
 
     Scenario: The GSR is welcomed
       When "Monday Step" is registered
@@ -96,7 +98,7 @@ Feature: Registering attendance
       When "Monday Step" is registered
       Then 1 email is waiting to be sent
 
-    Scenario: A GSR with only a phone number is registered and not emailed
+    Scenario: A GSR with no email on record is still registered, and not emailed
       Given the group "Tuesday Big Book"
       And "Dee E" is a GSR of "Tuesday Big Book"
       When "Tuesday Big Book" is registered
