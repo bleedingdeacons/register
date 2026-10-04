@@ -2,7 +2,7 @@ using TheBleedingDeacons.Intergroup.Register.ViewModels;
 
 namespace TheBleedingDeacons.Intergroup.Register.Views;
 
-public partial class EditPositionPage : ContentPage, IQueryAttributable
+public partial class EditPositionPage : ContentPage
 {
 	private readonly PositionEditViewModel _viewModel;
 
@@ -13,11 +13,13 @@ public partial class EditPositionPage : ContentPage, IQueryAttributable
 		BindingContext = _viewModel;
 	}
 
-	public void ApplyQueryAttributes(IDictionary<string, object> query)
-	{
-		if (_viewModel is IQueryAttributable queryAttributable)
-			queryAttributable.ApplyQueryAttributes(query);
-	}
+	// Navigation parameters reach the view-model straight from Shell, which
+	// calls ApplyQueryAttributes on a page's BindingContext whenever that is
+	// IQueryAttributable (BaseViewModel is). This page used to implement
+	// IQueryAttributable too and forward the same dictionary, so every
+	// navigation was applied twice: the group or position loaded twice, an
+	// add-member or edit-member request ran twice, and a return from Edit with
+	// autoRegister could tap Yes a second time. Don't forward it again.
 
 	protected override void OnAppearing()
 	{
