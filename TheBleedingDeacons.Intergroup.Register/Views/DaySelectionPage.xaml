@@ -7,6 +7,7 @@
     xmlns:models="clr-namespace:TheBleedingDeacons.Intergroup.Register.Models"
     xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
     xmlns:vm="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
+    HandlerProperties.DisconnectPolicy="Manual"
     Title="{Binding Title}"
     x:DataType="vm:DaySelectionViewModel">
 

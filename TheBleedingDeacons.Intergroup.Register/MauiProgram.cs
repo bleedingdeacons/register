@@ -281,23 +281,26 @@ public static class MauiProgram
 		builder.Services.AddSingleton<MainPage>();
 		builder.Services.AddTransient<EditGroupPage>();
 		builder.Services.AddTransient<VerifyGroupPage>();
-		// The four selection pages are transient: a fresh page on every visit.
+		// The four selection pages are singletons: each is reached from one
+		// place and never appears twice on the stack, so one instance is
+		// reused for the life of the app instead of rebuilding the page and
+		// its list on every visit.
 		//
-		// They used to be singletons, reused for the life of the app to save
-		// rebuilding each page. That stopped working with .NET 9's Shell,
-		// which disconnects the handlers of a page when it is popped. A
-		// singleton pushed a second time comes back with its body's handlers
-		// gone: the title bar draws and the body is blank. Seen on the tablet
+		// That only works because each page sets
+		// HandlerProperties.DisconnectPolicy="Manual" in its XAML. Since .NET 9,
+		// Shell disconnects the handlers of a page when it is popped, and a
+		// singleton pushed a second time came back with its body's handlers
+		// gone: the title bar drew and the body was blank. Seen on the tablet
 		// on 2026-10-04 — Select a Day showed its days on the first visit and
-		// nothing after returning to the main page.
-		//
-		// Their view-models stay singletons, so what a page shows and how its
-		// list reloads are unchanged; only the page is rebuilt.
-		builder.Services.AddTransient<DaySelectionPage>();
-		builder.Services.AddTransient<TypeSelectionPage>();
-		builder.Services.AddTransient<GroupSelectionPage>();
+		// nothing after returning to the main page. Making the pages
+		// transient fixed it too, but each visit was visibly slower; the
+		// manual policy keeps the old speed. A new singleton page pushed as a
+		// route needs the same attribute.
+		builder.Services.AddSingleton<DaySelectionPage>();
+		builder.Services.AddSingleton<TypeSelectionPage>();
+		builder.Services.AddSingleton<GroupSelectionPage>();
 		builder.Services.AddTransient<EditPositionPage>();
-		builder.Services.AddTransient<PositionSelectionPage>();
+		builder.Services.AddSingleton<PositionSelectionPage>();
 		builder.Services.AddTransient<DiagnosticDumpPage>();
 		builder.Services.AddTransient<EmailStatusPage>();
 		builder.Services.AddTransient<SettingsPage>();
@@ -308,8 +311,7 @@ public static class MauiProgram
 		// ── ViewModels ────────────────────────────────────────────────
 		builder.Services.AddTransient<MailSettingsViewModel>();
 		builder.Services.AddSingleton<MainPageViewModel>();
-		// Singleton, though GroupSelectionPage is now transient (see above):
-		// the view-model outlives each page. Its list still reloads on
+		// Singleton to match GroupSelectionPage. Its list still reloads on
 		// every visit: DaySelectionViewModel hands over a freshly constructed
 		// MeetingCriteria each time and MeetingCriteria is a plain class, so
 		// reference inequality means OnCriteriaChanged fires even when the
@@ -320,9 +322,9 @@ public static class MauiProgram
 		builder.Services.AddTransient<VerifyGroupViewModel>();
 		builder.Services.AddSingleton<TypeSelectionViewModel>();
 		builder.Services.AddSingleton<DaySelectionViewModel>();
-		// Singleton, though PositionSelectionPage is now transient: the
-		// view-model outlives each page. Its list still reloads on every
-		// visit, because PositionSelectionPage.OnAppearing drives the load.
+		// Singleton to match PositionSelectionPage. Its list still reloads on
+		// every visit, because PositionSelectionPage.OnAppearing drives the
+		// load and fires again each time the page is returned to.
 		builder.Services.AddSingleton<PositionSelectionViewModel>();
 		builder.Services.AddTransient<PositionEditViewModel>();
 		builder.Services.AddTransient<DiagnosticDumpViewModel>();
