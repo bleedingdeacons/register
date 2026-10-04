@@ -10,6 +10,13 @@ Feature: Who may be registered
 
   Rule: Someone must be reachable
 
+    The rule accepts a phone or an email. In practice every member has an
+    email — Unity requires one, and so does the tablet's member form — so
+    what actually stops a registration here is a group with no GSR at all.
+
+    Scenario: A group with no GSR cannot be registered
+      Then the group cannot be registered
+
     Scenario Outline: A holder can be reached by phone or by email
       Given a holder named "<name>" with phone "<phone>" and email "<email>"
       Then the group <verdict> be registered

@@ -43,7 +43,10 @@ sync ─▶ snapshot ─▶ register / accept (local DB + fsync'd log) ─▶ fi
   the group leaves its officers where they were.
 - **Stand-in**: someone attending in place of the GSR, recorded by name.
 - **Contactable**: a holder with an anonymous name, and a mobile number or a
-  personal email. Either one is enough.
+  personal email. In practice every member has a personal email — Unity
+  requires one, and so does the tablet's member form — so a holder is
+  contactable whenever they exist; the rule only fails for a group with no
+  GSR.
 - **Consent / acceptance**: a member's agreement to a version of the privacy
   policy. It records the version, the policy's id, its wording and the method
   (`register-app`).
@@ -82,7 +85,9 @@ would reject. The logs are kept, so the next attempt retries both.
 
 ## The two gates in front of Yes
 
-**Contact first.** At least one holder must be contactable. If someone is
+**Contact first.** At least one holder must be contactable. Since every
+member has a personal email, that comes down to there being a GSR at all:
+a group with none offers Sign-up rather than Yes. If someone is
 standing in for the GSR, they must give a name. Whitespace counts as present
 here: the check is `IsNullOrEmpty`. The gate was moved into Register.Core
 unchanged, and the behaviour is pinned in Register.Tests.
@@ -106,7 +111,8 @@ that counts. A group the last sync removed is skipped, not resurrected.
 ## Email is queued, never awaited
 
 Welcome and consent emails are queued, so the volunteer never waits on SMTP.
-Nobody without an email address is emailed, and that is normal. The queue
+Every member has an email address; a member without one would simply not
+be emailed, but Unity and the tablet's form both prevent that. The queue
 tries each email a limited number of times before marking it failed. While
 offline it does not run at all.
 
