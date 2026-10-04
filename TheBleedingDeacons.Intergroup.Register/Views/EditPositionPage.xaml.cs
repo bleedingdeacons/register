@@ -1,8 +1,9 @@
 using TheBleedingDeacons.Intergroup.Register.ViewModels;
+using TheBleedingDeacons.Intergroup.Register.Services;
 
 namespace TheBleedingDeacons.Intergroup.Register.Views;
 
-public partial class EditPositionPage : ContentPage
+public partial class EditPositionPage : ContentPage, IRegistrationWorkflow
 {
 	private readonly PositionEditViewModel _viewModel;
 

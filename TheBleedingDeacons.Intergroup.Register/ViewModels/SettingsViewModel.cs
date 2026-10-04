@@ -521,6 +521,23 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 			}
 		}
 
+		/// <summary>
+		/// Two-way bound to a Switch on SettingsPage. When on, every button on
+		/// the registration workflow plays a short click as it is tapped. See
+		/// <see cref="IConfigurationService.IsButtonSoundEnabled"/> and
+		/// <see cref="Services.ClickSound"/>. Defaults to on.
+		/// </summary>
+		public bool IsButtonSoundEnabled
+		{
+			get => _configService.IsButtonSoundEnabled;
+			set
+			{
+				if (_configService.IsButtonSoundEnabled == value) return;
+				_configService.SetButtonSoundEnabled(value);
+				OnPropertyChanged();
+			}
+		}
+
 		// =================================================================
 		// Navigation
 		// =================================================================

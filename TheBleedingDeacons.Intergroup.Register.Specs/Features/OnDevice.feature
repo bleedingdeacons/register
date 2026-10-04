@@ -51,6 +51,22 @@ Feature: On the tablet
     Then the SecureStorage secrets, the three settings files and the compliance address are gone
     And the log says "Removed the settings earlier builds kept on this tablet"
 
+  Scenario: Registration buttons click, on the media volume
+    Given a tablet with Touch sounds off and the system volume muted
+    When the volunteer taps Yes, No, a type, a day or a group
+    Then each tap clicks once, at the media volume
+    But Settings, Admin and the diagnostics stay silent
+
+  Scenario: The click can be switched off
+    Given Sound on Button Tap is off in Settings
+    When the volunteer taps Yes
+    Then nothing is heard
+
+  Scenario: No double click when Touch sounds is on
+    Given a tablet with Touch sounds on
+    When the volunteer taps Yes
+    Then one click is heard, Android's own
+
   Scenario: The logs survive an uninstall
     Given a tablet that has registered a group
     When the app is uninstalled and reinstalled

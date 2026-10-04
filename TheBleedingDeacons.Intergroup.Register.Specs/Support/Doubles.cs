@@ -128,6 +128,8 @@ public sealed class FakeConfigurationService : IConfigurationService
 
 	public bool IsComplianceAcceptanceEmailEnabled { get; set; } = true;
 
+	public bool IsButtonSoundEnabled { get; set; } = true;
+
 	public string ComplianceEmail { get; set; } = "privacy@aa-bristol.org";
 
 	public SmtpConfiguration GetSmtpConfiguration() => Smtp;
@@ -161,6 +163,8 @@ public sealed class FakeConfigurationService : IConfigurationService
 	public void SetDeviceLabel(string? label) => DeviceLabel = label ?? string.Empty;
 
 	public void SetComplianceAcceptanceEmailEnabled(bool enabled) => IsComplianceAcceptanceEmailEnabled = enabled;
+
+	public void SetButtonSoundEnabled(bool enabled) => IsButtonSoundEnabled = enabled;
 
 	public void InvalidateCache()
 	{

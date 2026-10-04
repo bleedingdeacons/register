@@ -1,8 +1,9 @@
 using TheBleedingDeacons.Intergroup.Register.ViewModels;
+using TheBleedingDeacons.Intergroup.Register.Services;
 
 namespace TheBleedingDeacons.Intergroup.Register.Views;
 
-public partial class RegistrationOverviewPage : ContentPage
+public partial class RegistrationOverviewPage : ContentPage, IRegistrationWorkflow
 {
 	private readonly RegistrationOverviewViewModel _viewModel;
 

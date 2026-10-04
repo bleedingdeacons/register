@@ -1,9 +1,10 @@
 using CommunityToolkit.Maui.Views;
 using TheBleedingDeacons.Intergroup.Register.ViewModels;
+using TheBleedingDeacons.Intergroup.Register.Services;
 
 namespace TheBleedingDeacons.Intergroup.Register.Views;
 
-public partial class CountdownPopup : Popup
+public partial class CountdownPopup : Popup, IRegistrationWorkflow
 {
     public CountdownPopup(string title, string message, Func<Task> navigateAction)
     {

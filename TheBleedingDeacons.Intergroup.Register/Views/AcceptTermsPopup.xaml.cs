@@ -1,10 +1,11 @@
 using CommunityToolkit.Maui.Views;
 using TheBleedingDeacons.Intergroup.Register.Support;
 using TheBleedingDeacons.Intergroup.Register.ViewModels;
+using TheBleedingDeacons.Intergroup.Register.Services;
 
 namespace TheBleedingDeacons.Intergroup.Register.Views;
 
-public partial class AcceptTermsPopup : Popup
+public partial class AcceptTermsPopup : Popup, IRegistrationWorkflow
 {
     private readonly TaskCompletionSource<bool> _resultTcs =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
