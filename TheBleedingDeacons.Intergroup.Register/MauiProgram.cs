@@ -269,14 +269,23 @@ public static class MauiProgram
 		builder.Services.AddSingleton<MainPage>();
 		builder.Services.AddTransient<EditGroupPage>();
 		builder.Services.AddTransient<VerifyGroupPage>();
+		// The four selection pages are singletons: each is reached from one
+		// place and never appears twice on the stack, so one instance is
+		// reused for the life of the app instead of rebuilding the page and
+		// its list on every visit.
+		//
+		// That only works because each page sets
+		// HandlerProperties.DisconnectPolicy="Manual" in its XAML. Since .NET 9,
+		// Shell disconnects the handlers of a page when it is popped, and a
+		// singleton pushed a second time came back with its body's handlers
+		// gone: the title bar drew and the body was blank. Seen on the tablet
+		// on 2026-10-04 — Select a Day showed its days on the first visit and
+		// nothing after returning to the main page. Making the pages
+		// transient fixed it too, but each visit was visibly slower; the
+		// manual policy keeps the old speed. A new singleton page pushed as a
+		// route needs the same attribute.
 		builder.Services.AddSingleton<DaySelectionPage>();
 		builder.Services.AddSingleton<TypeSelectionPage>();
-		// Singleton, like DaySelectionPage and TypeSelectionPage above: the
-		// two list pages are each reached from exactly one place and never
-		// appear twice on the navigation stack, so one instance can be
-		// reused for the life of the app instead of rebuilding the page and
-		// its CollectionView on every visit. See the view-model
-		// registrations below for the reload behaviour this relies on.
 		builder.Services.AddSingleton<GroupSelectionPage>();
 		builder.Services.AddTransient<EditPositionPage>();
 		builder.Services.AddSingleton<PositionSelectionPage>();

@@ -6,6 +6,7 @@
              xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
              x:Class="TheBleedingDeacons.Intergroup.Register.Views.TypeSelectionPage"
              x:DataType="vm:TypeSelectionViewModel"
+             HandlerProperties.DisconnectPolicy="Manual"
              Title="{Binding Title}">
 
     <ContentPage.Behaviors>
