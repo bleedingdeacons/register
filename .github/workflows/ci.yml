@@ -110,15 +110,14 @@ jobs:
       # the Register project's TargetFrameworks, letting each project reference
       # resolve its own TFM.
       #
-      # Debug config: no code signing (keystore is not in the repo) and no
-      # dev credentials baked in. Analyzer errors from .editorconfig break
-      # the build here.
+      # Debug config: no code signing (keystore is not in the repo). There
+      # are no credentials to bake in any more; they come from Freedom at
+      # run time. Analyzer errors from .editorconfig break the build here.
       - name: Build & analyze
         run: >
           dotnet build TheBleedingDeacons.Intergroup.Register/TheBleedingDeacons.Intergroup.Register.csproj
           -c Debug
           -p:RegisterAndroidOnly=true
-          -p:UseDevCredentials=false
           -p:ContinuousIntegrationBuild=true
 
   build-windows:
@@ -169,7 +168,6 @@ jobs:
           dotnet build TheBleedingDeacons.Intergroup.Register/TheBleedingDeacons.Intergroup.Register.csproj
           -c Debug
           -p:RegisterWindowsOnly=true
-          -p:UseDevCredentials=false
           -p:ContinuousIntegrationBuild=true
 
   test:

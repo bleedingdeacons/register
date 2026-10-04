@@ -29,6 +29,51 @@ public sealed class FreedomSettingsTests
 	}
 
 	[Fact]
+	public void WithNothingFromFreedomThereAreNoCredentials()
+	{
+		var smtp = FreedomSettings.Smtp(Managed());
+
+		Assert.Equal(string.Empty, smtp.Host);
+		Assert.Equal(string.Empty, smtp.Password);
+		Assert.False(smtp.IsValid());
+		Assert.Equal((string.Empty, string.Empty), FreedomSettings.Unity(Managed()));
+		Assert.False(FreedomSettings.BetterStack(Managed()).IsValid());
+		Assert.Equal(string.Empty, FreedomSettings.Compliance(Managed()));
+	}
+
+	[Fact]
+	public void OnlyTheShapeOfAConnectionHasADefault()
+	{
+		var smtp = FreedomSettings.Smtp(Managed((FreedomSettings.SmtpHost, "smtp.site.example")));
+
+		Assert.Equal("smtp.site.example", smtp.Host);
+		Assert.Equal(587, smtp.Port);
+		Assert.True(smtp.EnableSsl);
+		Assert.Equal(30, smtp.TimeoutSeconds);
+	}
+
+	[Fact]
+	public void EachCallStartsFromNothing()
+	{
+		// No caching or carry-over between reads: a value Freedom stops
+		// holding is gone on the next read, not remembered.
+		FreedomSettings.Smtp(Managed((FreedomSettings.SmtpHost, "smtp.site.example")));
+
+		Assert.Equal(string.Empty, FreedomSettings.Smtp(Managed()).Host);
+	}
+
+	[Fact]
+	public void TheUnitySiteAndKeyAreFreedoms()
+	{
+		var (baseUrl, apiKey) = FreedomSettings.Unity(Managed(
+			(FreedomSettings.UnityBaseUrl, "https://aa-bristol.org/amber"),
+			(FreedomSettings.UnityApiKey, "key")));
+
+		Assert.Equal("https://aa-bristol.org/amber", baseUrl);
+		Assert.Equal("key", apiKey);
+	}
+
+	[Fact]
 	public void NothingManagedChangesNothing()
 	{
 		var config = FreedomSettings.Apply(Tablet(), Managed());

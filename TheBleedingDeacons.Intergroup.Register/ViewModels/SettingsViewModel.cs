@@ -2,7 +2,6 @@
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
-using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 using System.Threading.Tasks;
 using TheBleedingDeacons.Intergroup.Register.Exceptions;
@@ -68,27 +67,13 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 		// =================================================================
 
 		/// <summary>
-		/// User-editable copy of the compliance email address. Two-way
-		/// bound to the Entry inside the Privacy Policy section of
-		/// SettingsPage — the address lives there because it's the
-		/// recipient for audit-trail copies of acceptance / revocation
-		/// events tied to the active policy shown in that card. Save is
-		/// explicit (a button + command) rather than
-		/// PropertyChanged-on-every-keystroke so we can validate the
-		/// address on commit and surface a single status message — green
-		/// on success, red on a validation failure or persistence error.
+		/// The compliance contact this tablet is using, shown read-only in
+		/// the Privacy Policy card. It comes from Freedom
+		/// (<c>compliance.email</c>) and nowhere else, so there is nothing to
+		/// edit here; "Not set" when the site holds none.
 		/// </summary>
 		[ObservableProperty]
 		private string complianceEmail = string.Empty;
-
-		[ObservableProperty]
-		private string complianceEmailStatusMessage = string.Empty;
-
-		[ObservableProperty]
-		private bool isComplianceEmailStatusVisible;
-
-		[ObservableProperty]
-		private bool isComplianceEmailStatusError;
 
 		// =================================================================
 		// Active privacy policy (read from on-device Scrutiny cache)
@@ -181,10 +166,10 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 			DeviceLabel = _configService.DeviceLabel;
 			DeviceLabelPlaceholder = _configService.DeviceLabel;
 
-			// Seed the compliance email Entry with the persisted value (empty
-			// on a fresh install — the placeholder in XAML invites the operator
-			// to fill it in).
-			ComplianceEmail = _configService.ComplianceEmail;
+			// The compliance contact, from Freedom. Read-only.
+			ComplianceEmail = string.IsNullOrWhiteSpace(_configService.ComplianceEmail)
+				? "Not set"
+				: _configService.ComplianceEmail;
 
 			// Load the cached privacy policy synchronously — Preferences
 			// is a synchronous KVS so there's no async work to fire-and-
@@ -231,83 +216,6 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 		{
 			DeviceLabelStatusMessage = message;
 			IsDeviceLabelStatusVisible = true;
-		}
-
-		// =================================================================
-		// Compliance email: validate + save
-		// =================================================================
-
-		/// <summary>
-		/// Validates and persists the typed-in compliance email address.
-		/// An empty value is allowed and clears the configured recipient
-		/// — callers downstream treat that as "no compliance recipient
-		/// configured" and silently skip the send. A non-empty value is
-		/// validated with <see cref="EmailAddressAttribute"/> (the same
-		/// check used on member email fields elsewhere in the app); a
-		/// failed validation surfaces a red status message and leaves
-		/// the persisted value untouched.
-		/// </summary>
-		[RelayCommand]
-		private void SaveComplianceEmail()
-		{
-			try
-			{
-				var trimmed = ComplianceEmail?.Trim() ?? string.Empty;
-
-				if (trimmed.Length > 0 && !IsValidEmail(trimmed))
-				{
-					ShowComplianceEmailStatus(
-						"That doesn't look like a valid email address.",
-						isError: true);
-					return;
-				}
-
-				_configService.SetComplianceEmail(trimmed);
-
-				// Reflect the canonical (trimmed) value back to the bound
-				// field so the Entry shows what was actually persisted.
-				ComplianceEmail = trimmed;
-
-				if (trimmed.Length == 0)
-				{
-					ShowComplianceEmailStatus(
-						"Compliance email cleared.",
-						isError: false);
-					Logger.Information("Compliance email cleared from Settings");
-				}
-				else
-				{
-					ShowComplianceEmailStatus(
-						$"Saved. Compliance service will use \"{trimmed}\".",
-						isError: false);
-					Logger.Information("Compliance email updated from Settings to {ComplianceEmail}", trimmed);
-				}
-			}
-			catch (Exception ex)
-			{
-				Logger.Error(ex, "Failed to save compliance email");
-				ShowComplianceEmailStatus("Could not save compliance email — see logs.", isError: true);
-			}
-		}
-
-		private void ShowComplianceEmailStatus(string message, bool isError)
-		{
-			ComplianceEmailStatusMessage = message;
-			IsComplianceEmailStatusError = isError;
-			IsComplianceEmailStatusVisible = true;
-		}
-
-		/// <summary>
-		/// Same validator used on member email fields (see EditGroupViewModel /
-		/// PositionEditViewModel). Wrapping in try/catch mirrors those call
-		/// sites — <see cref="EmailAddressAttribute"/> can throw on
-		/// pathological inputs, and a thrown validator should be treated as
-		/// "not valid" rather than bubbling up to the user.
-		/// </summary>
-		private static bool IsValidEmail(string email)
-		{
-			try { return new EmailAddressAttribute().IsValid(email); }
-			catch { return false; }
 		}
 
 		// =================================================================
@@ -407,7 +315,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 				// — this is a config issue, not a stale-cache issue.
 				Logger.Warning(ex, "Cannot refresh privacy policy: base URL not configured");
 				ShowPrivacyPolicyStatus(
-					"Configure the Unity base URL in API Settings first.",
+					"Unity is not set up for this tablet. Sign it in to Freedom under API Settings first.",
 					isError: true);
 			}
 			catch (HttpRequestException ex)
@@ -761,4 +669,4 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 			await Task.Delay(100);
 		}
 	}
-}
+}

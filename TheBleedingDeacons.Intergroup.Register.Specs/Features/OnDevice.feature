@@ -28,9 +28,21 @@ Feature: On the tablet
     When Settings, then Reset Device, is confirmed
     Then registrations.log and compliance.log are gone from Documents
 
-  Scenario: A release build carries no developer credentials
-    Given an APK built with -p:UseDevCredentials=false
+  Scenario: No build carries credentials
+    Given any APK built from this repository, Debug or Release
     Then devsettings.json is not among its embedded resources
+    And appsettings.json holds only the Freedom site, the logging level and the App name
+
+  Scenario: A tablet that has not signed in to Freedom says so
+    Given a freshly installed tablet that has not signed in to Freedom
+    Then Mail Settings and API Settings show "Not set" and a sign-in prompt
+    And Load Unity says Unity is not set up, rather than failing obscurely
+
+  Scenario: An upgraded tablet forgets what was typed in
+    Given a tablet that had SMTP, Unity and Better Stack settings typed in under an earlier build
+    When it starts the first build that takes them only from Freedom
+    Then the SecureStorage secrets, the three settings files and the compliance address are gone
+    And the log says "Removed the settings earlier builds kept on this tablet"
 
   Scenario: The logs survive an uninstall
     Given a tablet that has registered a group

@@ -1,8 +1,4 @@
-﻿using Microsoft.Extensions.Configuration;
-using Serilog;
-using System.Diagnostics.CodeAnalysis;
-using System.Reflection;
-using System.Text.Json;
+﻿using Serilog;
 using TheBleedingDeacons.Freedom.Client;
 using TheBleedingDeacons.Intergroup.Register.Models;
 using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
@@ -11,17 +7,25 @@ using TheBleedingDeacons.Inventory;
 
 namespace TheBleedingDeacons.Intergroup.Register.Services
 {
+	/// <summary>
+	/// The tablet's settings, on a real device.
+	///
+	/// <para><b>Credentials and endpoints come from Freedom and nowhere
+	/// else</b> — see <see cref="FreedomSettings"/>. There is no embedded
+	/// devsettings.json, no settings file and no SecureStorage fallback: a
+	/// tablet that is not signed in to Freedom, or a build that names no
+	/// Freedom site, has no SMTP, Unity or Better Stack settings at all, and
+	/// the pages that need them say so.</para>
+	///
+	/// <para>What stays here is the tablet's own: the feature switches, the
+	/// device label and the active intergroup meeting, in Preferences.</para>
+	/// </summary>
 	public class ConfigurationService : IConfigurationService
 	{
 		private static readonly ILogger Logger = AppLogger.ForContext<ConfigurationService>();
 
-		private static readonly JsonSerializerOptions WriteOptions = new() { WriteIndented = true };
 		private const string COMPLIANCE_ACCEPTANCE_EMAIL_ENABLED_KEY = "compliance_acceptance_email_enabled";
-		private const string COMPLIANCE_EMAIL_KEY = "compliance_email";
-		private const string SMTP_PASSWORD_KEY = "smtp_password";
-		private const string UNITY_API_KEY = "unity_api_key";
 		private const string UNITY_ACTIVE_MEETING_KEY = "unity_active_meeting_id";
-		private const string BETTERSTACK_SOURCE_TOKEN_KEY = "betterstack_source_token";
 		private const string REGISTRATION_LOG_ENABLED_KEY = "registration_log_enabled";
 		private const string AUTO_REGISTER_POSITIONS_KEY = "auto_register_positions_on_group";
 		private const string SINGLE_GSR_SHORTCUT_KEY = "single_gsr_shortcut_enabled";
@@ -30,20 +34,9 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		private const string WELCOME_EMAIL_ENABLED_KEY = "welcome_email_on_registration_enabled";
 		private const string DEVICE_LABEL_KEY = "device_label";
 
-#if USE_DEV_CREDENTIALS
-		private const string DEV_CREDENTIALS_RESOURCE =
-			"TheBleedingDeacons.Intergroup.Register.devsettings.json";
-#endif
-
-		private readonly IConfiguration _configuration;
-
 		// Null when the build names no Freedom site, or off Android. Every
-		// managed read below then falls through to the tablet's own settings,
-		// exactly as before Freedom existed. See FreedomSettings.
+		// credential and endpoint is then empty. See FreedomSettings.
 		private readonly FreedomClient? _freedom;
-		private readonly string _configFilePath;
-		private readonly string _unityConfigFilePath;
-		private readonly string _betterStackConfigFilePath;
 
 		private SmtpConfiguration? _cachedSmtpConfig;
 		private UnityConfiguration? _cachedUnityConfig;
@@ -58,160 +51,73 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		{
 			_freedom = freedom;
 
-			var builder = new ConfigurationBuilder();
-
-			// Load embedded appsettings.json
-			var assembly = Assembly.GetExecutingAssembly();
-			var stream = assembly.GetManifestResourceStream("TheBleedingDeacons.Intergroup.Register.appsettings.json");
-			if (stream != null)
+			if (_freedom is null)
 			{
-				builder.AddJsonStream(stream);
+				Logger.Warning("No Freedom client: this tablet has no SMTP, Unity or Better Stack settings");
 			}
 
-			// Load user-specific config file from app data
-			_configFilePath = Path.Combine(FileSystem.AppDataDirectory, "mailsettings.json");
-			_unityConfigFilePath = Path.Combine(FileSystem.AppDataDirectory, "unitysettings.json");
-			_betterStackConfigFilePath = Path.Combine(FileSystem.AppDataDirectory, "betterstacksettings.json");
-			if (File.Exists(_configFilePath))
-			{
-				builder.AddJsonFile(_configFilePath, optional: true, reloadOnChange: false);
-			}
-
-			_configuration = builder.Build();
-
+			LegacySettings.Forget();
 		}
+
+		/// <summary>The value Freedom holds for a key, or null when it holds none.</summary>
+		private string? Managed(string key) => _freedom?.Get(key);
 
 		// =================================================================
-		// SMTP
+		// SMTP, Unity, Better Stack, compliance contact — Freedom only
 		// =================================================================
 
-		public SmtpConfiguration GetSmtpConfiguration()
-		{
-			if (_cachedSmtpConfig != null)
-				return _cachedSmtpConfig;
+		public SmtpConfiguration GetSmtpConfiguration() =>
+			_cachedSmtpConfig ??= FreedomSettings.Smtp(Managed);
 
-#if USE_DEV_CREDENTIALS
-			// Dev/test mode: every SMTP field comes from the embedded
-			// devsettings.json — host, port, username, password, the lot.
-			// Don't fall through to BuildSmtpConfiguration: even though
-			// devsettings.json is now layered into _configuration in dev
-			// builds (see MauiProgram), the SMTP password is held in
-			// SecureStorage on production devices and we don't want
-			// dev-build code paths to depend on that secret being in
-			// _configuration. Going through LoadEmbeddedDevSmtpConfiguration
-			// keeps the dev path uniform and self-contained.
-			_cachedSmtpConfig = LoadEmbeddedDevSmtpConfiguration();
-#else
-			var password = GetSecretSync(SMTP_PASSWORD_KEY, "SMTP password");
-			_cachedSmtpConfig = BuildSmtpConfiguration(password);
-#endif
-			_cachedSmtpConfig = FreedomSettings.Apply(_cachedSmtpConfig, Managed);
-			return _cachedSmtpConfig;
+		public Task<SmtpConfiguration> LoadSmtpConfigurationAsync()
+		{
+			_cachedSmtpConfig = FreedomSettings.Smtp(Managed);
+			return Task.FromResult(_cachedSmtpConfig);
 		}
 
-		public async Task SaveSmtpConfigurationAsync(SmtpConfiguration config)
+		public Task<UnityConfiguration> LoadUnityConfigurationAsync()
 		{
-			await SaveSecretAsync(SMTP_PASSWORD_KEY, config.Password, "SMTP password");
-			await SaveJsonSettingsAsync(_configFilePath, "SmtpSettings", new
-			{
-				config.Host,
-				config.Port,
-				config.Username,
-				config.EnableSsl,
-				config.FromDisplayName,
-				config.TimeoutSeconds
-			});
-			_cachedSmtpConfig = config;
-		}
-
-		public async Task<SmtpConfiguration> LoadSmtpConfigurationAsync()
-		{
-#if USE_DEV_CREDENTIALS
-			// Mirrors GetSmtpConfiguration: in dev builds the full SMTP
-			// section is read from embedded devsettings.json. The async
-			// shape is preserved for callers (the reachability probe in
-			// EmailStatusViewModel.TestConnectionAsync, the Settings page
-			// reload path) but the read itself is from an in-memory
-			// resource so there's no real I/O to await — Task.FromResult
-			// keeps the signature without spawning unnecessary work.
-			_cachedSmtpConfig = FreedomSettings.Apply(LoadEmbeddedDevSmtpConfiguration(), Managed);
-			return await Task.FromResult(_cachedSmtpConfig);
-#else
-			var password = await GetSecretAsync(SMTP_PASSWORD_KEY, "SMTP password");
-			_cachedSmtpConfig = FreedomSettings.Apply(BuildSmtpConfiguration(password), Managed);
-			return _cachedSmtpConfig;
-#endif
-		}
-
-		/// <summary>
-		/// Binds the SmtpSettings section straight onto a new configuration
-		/// object and fills in the password (which is stored separately in
-		/// SecureStorage). IConfiguration's typed binding handles Port/EnableSsl/
-		/// TimeoutSeconds conversion, so no manual TryParse is needed.
-		/// </summary>
-		[SuppressMessage("Major Code Smell", "S1144:Unused private types or members should be removed", Justification = "Only called from the #else (production credentials) branches; a USE_DEV_CREDENTIALS build cannot see those call sites. Deleting this breaks every production build.")]
-		private SmtpConfiguration BuildSmtpConfiguration(string password)
-		{
-			var config = new SmtpConfiguration();
-			_configuration.GetSection("SmtpSettings").Bind(config);
-			config.Password = password;
-			return config;
-		}
-
-		// =================================================================
-		// Unity
-		// =================================================================
-
-		public async Task SaveUnityConfigurationAsync(UnityConfiguration config)
-		{
-			await SaveSecretAsync(UNITY_API_KEY, config.ApiKey, "Unity API key");
-			await SaveJsonSettingsAsync(_unityConfigFilePath, "UnitySettings", new { config.BaseUrl });
-			_cachedUnityConfig = config;
-		}
-
-		public async Task<UnityConfiguration> LoadUnityConfigurationAsync()
-		{
-			string baseUrl;
-			string apiKey;
-
-#if USE_DEV_CREDENTIALS
-			(baseUrl, apiKey) = LoadEmbeddedDevCredentials(
-				"UnitySettings", "BaseUrl", "ApiKey");
-#else
-			baseUrl = await ReadJsonPropertyAsync(_unityConfigFilePath, "UnitySettings", "BaseUrl", "Unity settings");
-			apiKey = await GetSecretAsync(UNITY_API_KEY, "Unity API key");
-#endif
-			baseUrl = Managed(FreedomSettings.UnityBaseUrl) ?? baseUrl;
-			apiKey = Managed(FreedomSettings.UnityApiKey) ?? apiKey;
-
-			int? activeIntergroupMeetingId = null;
-			try
-			{
-				var raw = Preferences.Get(UNITY_ACTIVE_MEETING_KEY, string.Empty);
-				if (int.TryParse(raw, out var parsedId) && parsedId > 0)
-					activeIntergroupMeetingId = parsedId;
-			}
-			catch (Exception ex)
-			{
-				Logger.Warning(ex, "Failed to load active intergroup meeting ID from Preferences");
-			}
+			var (baseUrl, apiKey) = FreedomSettings.Unity(Managed);
 
 			_cachedUnityConfig = new UnityConfiguration
 			{
 				BaseUrl = baseUrl,
 				ApiKey = apiKey,
-				ActiveIntergroupMeetingId = activeIntergroupMeetingId,
+				ActiveIntergroupMeetingId = LoadActiveIntergroupMeeting(),
 			};
 
-			return _cachedUnityConfig;
+			return Task.FromResult(_cachedUnityConfig);
 		}
 
-		public async Task SaveActiveIntergroupMeetingAsync(int? meetingId)
+		public BetterStackConfiguration GetBetterStackConfiguration() =>
+			_cachedBetterStackConfig ??= FreedomSettings.BetterStack(Managed);
+
+		public Task<BetterStackConfiguration> LoadBetterStackConfigurationAsync()
+		{
+			_cachedBetterStackConfig = FreedomSettings.BetterStack(Managed);
+			return Task.FromResult(_cachedBetterStackConfig);
+		}
+
+		public string ComplianceEmail => FreedomSettings.Compliance(Managed);
+
+		public void InvalidateCache()
+		{
+			_cachedSmtpConfig = null;
+			_cachedUnityConfig = null;
+			_cachedBetterStackConfig = null;
+			Logger.Information("Configuration cache cleared after Freedom changed");
+		}
+
+		// =================================================================
+		// Active intergroup meeting — the tablet's own
+		// =================================================================
+
+		public Task SaveActiveIntergroupMeetingAsync(int? meetingId)
 		{
 			try
 			{
 				if (meetingId.HasValue && meetingId.Value > 0)
-					Preferences.Set(UNITY_ACTIVE_MEETING_KEY, meetingId.Value.ToString());
+					Preferences.Set(UNITY_ACTIVE_MEETING_KEY, meetingId.Value.ToString(System.Globalization.CultureInfo.InvariantCulture));
 				else
 					Preferences.Remove(UNITY_ACTIVE_MEETING_KEY);
 			}
@@ -223,95 +129,24 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			if (_cachedUnityConfig != null)
 				_cachedUnityConfig.ActiveIntergroupMeetingId = meetingId;
 
-			Logger.Information("Active intergroup meeting set to {MeetingId}", meetingId?.ToString() ?? "none");
+			Logger.Information("Active intergroup meeting set to {MeetingId}", meetingId?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "none");
+			return Task.CompletedTask;
 		}
 
-		// =================================================================
-		// Better Stack
-		// =================================================================
-
-		public BetterStackConfiguration GetBetterStackConfiguration()
+		private static int? LoadActiveIntergroupMeeting()
 		{
-			if (_cachedBetterStackConfig != null)
-				return _cachedBetterStackConfig;
+			try
+			{
+				var raw = Preferences.Get(UNITY_ACTIVE_MEETING_KEY, string.Empty);
+				if (int.TryParse(raw, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var parsedId) && parsedId > 0)
+					return parsedId;
+			}
+			catch (Exception ex)
+			{
+				Logger.Warning(ex, "Failed to load active intergroup meeting ID from Preferences");
+			}
 
-#if USE_DEV_CREDENTIALS
-			var (endpoint, sourceToken) = LoadEmbeddedDevCredentials(
-				"BetterStack", "Endpoint", "SourceToken");
-#else
-			var endpoint = ReadJsonProperty(_betterStackConfigFilePath, "BetterStack", "Endpoint", "Better Stack settings");
-
-			// Fall back to embedded appsettings.json
-			if (string.IsNullOrWhiteSpace(endpoint))
-				endpoint = _configuration.GetSection("BetterStack")["Endpoint"] ?? "";
-
-			var sourceToken = GetSecretSync(BETTERSTACK_SOURCE_TOKEN_KEY, "Better Stack source token");
-#endif
-
-			_cachedBetterStackConfig = FreedomSettings.Apply(
-				new BetterStackConfiguration
-				{
-					Endpoint = endpoint,
-					SourceToken = sourceToken
-				},
-				Managed);
-
-			return _cachedBetterStackConfig;
-		}
-
-		public async Task SaveBetterStackConfigurationAsync(BetterStackConfiguration config)
-		{
-			await SaveSecretAsync(BETTERSTACK_SOURCE_TOKEN_KEY, config.SourceToken, "Better Stack source token");
-			await SaveJsonSettingsAsync(_betterStackConfigFilePath, "BetterStack", new { config.Endpoint });
-			_cachedBetterStackConfig = config;
-		}
-
-		public async Task<BetterStackConfiguration> LoadBetterStackConfigurationAsync()
-		{
-			string endpoint;
-			string sourceToken;
-
-#if USE_DEV_CREDENTIALS
-			(endpoint, sourceToken) = LoadEmbeddedDevCredentials(
-				"BetterStack", "Endpoint", "SourceToken");
-#else
-			endpoint = await ReadJsonPropertyAsync(_betterStackConfigFilePath, "BetterStack", "Endpoint", "Better Stack settings");
-
-			if (string.IsNullOrWhiteSpace(endpoint))
-				endpoint = _configuration.GetSection("BetterStack")["Endpoint"] ?? "";
-
-			sourceToken = await GetSecretAsync(BETTERSTACK_SOURCE_TOKEN_KEY, "Better Stack source token");
-#endif
-
-			_cachedBetterStackConfig = FreedomSettings.Apply(
-				new BetterStackConfiguration
-				{
-					Endpoint = endpoint,
-					SourceToken = sourceToken
-				},
-				Managed);
-
-			return _cachedBetterStackConfig;
-		}
-
-		// =================================================================
-		// Freedom
-		// =================================================================
-
-		/// <summary>
-		/// The value Freedom holds for a key, or null when it holds none —
-		/// which every caller reads as "use what the tablet stored".
-		/// </summary>
-		private string? Managed(string key) => _freedom?.Get(key);
-
-		public bool IsManaged(string key) => Managed(key) is not null;
-
-		public void InvalidateCache()
-		{
-			_cachedSmtpConfig = null;
-			_cachedUnityConfig = null;
-			_cachedBetterStackConfig = null;
-			Logger.Information("Configuration cache cleared after Freedom changed a setting");
+			return null;
 		}
 
 		// =================================================================
@@ -697,259 +532,6 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			}
 		}
 
-		// =================================================================
-		// Shared helpers — JSON file I/O
-		// =================================================================
-
-		/// <summary>
-		/// Reads a single property from a JSON settings file (sync).
-		/// Returns empty string if the file doesn't exist or the property is missing.
-		/// </summary>
-		[SuppressMessage("Major Code Smell", "S1144:Unused private types or members should be removed", Justification = "Only called from the #else (production credentials) branches; a USE_DEV_CREDENTIALS build cannot see those call sites. Deleting this breaks every production build.")]
-		private static string ReadJsonProperty(string filePath, string sectionName, string propertyName, string description)
-		{
-			if (!File.Exists(filePath))
-				return "";
-
-			try
-			{
-				var json = File.ReadAllText(filePath);
-				return ExtractProperty(json, sectionName, propertyName);
-			}
-			catch (Exception ex)
-			{
-				Logger.Warning(ex, "Failed to load {Description} from file", description);
-				return "";
-			}
-		}
-
-		/// <summary>
-		/// Reads a single property from a JSON settings file (async).
-		/// Returns empty string if the file doesn't exist or the property is missing.
-		/// </summary>
-		[SuppressMessage("Major Code Smell", "S1144:Unused private types or members should be removed", Justification = "Only called from the #else (production credentials) branches; a USE_DEV_CREDENTIALS build cannot see those call sites. Deleting this breaks every production build.")]
-		private static async Task<string> ReadJsonPropertyAsync(string filePath, string sectionName, string propertyName, string description)
-		{
-			if (!File.Exists(filePath))
-				return "";
-
-			try
-			{
-				var json = await File.ReadAllTextAsync(filePath);
-				return ExtractProperty(json, sectionName, propertyName);
-			}
-			catch (Exception ex)
-			{
-				Logger.Warning(ex, "Failed to load {Description} from file", description);
-				return "";
-			}
-		}
-
-		private static string ExtractProperty(string json, string sectionName, string propertyName)
-		{
-			var doc = JsonDocument.Parse(json);
-			if (doc.RootElement.TryGetProperty(sectionName, out var section) &&
-				section.TryGetProperty(propertyName, out var prop))
-			{
-				return prop.GetString() ?? "";
-			}
-			return "";
-		}
-
-		/// <summary>
-		/// Serialises a settings object under a named section and writes it to a JSON file.
-		/// </summary>
-		private static async Task SaveJsonSettingsAsync(string filePath, string sectionName, object settings)
-		{
-			var wrapper = new Dictionary<string, object>(StringComparer.Ordinal) { [sectionName] = settings };
-			var json = JsonSerializer.Serialize(wrapper, WriteOptions);
-			await File.WriteAllTextAsync(filePath, json);
-		}
-
-#if USE_DEV_CREDENTIALS
-		/// <summary>
-		/// Reads two properties from a named section of the embedded
-		/// devsettings.json resource. Only present in builds where
-		/// USE_DEV_CREDENTIALS is defined (i.e. any build that isn't run
-		/// with -p:UseDevCredentials=false). Returns empty strings on
-		/// failure so callers produce an "invalid" config and skip setup
-		/// rather than throw on startup.
-		/// </summary>
-		private static (string First, string Second) LoadEmbeddedDevCredentials(
-			string sectionName, string firstProperty, string secondProperty)
-		{
-			var assembly = Assembly.GetExecutingAssembly();
-			using var stream = assembly.GetManifestResourceStream(DEV_CREDENTIALS_RESOURCE);
-			if (stream == null)
-			{
-				Logger.Error(
-					"Embedded resource {Resource} not found. Dev credentials for {Section} will be empty. " +
-					"Ensure devsettings.json exists in the project root and " +
-					"UseDevCredentials=true when building.",
-					DEV_CREDENTIALS_RESOURCE, sectionName);
-				return ("", "");
-			}
-
-			try
-			{
-				using var doc = JsonDocument.Parse(stream);
-				if (doc.RootElement.TryGetProperty(sectionName, out var section))
-				{
-					var first = section.TryGetProperty(firstProperty, out var a) ? a.GetString() ?? "" : "";
-					var second = section.TryGetProperty(secondProperty, out var b) ? b.GetString() ?? "" : "";
-					return (first, second);
-				}
-
-				Logger.Warning(
-					"Section {Section} missing from embedded {Resource}",
-					sectionName, DEV_CREDENTIALS_RESOURCE);
-			}
-			catch (Exception ex)
-			{
-				Logger.Error(ex, "Failed to parse embedded {Resource}", DEV_CREDENTIALS_RESOURCE);
-			}
-
-			return ("", "");
-		}
-
-		/// <summary>
-		/// Reads the entire <c>SmtpSettings</c> section from the embedded
-		/// <c>devsettings.json</c> resource and binds it onto a fresh
-		/// <see cref="SmtpConfiguration"/>. Used by <see cref="GetSmtpConfiguration"/>
-		/// and <see cref="LoadSmtpConfigurationAsync"/> in dev builds so the
-		/// host, port, username, password, EnableSsl, FromDisplayName, and
-		/// TimeoutSeconds all come from devsettings — not just the password.
-		///
-		/// <para>Uses the same <see cref="ConfigurationBuilder"/> +
-		/// <see cref="ConfigurationBinder.Bind(IConfiguration, object)"/>
-		/// path as <see cref="BuildSmtpConfiguration"/>, so type conversion
-		/// for Port (int) / EnableSsl (bool) / TimeoutSeconds (int) follows
-		/// identical rules between dev and prod paths and the
-		/// <see cref="SmtpConfiguration"/> defaults (Port=587, EnableSsl=true,
-		/// TimeoutSeconds=30, MaxRetries=10) take effect for any field
-		/// missing from devsettings.</para>
-		///
-		/// <para>Returns a default-constructed <see cref="SmtpConfiguration"/>
-		/// on any failure (resource missing, parse error, section missing).
-		/// That instance fails <see cref="SmtpConfiguration.IsValid"/> on the
-		/// blank Host / Username / Password, so the EmailService startup
-		/// path skips configuration cleanly instead of throwing — matching
-		/// the silent-failure contract of <see cref="LoadEmbeddedDevCredentials"/>.</para>
-		/// </summary>
-		private static SmtpConfiguration LoadEmbeddedDevSmtpConfiguration()
-		{
-			var assembly = Assembly.GetExecutingAssembly();
-			using var stream = assembly.GetManifestResourceStream(DEV_CREDENTIALS_RESOURCE);
-			if (stream == null)
-			{
-				Logger.Error(
-					"Embedded resource {Resource} not found. Dev SMTP credentials will be empty. " +
-					"Ensure devsettings.json exists in the project root and " +
-					"UseDevCredentials=true when building.",
-					DEV_CREDENTIALS_RESOURCE);
-				return new SmtpConfiguration();
-			}
-
-			try
-			{
-				// Layer the embedded devsettings.json into a fresh
-				// IConfiguration and bind the SmtpSettings section through
-				// the same Bind() path BuildSmtpConfiguration uses, so the
-				// dev path produces an identically-shaped result to the
-				// production path — same defaults, same type conversion,
-				// same field coverage. Anything in devsettings's
-				// SmtpSettings section maps onto SmtpConfiguration by
-				// property name; anything missing keeps its model default.
-				var config = new ConfigurationBuilder()
-					.AddJsonStream(stream)
-					.Build();
-
-				var smtp = new SmtpConfiguration();
-				config.GetSection("SmtpSettings").Bind(smtp);
-
-				if (string.IsNullOrWhiteSpace(smtp.Host))
-				{
-					Logger.Warning(
-						"SmtpSettings section in embedded {Resource} is missing or has no Host; " +
-						"returning a blank SmtpConfiguration. EmailService will skip setup at startup.",
-						DEV_CREDENTIALS_RESOURCE);
-				}
-				else
-				{
-					Logger.Information(
-						"Loaded dev SMTP configuration from embedded {Resource}: " +
-						"host={Host} port={Port} username={Username} ssl={Ssl}",
-						DEV_CREDENTIALS_RESOURCE,
-						smtp.Host, smtp.Port, smtp.Username, smtp.EnableSsl);
-				}
-
-				return smtp;
-			}
-			catch (Exception ex)
-			{
-				Logger.Error(ex,
-					"Failed to parse embedded {Resource} for SMTP configuration",
-					DEV_CREDENTIALS_RESOURCE);
-				return new SmtpConfiguration();
-			}
-		}
-#endif
-
-		// =================================================================
-		// Shared helpers — SecureStorage
-		// =================================================================
-
-		/// <summary>
-		/// Reads a secret from SecureStorage (sync-safe). Uses Task.Run to
-		/// hop off the calling SynchronizationContext, avoiding deadlock when
-		/// called from the MAUI UI thread. Returns empty string on failure.
-		/// </summary>
-		[SuppressMessage("Major Code Smell", "S1144:Unused private types or members should be removed", Justification = "Only called from the #else (production credentials) branches; a USE_DEV_CREDENTIALS build cannot see those call sites. Deleting this breaks every production build.")]
-		private static string GetSecretSync(string key, string description)
-		{
-			try
-			{
-				return Task.Run(() => SecureStorage.GetAsync(key)).GetAwaiter().GetResult() ?? "";
-			}
-			catch (Exception ex)
-			{
-				Logger.Warning(ex, "SecureStorage unavailable for {Description}", description);
-				return "";
-			}
-		}
-
-		/// <summary>
-		/// Reads a secret from SecureStorage (async). Returns empty string on failure.
-		/// </summary>
-		[SuppressMessage("Major Code Smell", "S1144:Unused private types or members should be removed", Justification = "Only called from the #else (production credentials) branches; a USE_DEV_CREDENTIALS build cannot see those call sites. Deleting this breaks every production build.")]
-		private static async Task<string> GetSecretAsync(string key, string description)
-		{
-			try
-			{
-				return await SecureStorage.GetAsync(key) ?? "";
-			}
-			catch (Exception ex)
-			{
-				Logger.Warning(ex, "SecureStorage unavailable for {Description}", description);
-				return "";
-			}
-		}
-
-		/// <summary>
-		/// Writes a secret to SecureStorage. Logs a warning on failure.
-		/// </summary>
-		private static async Task SaveSecretAsync(string key, string value, string description)
-		{
-			try
-			{
-				await SecureStorage.SetAsync(key, value);
-			}
-			catch (Exception ex)
-			{
-				Logger.Warning(ex, "SecureStorage unavailable for {Description}", description);
-			}
-		}
-
 		/// <summary>
 		/// Reads the toggle from Preferences. Defaults to <c>true</c> when
 		/// the preference has never been written — fresh installs do not
@@ -992,71 +574,5 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 				Logger.Warning(ex, "Failed to save compliance-acceptance-email toggle");
 			}
 		}
-
-		// =================================================================
-		// Compliance Email (recipient address used by the compliance service)
-		// =================================================================
-
-		/// <summary>
-		/// Reads the configured compliance email address from Preferences.
-		/// Returns <see cref="string.Empty"/> when no value has been written
-		/// (fresh install) or when the prefs store is unavailable — callers
-		/// should treat the empty string as "no compliance recipient
-		/// configured" and skip any send that would otherwise target it.
-		/// String pattern mirrors <see cref="DeviceLabel"/>: persisted in
-		/// Preferences as a plain string, read per-call so a Settings-page
-		/// edit takes effect on the next compliance action without an app
-		/// restart.
-		/// </summary>
-		public string ComplianceEmail
-		{
-			get
-			{
-				if (Managed(FreedomSettings.ComplianceEmail) is { } managed)
-					return managed;
-
-#if USE_DEV_CREDENTIALS 
-				return "compliance@aa-bristol.org";
-#else
-				try
-				{
-					return Preferences.Get(COMPLIANCE_EMAIL_KEY, string.Empty);
-				}
-				catch (Exception ex)
-				{
-					// If Preferences is unavailable, fail safe by treating
-					// the recipient as unconfigured — better to skip the
-					// send than to throw mid-acceptance.
-					Logger.Warning(ex, "Failed to read compliance email — treating as unconfigured");
-					return string.Empty;
-				}
-			
-#endif
-			}
-
-		}
-
-		public void SetComplianceEmail(string? email)
-		{
-			try
-			{
-				if (string.IsNullOrWhiteSpace(email))
-				{
-					Preferences.Remove(COMPLIANCE_EMAIL_KEY);
-					Logger.Information("Compliance email cleared — no recipient configured");
-				}
-				else
-				{
-					var trimmed = email.Trim();
-					Preferences.Set(COMPLIANCE_EMAIL_KEY, trimmed);
-					Logger.Information("Compliance email set to {ComplianceEmail}", trimmed);
-				}
-			}
-			catch (Exception ex)
-			{
-				Logger.Warning(ex, "Failed to save compliance email");
-			}
-		}
-
 	}
 }

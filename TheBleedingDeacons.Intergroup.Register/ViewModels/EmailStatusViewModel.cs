@@ -541,7 +541,7 @@ public partial class EmailStatusViewModel : BaseViewModel
 			var config = await _configService.LoadSmtpConfigurationAsync();
 			if (!config.IsValid())
 			{
-				StatusMessage = "SMTP is not configured — fill it in under Settings first.";
+				StatusMessage = "SMTP is not set up for this tablet. Sign it in to Freedom under Settings → API Settings.";
 				return;
 			}
 
@@ -702,4 +702,4 @@ public partial class EmailDisplayModel : ObservableObject
 		LastError = queuedEmail.LastError;
 		IsHtml = queuedEmail.IsHtml;
 	}
-}
+}

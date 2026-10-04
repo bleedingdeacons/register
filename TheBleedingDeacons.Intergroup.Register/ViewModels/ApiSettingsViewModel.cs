@@ -1,7 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Serilog;
-using System.Diagnostics.CodeAnalysis;
 using TheBleedingDeacons.Intergroup.Register.Models;
 using TheBleedingDeacons.Intergroup.Register.Services;
 using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
@@ -11,50 +10,35 @@ using TheBleedingDeacons.Inventory;
 namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 {
 	/// <summary>
-	/// Combined ViewModel for the API settings page, backing both the
-	/// Unity API section and the Better Stack logging section on a single page.
+	/// The API settings page: the Freedom sign-in, and the Unity and Better
+	/// Stack connections Freedom supplies.
 	///
-	/// Each section keeps its own Test / Save commands and its own status bar
-	/// because the underlying operations are different (Unity hits a WordPress
-	/// REST endpoint; Better Stack tears down and rebuilds the Serilog sink).
-	/// The only thing shared is the <see cref="HasUnsavedChanges"/> flag, which
-	/// is true when *either* form differs from the last-loaded/saved snapshot
-	/// — this drives the navigation-away prompt on the page.
+	/// <para>The connections are read-only. They come from Freedom and
+	/// nowhere else (see <see cref="FreedomSettings"/>), so the page shows
+	/// where the tablet is pointed — the Unity site in full, a key or token
+	/// only as set or not set — and keeps a Test button for each, which is
+	/// what an operator needs when something is not arriving.</para>
 	/// </summary>
 	public partial class ApiSettingsViewModel : ObservableObject
 	{
 		private static readonly ILogger Logger = AppLogger.ForContext<ApiSettingsViewModel>();
 
 		private readonly IConfigurationService _configService;
-		private readonly ILogShipper _logShipper;
 
-		// Snapshots of the last-loaded / last-saved values. We compare the
-		// current form fields against these to decide if there are unsaved
-		// changes. Initialised by LoadConfigurationAsync and refreshed on
-		// each successful save.
-		private string _unityBaseUrlSnapshot = string.Empty;
-		private string _unityApiKeySnapshot = string.Empty;
-		private string _betterStackEndpointSnapshot = string.Empty;
-		private string _betterStackSourceTokenSnapshot = string.Empty;
-
-		// Skip dirty-checking while we're loading or resetting the form from
-		// a persisted snapshot — otherwise every field assignment during load
-		// would flip HasUnsavedChanges to true and back again.
-		private bool _suppressDirtyCheck;
+		private UnityConfiguration _unity = new();
+		private BetterStackConfiguration _betterStack = new();
 
 		public ApiSettingsViewModel(
 			IConfigurationService configService,
-			ILogShipper logShipper,
 			TheBleedingDeacons.Freedom.Client.FreedomClient? freedom = null)
 		{
 			_configService = configService;
-			_logShipper = logShipper;
 			_freedom = freedom;
 			RefreshFreedomStatus();
 			LoadConfigurationAsync().SafeFireAndForget("LoadApiSettingsConfig");
 		}
 
-		// ─── Unity fields ─────────────────────────────────────────────────
+		// ─── Unity ────────────────────────────────────────────────────────
 
 		[ObservableProperty]
 		private string unityBaseUrl = string.Empty;
@@ -63,7 +47,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 		private string unityApiKey = string.Empty;
 
 		[ObservableProperty]
-		private bool isUnitySaving;
+		private bool isUnityConfigured;
 
 		[ObservableProperty]
 		private bool isUnityTesting;
@@ -77,12 +61,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 		[ObservableProperty]
 		private bool isUnityStatusError;
 
-		public bool IsUnityFormValid =>
-			!string.IsNullOrWhiteSpace(UnityBaseUrl) &&
-			!string.IsNullOrWhiteSpace(UnityApiKey) &&
-			Uri.TryCreate(UnityBaseUrl, UriKind.Absolute, out _);
-
-		// ─── Better Stack fields ──────────────────────────────────────────
+		// ─── Better Stack ─────────────────────────────────────────────────
 
 		[ObservableProperty]
 		private string betterStackEndpoint = string.Empty;
@@ -91,7 +70,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 		private string betterStackSourceToken = string.Empty;
 
 		[ObservableProperty]
-		private bool isBetterStackSaving;
+		private bool isBetterStackConfigured;
 
 		[ObservableProperty]
 		private bool isBetterStackTesting;
@@ -105,41 +84,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 		[ObservableProperty]
 		private bool isBetterStackStatusError;
 
-		/// <summary>
-		/// The form as the log shipper would take it. Inventory's own rule
-		/// decides what is valid, so this page cannot accept an endpoint the
-		/// shipper would then silently refuse: a bare hostname — what Better
-		/// Stack's dashboard shows — gets https://, and http:// is refused,
-		/// because the source token travels as a bearer header with every
-		/// batch and would go in cleartext.
-		/// </summary>
-		private BetterStackConfiguration BetterStackForm => new()
-		{
-			SourceToken = (BetterStackSourceToken ?? string.Empty).Trim(),
-			Endpoint = (BetterStackEndpoint ?? string.Empty).Trim().TrimEnd('/'),
-		};
-
-		public bool IsBetterStackFormValid => BetterStackForm.IsValid();
-
-		/// <summary>
-		/// Why the endpoint is refused, when the reason is not obvious from an
-		/// empty field. The buttons are disabled while the form is invalid, so
-		/// without this an http:// address would just grey them out.
-		/// </summary>
-		public string BetterStackEndpointProblem =>
-			Uri.TryCreate(BetterStackForm.Endpoint, UriKind.Absolute, out var endpoint)
-			&& string.Equals(endpoint.Scheme, Uri.UriSchemeHttp, StringComparison.Ordinal)
-				? "Must be an https address: the source token is sent with every batch."
-				: string.Empty;
-
-		public bool HasBetterStackEndpointProblem => BetterStackEndpointProblem.Length != 0;
-
-		// ─── Unsaved-changes flag ─────────────────────────────────────────
-
-		[ObservableProperty]
-		private bool hasUnsavedChanges;
-
-		// ─── Unity commands ───────────────────────────────────────────────
+		// ─── Unity test ───────────────────────────────────────────────────
 
 		[RelayCommand]
 		private async Task TestUnityConnectionAsync()
@@ -149,17 +94,18 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 				IsUnityTesting = true;
 				HideUnityStatus();
 
-				if (!IsUnityFormValid)
+				await LoadConfigurationAsync();
+				if (!IsUnityConfigured)
 				{
-					ShowUnityStatus("Please fill in all required fields", true);
+					ShowUnityStatus("Unity is not set up on the site for this tablet. Sign in to Freedom above.", true);
 					return;
 				}
 
 				using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
 				httpClient.DefaultRequestHeaders.Authorization =
-					new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", UnityApiKey.Trim());
+					new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _unity.ApiKey.Trim());
 
-				var testUrl = UnityBaseUrl.TrimEnd('/') + "/wp-json/integrity/v1/positions?per_page=1";
+				var testUrl = _unity.BaseUrl.TrimEnd('/') + "/wp-json/integrity/v1/positions?per_page=1";
 				var response = await httpClient.GetAsync(testUrl);
 
 				if (response.IsSuccessStatusCode)
@@ -169,7 +115,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 				else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized ||
 						 response.StatusCode == System.Net.HttpStatusCode.Forbidden)
 				{
-					ShowUnityStatus("Authentication failed. Please check your API key.", true);
+					ShowUnityStatus("Authentication failed. Check the API key on the site.", true);
 				}
 				else
 				{
@@ -178,7 +124,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 			}
 			catch (TaskCanceledException)
 			{
-				ShowUnityStatus("Connection timed out. Please check the URL.", true);
+				ShowUnityStatus("Connection timed out. Check the site address on the site.", true);
 			}
 			catch (HttpRequestException ex)
 			{
@@ -186,6 +132,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 			}
 			catch (Exception ex)
 			{
+				Logger.Warning(ex, "Unity connection test failed");
 				ShowUnityStatus($"Test failed: {ex.Message}", true);
 			}
 			finally
@@ -194,57 +141,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 			}
 		}
 
-		[RelayCommand]
-		private async Task SaveUnitySettingsAsync()
-		{
-			try
-			{
-				IsUnitySaving = true;
-				HideUnityStatus();
-
-				if (!IsUnityFormValid)
-				{
-					ShowUnityStatus("Please fill in all required fields", true);
-					return;
-				}
-
-				var config = new UnityConfiguration
-				{
-					BaseUrl = UnityBaseUrl.Trim().TrimEnd('/'),
-					ApiKey = UnityApiKey.Trim(),
-				};
-
-				await _configService.SaveUnityConfigurationAsync(config);
-
-				// Update the snapshot to the just-saved normalised values so
-				// that the dirty check returns false immediately after a save.
-				_unityBaseUrlSnapshot = config.BaseUrl;
-				_unityApiKeySnapshot = config.ApiKey;
-
-				// Reflect the normalised values back into the form so the user
-				// sees what was actually persisted.
-				_suppressDirtyCheck = true;
-				UnityBaseUrl = config.BaseUrl;
-				UnityApiKey = config.ApiKey;
-				_suppressDirtyCheck = false;
-
-				RecomputeHasUnsavedChanges();
-
-				ShowUnityStatus("Unity API settings saved successfully!", false);
-				Logger.Information("Unity API settings saved for {BaseUrl}", config.ToLogSafe().BaseUrl);
-			}
-			catch (Exception ex)
-			{
-				ShowUnityStatus($"Failed to save settings: {ex.Message}", true);
-				Logger.Error(ex, "Failed to save Unity configuration");
-			}
-			finally
-			{
-				IsUnitySaving = false;
-			}
-		}
-
-		// ─── Better Stack commands ────────────────────────────────────────
+		// ─── Better Stack test ────────────────────────────────────────────
 
 		[RelayCommand]
 		private async Task TestBetterStackConnectionAsync()
@@ -254,22 +151,20 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 				IsBetterStackTesting = true;
 				HideBetterStackStatus();
 
-				if (!IsBetterStackFormValid)
+				await LoadConfigurationAsync();
+				if (!IsBetterStackConfigured)
 				{
-					ShowBetterStackStatus("Please fill in all required fields", true);
+					ShowBetterStackStatus("Better Stack is not set up on the site for this tablet, or its endpoint is not https.", true);
 					return;
 				}
 
-				var form = BetterStackForm;
 				using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
-
 				httpClient.DefaultRequestHeaders.Authorization =
-					new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", form.SourceToken);
+					new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _betterStack.SourceToken);
 
-				// The normalised endpoint, which IsBetterStackFormValid has
-				// already held to https — never the raw field, which could send
-				// the token in cleartext before anything is saved.
-				var response = await httpClient.GetAsync(form.Endpoint);
+				// IsValid has already held the endpoint to https, so the token
+				// never goes out in cleartext.
+				var response = await httpClient.GetAsync(_betterStack.Endpoint);
 
 				if (response.IsSuccessStatusCode)
 				{
@@ -278,7 +173,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 				else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized ||
 						 response.StatusCode == System.Net.HttpStatusCode.Forbidden)
 				{
-					ShowBetterStackStatus("Authentication failed. Please check your source token.", true);
+					ShowBetterStackStatus("Authentication failed. Check the source token on the site.", true);
 				}
 				else
 				{
@@ -287,7 +182,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 			}
 			catch (TaskCanceledException)
 			{
-				ShowBetterStackStatus("Connection timed out. Please check the endpoint URL.", true);
+				ShowBetterStackStatus("Connection timed out. Check the endpoint on the site.", true);
 			}
 			catch (HttpRequestException ex)
 			{
@@ -295,6 +190,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 			}
 			catch (Exception ex)
 			{
+				Logger.Warning(ex, "Better Stack connection test failed");
 				ShowBetterStackStatus($"Test failed: {ex.Message}", true);
 			}
 			finally
@@ -303,109 +199,27 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 			}
 		}
 
-		[RelayCommand]
-		private async Task SaveBetterStackSettingsAsync()
-		{
-			try
-			{
-				IsBetterStackSaving = true;
-				HideBetterStackStatus();
-
-				if (!IsBetterStackFormValid)
-				{
-					ShowBetterStackStatus("Please fill in all required fields", true);
-					return;
-				}
-
-				var config = BetterStackForm;
-
-				// Persist first so that if the save fails, the running pipeline
-				// is untouched and a relaunch won't pick up partial state.
-				await _configService.SaveBetterStackConfigurationAsync(config);
-
-				// Tear down the previous Serilog pipeline and rebuild with the
-				// new credentials. Without this, the app continues shipping to
-				// the previous endpoint/token until restart.
-				_logShipper.Ship(config);
-
-				// Update snapshot and reflect normalised values in the form.
-				_betterStackSourceTokenSnapshot = config.SourceToken;
-				_betterStackEndpointSnapshot = config.Endpoint;
-
-				_suppressDirtyCheck = true;
-				BetterStackSourceToken = config.SourceToken;
-				BetterStackEndpoint = config.Endpoint;
-				_suppressDirtyCheck = false;
-
-				RecomputeHasUnsavedChanges();
-
-				ShowBetterStackStatus("Better Stack settings saved successfully!", false);
-				Logger.Information("Better Stack settings saved for {Endpoint}", config.ToLogSafe().Endpoint);
-			}
-			catch (Exception ex)
-			{
-				ShowBetterStackStatus($"Failed to save settings: {ex.Message}", true);
-				Logger.Error(ex, "Failed to save Better Stack configuration");
-			}
-			finally
-			{
-				IsBetterStackSaving = false;
-			}
-		}
-
-		// ─── Load / dirty tracking ────────────────────────────────────────
+		// ─── Load ─────────────────────────────────────────────────────────
 
 		private async Task LoadConfigurationAsync()
 		{
-			_suppressDirtyCheck = true;
-			try
-			{
-				var unity = await _configService.LoadUnityConfigurationAsync();
-				var betterStack = await _configService.LoadBetterStackConfigurationAsync();
+			_unity = await _configService.LoadUnityConfigurationAsync();
+			_betterStack = await _configService.LoadBetterStackConfigurationAsync();
 
-				SetProperty(ref unityBaseUrl, unity.BaseUrl, nameof(UnityBaseUrl));
-				SetProperty(ref unityApiKey, unity.ApiKey, nameof(UnityApiKey));
-				SetProperty(ref betterStackSourceToken, betterStack.SourceToken, nameof(BetterStackSourceToken));
-				SetProperty(ref betterStackEndpoint, betterStack.Endpoint, nameof(BetterStackEndpoint));
+			UnityBaseUrl = string.IsNullOrWhiteSpace(_unity.BaseUrl) ? "Not set" : _unity.BaseUrl;
+			UnityApiKey = string.IsNullOrEmpty(_unity.ApiKey) ? "Not set" : "Set";
+			IsUnityConfigured = _unity.IsValid();
 
-				_unityBaseUrlSnapshot = unity.BaseUrl ?? string.Empty;
-				_unityApiKeySnapshot = unity.ApiKey ?? string.Empty;
-				_betterStackSourceTokenSnapshot = betterStack.SourceToken ?? string.Empty;
-				_betterStackEndpointSnapshot = betterStack.Endpoint ?? string.Empty;
-
-				OnPropertyChanged(nameof(IsUnityFormValid));
-				OnPropertyChanged(nameof(IsBetterStackFormValid));
-			}
-			finally
-			{
-				_suppressDirtyCheck = false;
-				HasUnsavedChanges = false;
-			}
-		}
-
-		private void RecomputeHasUnsavedChanges()
-		{
-			if (_suppressDirtyCheck) return;
-
-			// Trim during comparison to match the normalisation that happens
-			// on save. Without this, a trailing space the user didn't mean to
-			// add would trigger the unsaved-changes prompt.
-			HasUnsavedChanges =
-				!string.Equals((UnityBaseUrl ?? string.Empty).Trim().TrimEnd('/'),
-							   _unityBaseUrlSnapshot, StringComparison.Ordinal) ||
-				!string.Equals((UnityApiKey ?? string.Empty).Trim(),
-							   _unityApiKeySnapshot, StringComparison.Ordinal) ||
-				!string.Equals((BetterStackSourceToken ?? string.Empty).Trim(),
-							   _betterStackSourceTokenSnapshot, StringComparison.Ordinal) ||
-				!string.Equals((BetterStackEndpoint ?? string.Empty).Trim().TrimEnd('/'),
-							   _betterStackEndpointSnapshot, StringComparison.Ordinal);
+			BetterStackEndpoint = string.IsNullOrWhiteSpace(_betterStack.Endpoint) ? "Not set" : _betterStack.Endpoint;
+			BetterStackSourceToken = string.IsNullOrEmpty(_betterStack.SourceToken) ? "Not set" : "Set";
+			IsBetterStackConfigured = _betterStack.IsValid();
 		}
 
 		// ─── Status helpers ───────────────────────────────────────────────
 
 		private void ShowUnityStatus(string message, bool isError)
 		{
-			UnityStatusMessage = isError ? $"\u274c {message}" : $"\u2705 {message}";
+			UnityStatusMessage = isError ? $"❌ {message}" : $"✅ {message}";
 			IsUnityStatusError = isError;
 			IsUnityStatusVisible = true;
 
@@ -423,7 +237,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 
 		private void ShowBetterStackStatus(string message, bool isError)
 		{
-			BetterStackStatusMessage = isError ? $"\u274c {message}" : $"\u2705 {message}";
+			BetterStackStatusMessage = isError ? $"❌ {message}" : $"✅ {message}";
 			IsBetterStackStatusError = isError;
 			IsBetterStackStatusVisible = true;
 
@@ -437,41 +251,6 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 		{
 			IsBetterStackStatusVisible = false;
 			BetterStackStatusMessage = string.Empty;
-		}
-
-		// ─── Property-changed hooks ───────────────────────────────────────
-		//
-		// Every field that forms part of either IsFormValid or the dirty-check
-		// comparison needs to re-run both. Keeping this explicit rather than
-		// using a base-class observer because the two sections feed different
-		// validation flags.
-
-		partial void OnUnityBaseUrlChanged(string value)
-		{
-			OnPropertyChanged(nameof(IsUnityFormValid));
-			RecomputeHasUnsavedChanges();
-		}
-
-		[SuppressMessage("Major Code Smell", "S4144:Methods should not have identical implementations", Justification = "One hook per property by design — see the note above; the Unity and Better Stack sections feed different validation flags and must stay independently editable.")]
-		partial void OnUnityApiKeyChanged(string value)
-		{
-			OnPropertyChanged(nameof(IsUnityFormValid));
-			RecomputeHasUnsavedChanges();
-		}
-
-		partial void OnBetterStackSourceTokenChanged(string value)
-		{
-			OnPropertyChanged(nameof(IsBetterStackFormValid));
-			RecomputeHasUnsavedChanges();
-		}
-
-		[SuppressMessage("Major Code Smell", "S4144:Methods should not have identical implementations", Justification = "One hook per property by design — see the note above; the Unity and Better Stack sections feed different validation flags and must stay independently editable.")]
-		partial void OnBetterStackEndpointChanged(string value)
-		{
-			OnPropertyChanged(nameof(IsBetterStackFormValid));
-			OnPropertyChanged(nameof(BetterStackEndpointProblem));
-			OnPropertyChanged(nameof(HasBetterStackEndpointProblem));
-			RecomputeHasUnsavedChanges();
 		}
 	}
 }

@@ -13,11 +13,14 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 	/// Wires Freedom into Register: registration at build time, and on every
 	/// start a local read followed by a background sync.
 	///
-	/// <para><b>Android only, for now.</b> Freedom.Client.Maui's sign-in and
-	/// device identity are Android's (WebAuthenticator, ANDROID_ID), and what a
-	/// Windows or iOS tablet should be identified by is still open. Off
-	/// Android nothing is registered, <see cref="ConfigurationService"/> gets
-	/// no client, and the app behaves exactly as it did.</para>
+	/// <para><b>Freedom is where every credential and endpoint comes from</b>
+	/// — see <see cref="FreedomSettings"/>. Without it the tablet has no SMTP,
+	/// Unity or Better Stack settings at all.</para>
+	///
+	/// <para><b>Android only.</b> Freedom.Client.Maui's sign-in and device
+	/// identity are Android's (WebAuthenticator, ANDROID_ID). Off Android
+	/// nothing is registered, <see cref="ConfigurationService"/> gets no
+	/// client, and the Windows head runs unconfigured.</para>
 	///
 	/// <para><b>Nothing waits on the network.</b> The start reads what Freedom
 	/// stored last time — a secure-storage read, no request — so the settings

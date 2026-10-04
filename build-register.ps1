@@ -3,32 +3,30 @@ param(
     [string]$KeyStorePassword
 )
 
-# -- Always prompt for production flag ---------------------------------
-# PowerShell's Mandatory + default don't play well together, so we
-# prompt manually. Pressing Enter without typing anything defaults to no.
-$productionInput = Read-Host "Production build? (yes/no) [no]"
-if ([string]::IsNullOrWhiteSpace($productionInput)) {
-    $productionInput = 'no'
-}
-
-if ($productionInput -inotin @('yes','no')) {
-    Write-Host "Invalid input '$productionInput'. Must be 'yes' or 'no'." -ForegroundColor Yellow
+# -- Which Freedom site ------------------------------------------------
+# There are no credentials in the build any more: SMTP, Unity, Better Stack
+# and the compliance address all come from Freedom once the tablet signs in.
+# The one thing the build decides is WHICH Freedom site it asks, from the
+# git-ignored appsettings.json. That is the test-or-live choice the old
+# "Production build?" prompt used to make by baking dev credentials in, so
+# it is shown here and confirmed rather than assumed.
+$appSettingsPath = 'TheBleedingDeacons.Intergroup.Register\appsettings.json'
+if (-not (Test-Path $appSettingsPath)) {
+    Write-Host "No $appSettingsPath. It must name the Freedom site the tablet takes its settings from." -ForegroundColor Red
     exit 1
 }
 
-$isProduction = $productionInput -ieq 'yes'
+$freedomSite = (Get-Content $appSettingsPath -Raw | ConvertFrom-Json).Freedom.BaseUrl
+if ([string]::IsNullOrWhiteSpace($freedomSite)) {
+    Write-Host "$appSettingsPath names no Freedom site (Freedom:BaseUrl). A tablet built from it would have no settings at all." -ForegroundColor Red
+    exit 1
+}
 
-if ($isProduction) {
-    $answer = Read-Host "PRODUCTION build requested. Type 'YES' to confirm"
-    if ($answer -cne 'YES') {
-        Write-Host "Aborted -- production build not confirmed." -ForegroundColor Yellow
-        exit 1
-    }
-    $useDevCredentials = 'false'
-    Write-Host "Building PRODUCTION (no dev credentials baked in)..." -ForegroundColor Red
-} else {
-    $useDevCredentials = 'true'
-    Write-Host "Building with DEV credentials baked in..." -ForegroundColor Cyan
+Write-Host "This build takes its settings from the Freedom site: $freedomSite" -ForegroundColor Cyan
+$answer = Read-Host "Build against that site? (yes/no) [no]"
+if ($answer -ine 'yes') {
+    Write-Host "Aborted. Change Freedom:BaseUrl in $appSettingsPath to build against another site." -ForegroundColor Yellow
+    exit 1
 }
 
 # -- Android head TFM --------------------------------------------------
@@ -49,8 +47,7 @@ dotnet publish $registerProject `
     -p:AndroidSigningKeyStore=..\..\badi.keystore `
     -p:AndroidSigningKeyAlias=badi `
     -p:AndroidSigningKeyPass=$KeyStorePassword `
-    -p:AndroidSigningStorePass=$KeyStorePassword `
-    -p:UseDevCredentials=$useDevCredentials
+    -p:AndroidSigningStorePass=$KeyStorePassword
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Build failed." -ForegroundColor Red
