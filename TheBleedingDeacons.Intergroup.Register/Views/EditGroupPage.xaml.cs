@@ -1,8 +1,9 @@
 using TheBleedingDeacons.Intergroup.Register.ViewModels;
+using TheBleedingDeacons.Intergroup.Register.Services;
 
 namespace TheBleedingDeacons.Intergroup.Register.Views;
 
-public partial class EditGroupPage : ContentPage
+public partial class EditGroupPage : ContentPage, IRegistrationWorkflow
 {
 	private readonly EditGroupViewModel _viewModel;
 

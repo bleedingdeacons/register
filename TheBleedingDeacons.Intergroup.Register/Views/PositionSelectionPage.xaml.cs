@@ -1,9 +1,10 @@
 using TheBleedingDeacons.Intergroup.Register.Support;
 using TheBleedingDeacons.Intergroup.Register.ViewModels;
+using TheBleedingDeacons.Intergroup.Register.Services;
 
 namespace TheBleedingDeacons.Intergroup.Register.Views;
 
-public partial class PositionSelectionPage : ContentPage
+public partial class PositionSelectionPage : ContentPage, IRegistrationWorkflow
 {
 	private readonly PositionSelectionViewModel _viewModel;
 

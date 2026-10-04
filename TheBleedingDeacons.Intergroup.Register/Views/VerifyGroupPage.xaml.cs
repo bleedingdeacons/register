@@ -1,8 +1,9 @@
 using TheBleedingDeacons.Intergroup.Register.ViewModels;
+using TheBleedingDeacons.Intergroup.Register.Services;
 
 namespace TheBleedingDeacons.Intergroup.Register.Views;
 
-public partial class VerifyGroupPage : ContentPage
+public partial class VerifyGroupPage : ContentPage, IRegistrationWorkflow
 {
 	private readonly VerifyGroupViewModel _viewModel;
 

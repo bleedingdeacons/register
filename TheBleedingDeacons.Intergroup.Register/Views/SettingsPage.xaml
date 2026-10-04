@@ -163,7 +163,11 @@
                 TextColor="{AppThemeBinding Light={StaticResource Gray600},
                                             Dark={StaticResource Gray300}}" />
 
-            <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="12">
+            <Grid
+                ColumnDefinitions="*,*,*,*"
+                ColumnSpacing="12"
+                RowDefinitions="Auto,Auto"
+                RowSpacing="12">
 
                 <Border
                     Grid.Column="0"
@@ -324,6 +328,48 @@
                             FontSize="13"
                             LineBreakMode="WordWrap"
                             Text="When on, the Edit Position page shows an + Add button for creating new holders directly on the device. Off by default — holders are normally managed centrally via the Unity API."
+                            TextColor="{AppThemeBinding Light={StaticResource Gray600},
+                                                        Dark={StaticResource Gray300}}" />
+                    </Grid>
+                </Border>
+
+                <Border
+                    Grid.Row="1"
+                    Grid.Column="0"
+                    Padding="15,12"
+                    BackgroundColor="{AppThemeBinding Light=White,
+                                                      Dark=#2D2D30}"
+                    Stroke="{AppThemeBinding Light=#E0E0E0,
+                                             Dark=#424242}"
+                    StrokeShape="RoundRectangle 10"
+                    StrokeThickness="1">
+                    <Grid
+                        ColumnDefinitions="*,Auto"
+                        ColumnSpacing="12"
+                        RowDefinitions="Auto,Auto"
+                        RowSpacing="4">
+
+                        <Label
+                            Grid.Row="0"
+                            Grid.Column="0"
+                            FontAttributes="Bold"
+                            FontSize="16"
+                            Text="Sound on Button Tap"
+                            VerticalOptions="Center" />
+
+                        <Switch
+                            Grid.Row="0"
+                            Grid.Column="1"
+                            IsToggled="{Binding IsButtonSoundEnabled, Mode=TwoWay}"
+                            VerticalOptions="Center" />
+
+                        <Label
+                            Grid.Row="1"
+                            Grid.Column="0"
+                            Grid.ColumnSpan="2"
+                            FontSize="13"
+                            LineBreakMode="WordWrap"
+                            Text="When on, every button on the registration workflow clicks as it is tapped, through the media volume, so a tap is heard even with Android's touch sounds off. On by default."
                             TextColor="{AppThemeBinding Light={StaticResource Gray600},
                                                         Dark={StaticResource Gray300}}" />
                     </Grid>

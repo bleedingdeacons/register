@@ -3,7 +3,7 @@ using TheBleedingDeacons.Intergroup.Register.ViewModels;
 
 namespace TheBleedingDeacons.Intergroup.Register.Views;
 
-public partial class DaySelectionPage : ContentPage
+public partial class DaySelectionPage : ContentPage, IRegistrationWorkflow
 {    
 
     public DaySelectionPage(DaySelectionViewModel viewModel)

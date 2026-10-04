@@ -108,6 +108,10 @@ public static class MauiProgram
 		// when this build names a Freedom site. See FreedomStartup.
 		FreedomStartup.Register(builder);
 
+		// A click on every registration-workflow button, on the media stream.
+		// See ClickSound for why not Android's own click.
+		ClickSound.Register();
+
 		// Add configuration service. Given the Freedom client when there is
 		// one, so a value Freedom holds is laid over the tablet's own.
 		builder.Services.AddSingleton<IConfigurationService>(sp =>

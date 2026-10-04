@@ -1,8 +1,9 @@
 using TheBleedingDeacons.Intergroup.Register.ViewModels;
+using TheBleedingDeacons.Intergroup.Register.Services;
 
 namespace TheBleedingDeacons.Intergroup.Register.Views;
 
-public partial class VerifyPositionPage : ContentPage
+public partial class VerifyPositionPage : ContentPage, IRegistrationWorkflow
 {
 	private readonly VerifyPositionViewModel _viewModel;
 

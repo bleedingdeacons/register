@@ -188,6 +188,20 @@ namespace TheBleedingDeacons.Intergroup.Register.Services.Interfaces
 		void SetComplianceAcceptanceEmailEnabled(bool enabled);
 
 		/// <summary>
+		/// When true, every button on the registration workflow plays a short
+		/// click as it is tapped — audible confirmation that a tap registered,
+		/// in a noisy hall. Played on the media stream, so it is heard even
+		/// with Android's Touch sounds off. Defaults to true. The tablet's own
+		/// switch, not Freedom's.
+		/// </summary>
+		bool IsButtonSoundEnabled { get; }
+
+		/// <summary>
+		/// Persists the button-sound switch. Takes effect on the next tap.
+		/// </summary>
+		void SetButtonSoundEnabled(bool enabled);
+
+		/// <summary>
 		/// The compliance contact, from Freedom (<c>compliance.email</c>) —
 		/// used as the Reply-To on acceptance confirmations. Empty when
 		/// Freedom holds none, which callers treat as "no compliance contact"

@@ -33,6 +33,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		private const string COMPLIANCE_LOG_ENABLED_KEY = "compliance_log_enabled";
 		private const string WELCOME_EMAIL_ENABLED_KEY = "welcome_email_on_registration_enabled";
 		private const string DEVICE_LABEL_KEY = "device_label";
+		private const string BUTTON_SOUND_ENABLED_KEY = "button_sound_enabled";
 
 		// Null when the build names no Freedom site, or off Android. Every
 		// credential and endpoint is then empty. See FreedomSettings.
@@ -106,6 +107,47 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			_cachedUnityConfig = null;
 			_cachedBetterStackConfig = null;
 			Logger.Information("Configuration cache cleared after Freedom changed");
+		}
+
+		// =================================================================
+		// Button sound — the tablet's own
+		// =================================================================
+
+		/// <summary>
+		/// Reads the switch from Preferences. Defaults to <c>true</c> when it
+		/// has never been written: the click is audible confirmation that a
+		/// tap registered, which is what the switch exists to give. Fails
+		/// safe to on if Preferences cannot be read.
+		/// </summary>
+		public bool IsButtonSoundEnabled
+		{
+			get
+			{
+				try
+				{
+					var raw = Preferences.Get(BUTTON_SOUND_ENABLED_KEY, string.Empty);
+					if (string.IsNullOrEmpty(raw)) return true;
+					return !bool.TryParse(raw, out var value) || value;
+				}
+				catch (Exception ex)
+				{
+					Logger.Warning(ex, "Failed to read button-sound switch — defaulting to on");
+					return true;
+				}
+			}
+		}
+
+		public void SetButtonSoundEnabled(bool enabled)
+		{
+			try
+			{
+				Preferences.Set(BUTTON_SOUND_ENABLED_KEY, enabled ? "true" : "false");
+				Logger.Information("Button sound {State}", enabled ? "ENABLED" : "DISABLED");
+			}
+			catch (Exception ex)
+			{
+				Logger.Warning(ex, "Failed to save button-sound switch");
+			}
 		}
 
 		// =================================================================
