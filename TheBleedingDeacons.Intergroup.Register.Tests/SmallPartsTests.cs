@@ -204,6 +204,22 @@ public sealed class EmailTemplateServiceTests
 		Assert.False(string.IsNullOrWhiteSpace(html));
 	}
 
+	/// <summary>
+	/// The regression from the Core split: the app handed over its own
+	/// assembly, which holds no templates, and every acceptance email failed.
+	/// A service given an assembly without the templates still finds them in
+	/// Core, where they are embedded.
+	/// </summary>
+	[Theory]
+	[InlineData("WelcomeEmail")]
+	[InlineData("ComplianceAcceptanceEmail")]
+	public async Task GivenAnAssemblyWithoutTheTemplatesTheyAreStillFound(string name)
+	{
+		var service = new EmailTemplateService(typeof(object).Assembly);
+
+		Assert.False(string.IsNullOrWhiteSpace(await service.RenderTemplateAsync(name, new { })));
+	}
+
 	[Fact]
 	public async Task AnUnknownTemplateIsNotFoundRatherThanABlankEmail()
 	{
