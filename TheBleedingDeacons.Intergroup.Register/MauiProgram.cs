@@ -247,11 +247,14 @@ public static class MauiProgram
 
 		builder.Services.AddSingleton<IPhoneNumberService, PhoneNumberService>();
 
-		// Register Email Templates
-		builder.Services.AddSingleton<IEmailTemplateService>(provider =>
-		{
-			return new EmailTemplateService(Assembly.GetExecutingAssembly(), "Templates");
-		});
+		// Email templates. They are embedded in Register.Core, beside the
+		// EmailTemplateService that reads them, so the assembly handed over
+		// has to be Core's: Assembly.GetExecutingAssembly() here is the app,
+		// which holds no templates since the Core split (register#48). That
+		// mistake made every acceptance and welcome email fail with
+		// TemplateNotFoundException until this line said so explicitly.
+		builder.Services.AddSingleton<IEmailTemplateService>(_ =>
+			new EmailTemplateService(typeof(EmailTemplateService).Assembly, "Templates"));
 
 		// Register the email service as singleton — EmailService owns a background
 		// Timer for queue processing that must live for the entire app lifetime.

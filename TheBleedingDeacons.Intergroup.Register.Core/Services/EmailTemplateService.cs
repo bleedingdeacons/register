@@ -121,15 +121,27 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			{
 				var extensions = new[] { ".html", ".cshtml", ".txt" };
 
-				foreach (var extension in extensions)
-				{
-					var resourceName = $"TheBleedingDeacons.Intergroup.Register.{_templateDirectory}.{templateName}{extension}";
-					using var stream = _assembly.GetManifestResourceStream(resourceName);
+				// The assembly the caller named first, then this one: the
+				// shipping templates are embedded beside this service, in
+				// Register.Core. Until register#55 the app passed its own
+				// assembly, which has held no templates since the Core split,
+				// and every acceptance and welcome email failed with
+				// TemplateNotFoundException.
+				var own = typeof(EmailTemplateService).Assembly;
+				var assemblies = _assembly == own ? new[] { own } : new[] { _assembly, own };
 
-					if (stream != null)
+				foreach (var assembly in assemblies)
+				{
+					foreach (var extension in extensions)
 					{
-						using var reader = new StreamReader(stream);
-						return await reader.ReadToEndAsync();
+						var resourceName = $"TheBleedingDeacons.Intergroup.Register.{_templateDirectory}.{templateName}{extension}";
+						using var stream = assembly.GetManifestResourceStream(resourceName);
+
+						if (stream != null)
+						{
+							using var reader = new StreamReader(stream);
+							return await reader.ReadToEndAsync();
+						}
 					}
 				}
 
