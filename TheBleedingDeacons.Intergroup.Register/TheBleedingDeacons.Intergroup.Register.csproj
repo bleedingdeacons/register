@@ -263,8 +263,8 @@
 		     every head; its MAUI defaults (sign-in, ANDROID_ID, SecureStorage
 		     stores) only on Android, which is the only head that uses them.
 		     Both come from the GitHub Packages feed in nuget.config. -->
-		<PackageReference Include="Freedom.Client" Version="0.1.1" />
-		<PackageReference Include="Freedom.Client.Maui" Version="0.1.1" Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'" />
+		<PackageReference Include="Freedom.Client" Version="0.2.1" />
+		<PackageReference Include="Freedom.Client.Maui" Version="0.2.1" Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'" />
 		<PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="10.0.90" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.10" />
 		<PackageReference Include="CommunityToolkit.Maui" Version="15.0.0" />
