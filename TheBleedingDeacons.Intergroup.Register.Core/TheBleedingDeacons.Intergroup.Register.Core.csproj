@@ -93,7 +93,7 @@
 		<PackageReference Include="Inventory" Version="0.1.1" />
 		<!-- The managed-values overlay. The app references Freedom.Client.Maui
 		     at the same version, on Android. -->
-		<PackageReference Include="Freedom.Client" Version="0.1.1" />
+		<PackageReference Include="Freedom.Client" Version="0.2.1" />
 		<PackageReference Include="SonarAnalyzer.CSharp" Version="10.31.0.145097">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
