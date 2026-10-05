@@ -52,8 +52,28 @@
 		<!-- Display name -->
 		<ApplicationTitle>Intergroup Register</ApplicationTitle>
 
-		<!-- App Identifier -->
+		<!--
+			App Identifier. The Android head overrides it: see below.
+		-->
 		<ApplicationId>com.thebleedingdeacons.intergroup.register</ApplicationId>
+		<!--
+			Android's identifier must match the package attribute in
+			Platforms/Android/AndroidManifest.xml, and that attribute is the
+			one that actually reaches a tablet: every APK built so far, 1.6.1
+			included, is org.aa_bristol...register, although ApplicationId
+			said com.thebleedingdeacons...register for every head until the
+			Android one was made to agree.
+
+			Google Play pins the package of the first bundle uploaded and
+			never lets it change, so this value is now permanent. Changing
+			it, or the manifest's attribute, would build a different app, one
+			no tablet can upgrade to. /acceptance checks the built package
+			before every upload for that reason.
+
+			Android only. The Windows head keeps the identity its
+			Package.appxmanifest has always had.
+		-->
+		<ApplicationId Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">org.aa_bristol.thebleedingdeacons.intergroup.register</ApplicationId>
 
 		<!--
 			Versions. ApplicationDisplayVersion must stay unconditional: it feeds
