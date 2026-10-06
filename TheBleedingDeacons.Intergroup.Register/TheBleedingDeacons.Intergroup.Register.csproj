@@ -97,9 +97,9 @@
 			command-line restore does not run NuGet's cross-framework consistency
 			check, so this only ever shows up in Visual Studio.
 		-->
-		<ApplicationDisplayVersion>1.6.1</ApplicationDisplayVersion>
+		<ApplicationDisplayVersion>1.6.2</ApplicationDisplayVersion>
 		<Version>$(ApplicationDisplayVersion)</Version>
-		<ApplicationVersion>23</ApplicationVersion>
+		<ApplicationVersion>24</ApplicationVersion>
 
 		<!--
 			Platform floors, raised for .NET 10.
