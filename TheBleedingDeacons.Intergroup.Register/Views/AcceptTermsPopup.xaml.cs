@@ -18,14 +18,24 @@ public partial class AcceptTermsPopup : Popup, IRegistrationWorkflow
     // text is still below the fold.
     private const double ScrollEndTolerance = 4.0;
 
-    // Scroll-hint animation. The jump-to-end arrow rises and falls to say
-    // "there is more below, and you need it" — the consent row stays
-    // disabled until the policy has been read to the end, and a static
-    // arrow left people waiting for a checkbox that never enabled.
-    private const double HintRiseDistance = 10.0;   // px travelled per bounce
-    private const uint HintLegDuration = 220;       // ms for one leg
-    private const int HintBouncesPerBurst = 2;      // bounces, then a rest
-    private static readonly TimeSpan HintRestBetweenBursts = TimeSpan.FromSeconds(2);
+    // Scroll-hint animation. The jump-to-end arrow bounces, swells as it
+    // rises, and sends a ripple out from under it, to say "there is more
+    // below, and you need it" — the consent row stays disabled until the
+    // policy has been read to the end, and a static arrow left people
+    // waiting for a checkbox that never enabled. The first version (a 10px
+    // rise, twice, every two seconds) was too quiet to draw the eye away
+    // from the policy text, so this one is bigger and rests for less.
+    private const double HintRiseDistance = 16.0;   // px travelled per bounce
+    private const double HintPeakScale = 1.2;       // arrow's size at the top of a bounce
+    private const uint HintLegDuration = 240;       // ms for one leg
+    private const int HintBouncesPerBurst = 3;      // bounces, then a rest
+    private static readonly TimeSpan HintRestBetweenBursts = TimeSpan.FromSeconds(1.2);
+
+    // The ripple: starts at the arrow's size, half opaque, and grows to
+    // HaloEndScale while fading to nothing, once per burst.
+    private const double HaloStartOpacity = 0.5;
+    private const double HaloEndScale = 2.2;
+    private const uint HaloDuration = 900;
 
     // Non-null only while the hint is running; doubles as the "already
     // started" guard, since SizeChanged fires more than once.
@@ -60,6 +70,13 @@ public partial class AcceptTermsPopup : Popup, IRegistrationWorkflow
         PolicyScrollView.Scrolled += OnPolicyScrolled;
         PolicyScrollView.SizeChanged += OnPolicyScrollViewSizeChanged;
 
+        // SizeChanged is the ScrollView's own size, not its content's. When
+        // the policy text is measured after the last SizeChanged, the check
+        // saw a content height of 0 and gave up, and the hint never started
+        // on the long policies it is for. ContentSize raises PropertyChanged
+        // when it settles, so the check runs again then.
+        PolicyScrollView.PropertyChanged += OnPolicyScrollViewPropertyChanged;
+
         // The hint exists only to say "scroll for the gate to open", so it
         // stops the instant the gate opens — by whichever route, scrolling
         // or the jump button.
@@ -75,6 +92,7 @@ public partial class AcceptTermsPopup : Popup, IRegistrationWorkflow
         this.Closed -= OnPopupClosed;
         PolicyScrollView.Scrolled -= OnPolicyScrolled;
         PolicyScrollView.SizeChanged -= OnPolicyScrollViewSizeChanged;
+        PolicyScrollView.PropertyChanged -= OnPolicyScrollViewPropertyChanged;
 
         if (BindingContext is AcceptTermsPopupViewModel vm)
         {
@@ -116,10 +134,16 @@ public partial class AcceptTermsPopup : Popup, IRegistrationWorkflow
         _hintCts = null;
         cts.Cancel();
         cts.Dispose();
+
+        // Stop mid-flight rather than at the end of the current leg: the
+        // gate has just opened, and an arrow still swelling after it has
+        // gone looks like a glitch.
+        JumpToEndButton.CancelAnimations();
+        JumpToEndHalo.CancelAnimations();
     }
 
     /// <summary>
-    /// Rises and falls a couple of times, rests, repeats — until cancelled.
+    /// A ripple and a few bounces, a short rest, repeat — until cancelled.
     /// A continuous bounce would be nagging; a single one is missable if the
     /// user happens to be reading the top of the policy when it plays.
     /// </summary>
@@ -129,14 +153,22 @@ public partial class AcceptTermsPopup : Popup, IRegistrationWorkflow
         {
             while (!ct.IsCancellationRequested)
             {
+                // The ripple runs alongside the bounces, not before them.
+                var ripple = RippleAsync();
+
                 for (var i = 0; i < HintBouncesPerBurst && !ct.IsCancellationRequested; i++)
                 {
                     // *Async forms, not the bare TranslateTo: MAUI 10
                     // deprecated the originals and this repo builds clean.
-                    await JumpToEndButton.TranslateToAsync(0, -HintRiseDistance, HintLegDuration, Easing.CubicOut);
-                    await JumpToEndButton.TranslateToAsync(0, 0, HintLegDuration, Easing.CubicIn);
+                    await Task.WhenAll(
+                        JumpToEndButton.TranslateToAsync(0, -HintRiseDistance, HintLegDuration, Easing.CubicOut),
+                        JumpToEndButton.ScaleToAsync(HintPeakScale, HintLegDuration, Easing.CubicOut));
+                    await Task.WhenAll(
+                        JumpToEndButton.TranslateToAsync(0, 0, HintLegDuration, Easing.CubicIn),
+                        JumpToEndButton.ScaleToAsync(1, HintLegDuration, Easing.CubicIn));
                 }
 
+                await ripple;
                 await Task.Delay(HintRestBetweenBursts, ct);
             }
         }
@@ -146,9 +178,23 @@ public partial class AcceptTermsPopup : Popup, IRegistrationWorkflow
         }
         finally
         {
-            // Leave the arrow where it belongs even if cancelled mid-rise.
+            // Leave the arrow where it belongs, and the ripple out of sight,
+            // even if cancelled mid-flight.
             JumpToEndButton.TranslationY = 0;
+            JumpToEndButton.Scale = 1;
+            JumpToEndHalo.Scale = 1;
+            JumpToEndHalo.Opacity = 0;
         }
+    }
+
+    private Task RippleAsync()
+    {
+        JumpToEndHalo.Scale = 1;
+        JumpToEndHalo.Opacity = HaloStartOpacity;
+
+        return Task.WhenAll(
+            JumpToEndHalo.ScaleToAsync(HaloEndScale, HaloDuration, Easing.CubicOut),
+            JumpToEndHalo.FadeToAsync(0, HaloDuration, Easing.CubicIn));
     }
 
     private void OnPolicyScrolled(object? sender, ScrolledEventArgs e)
@@ -167,7 +213,22 @@ public partial class AcceptTermsPopup : Popup, IRegistrationWorkflow
         }
     }
 
-    private void OnPolicyScrollViewSizeChanged(object? sender, EventArgs e)
+    private void OnPolicyScrollViewSizeChanged(object? sender, EventArgs e) => EvaluatePolicyLength();
+
+    private void OnPolicyScrollViewPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(ScrollView.ContentSize))
+        {
+            EvaluatePolicyLength();
+        }
+    }
+
+    /// <summary>
+    /// Once both heights are known: a policy that fits is already read, and
+    /// one that runs past the fold starts the hint. Runs whenever either
+    /// height changes, so it has to be safe to call repeatedly, and is.
+    /// </summary>
+    private void EvaluatePolicyLength()
     {
         if (BindingContext is not AcceptTermsPopupViewModel vm) return;
         if (vm.HasScrolledToEnd) return; // Already satisfied, nothing to do.

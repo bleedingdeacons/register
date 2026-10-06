@@ -83,16 +83,43 @@
                 </Border>
 
                 <!--
-                    Nudged up and down by the code-behind while the policy
+                    A ripple behind the arrow: grows and fades out from under
+                    it at the start of every burst of the scroll hint, so the
+                    eye is drawn to the arrow even while reading the top of
+                    the policy. Scale and Opacity are animated by the
+                    code-behind, so nothing here may set Scale, and Opacity
+                    stays 0 at rest. InputTransparent so it never takes the
+                    arrow's tap.
+                -->
+                <Border
+                    x:Name="JumpToEndHalo"
+                    Margin="0,0,0,3"
+                    BackgroundColor="{AppThemeBinding Light={StaticResource Primary},
+                                                      Dark={StaticResource PrimaryDark}}"
+                    HeightRequest="44"
+                    HorizontalOptions="Center"
+                    InputTransparent="True"
+                    IsVisible="{Binding HasScrolledToEnd, Converter={StaticResource InvertedBoolConverter}}"
+                    Opacity="0"
+                    StrokeThickness="0"
+                    VerticalOptions="End"
+                    WidthRequest="44">
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="22" />
+                    </Border.StrokeShape>
+                </Border>
+
+                <!--
+                    Bounced and pulsed by the code-behind while the policy
                     still needs scrolling — see StartScrollHint. The consent
                     row below is disabled until the user reaches the bottom,
                     and a static arrow was not saying so loudly enough.
-                    TranslationY is the animated property, so nothing here
-                    may set it.
+                    TranslationY and Scale are the animated properties, so
+                    nothing here may set them.
                 -->
                 <Button
                     x:Name="JumpToEndButton"
-                    Margin="0,0,0,00"
+                    Margin="0,0,0,3"
                     Padding="0"
                     BackgroundColor="{AppThemeBinding Light={StaticResource Primary},
                                                       Dark={StaticResource PrimaryDark}}"
