@@ -53,27 +53,24 @@
 		<ApplicationTitle>Intergroup Register</ApplicationTitle>
 
 		<!--
-			App Identifier. The Android head overrides it: see below.
-		-->
-		<ApplicationId>com.thebleedingdeacons.intergroup.register</ApplicationId>
-		<!--
-			Android's identifier must match the package attribute in
-			Platforms/Android/AndroidManifest.xml, and that attribute is the
-			one that actually reaches a tablet: every APK built so far, 1.6.1
-			included, is org.aa_bristol...register, although ApplicationId
-			said com.thebleedingdeacons...register for every head until the
-			Android one was made to agree.
+			App Identifier. Keep it equal to the package attribute in
+			Platforms/Android/AndroidManifest.xml: on Android that attribute
+			is what actually reaches a device. Until 1.6.1 the two disagreed,
+			and every APK shipped as the manifest's org.aa_bristol...register
+			while this said com.thebleedingdeacons...register.
+
+			Both became org.thebleedingdeacons.intergroup.register before the
+			first Google Play upload. Android treats a new package as a new
+			app, so a tablet on an org.aa_bristol build does not upgrade to
+			this one; it installs alongside it, and the old one is uninstalled
+			by hand.
 
 			Google Play pins the package of the first bundle uploaded and
-			never lets it change, so this value is now permanent. Changing
-			it, or the manifest's attribute, would build a different app, one
-			no tablet can upgrade to. /acceptance checks the built package
-			before every upload for that reason.
-
-			Android only. The Windows head keeps the identity its
-			Package.appxmanifest has always had.
+			never lets it change, so after that upload this value is
+			permanent. /acceptance checks the built package before every
+			upload for that reason.
 		-->
-		<ApplicationId Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">org.aa_bristol.thebleedingdeacons.intergroup.register</ApplicationId>
+		<ApplicationId>org.thebleedingdeacons.intergroup.register</ApplicationId>
 
 		<!--
 			Versions. ApplicationDisplayVersion must stay unconditional: it feeds
