@@ -5,7 +5,7 @@
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
   IgnorableNamespaces="uap rescap">
 
-	<Identity Name="com.thebleedingdeacons.intergroup.register" Publisher="CN=TheBleedingDeacons" Version="1.0.0.0" />
+	<Identity Name="org.thebleedingdeacons.intergroup.register" Publisher="CN=TheBleedingDeacons" Version="1.0.0.0" />
 
 	<Properties>
 		<DisplayName>Intergroup Register</DisplayName>
