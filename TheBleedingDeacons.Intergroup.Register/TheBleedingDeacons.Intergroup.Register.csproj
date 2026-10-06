@@ -52,8 +52,25 @@
 		<!-- Display name -->
 		<ApplicationTitle>Intergroup Register</ApplicationTitle>
 
-		<!-- App Identifier -->
-		<ApplicationId>com.thebleedingdeacons.intergroup.register</ApplicationId>
+		<!--
+			App Identifier. Keep it equal to the package attribute in
+			Platforms/Android/AndroidManifest.xml: on Android that attribute
+			is what actually reaches a device. Until 1.6.1 the two disagreed,
+			and every APK shipped as the manifest's org.aa_bristol...register
+			while this said com.thebleedingdeacons...register.
+
+			Both became org.thebleedingdeacons.intergroup.register before the
+			first Google Play upload. Android treats a new package as a new
+			app, so a tablet on an org.aa_bristol build does not upgrade to
+			this one; it installs alongside it, and the old one is uninstalled
+			by hand.
+
+			Google Play pins the package of the first bundle uploaded and
+			never lets it change, so after that upload this value is
+			permanent. /acceptance checks the built package before every
+			upload for that reason.
+		-->
+		<ApplicationId>org.thebleedingdeacons.intergroup.register</ApplicationId>
 
 		<!--
 			Versions. ApplicationDisplayVersion must stay unconditional: it feeds
