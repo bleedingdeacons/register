@@ -113,7 +113,7 @@ the test-or-live choice: `/amber` is the test bed.
 ```
 
 `CallbackUri` defaults to
-`com.thebleedingdeacons.intergroup.register.freedom://auth`, which is what
+`org.thebleedingdeacons.intergroup.register.freedom://auth`, which is what
 `Platforms/Android/FreedomCallbackActivity.cs` catches; the Freedom admin's
 `register` application must have the same Callback URI. Then sign the tablet in
 from **API Settings → Freedom**. **Android only**: the Windows head builds, but

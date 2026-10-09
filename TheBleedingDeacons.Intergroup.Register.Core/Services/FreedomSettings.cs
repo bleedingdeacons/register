@@ -71,7 +71,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		}
 
 		/// <summary>The default callback: the app id, a <c>.freedom</c> suffix, host <c>auth</c>.</summary>
-		public const string FreedomCallbackUri = "com.thebleedingdeacons.intergroup.register.freedom://auth";
+		public const string FreedomCallbackUri = "org.thebleedingdeacons.intergroup.register.freedom://auth";
 
 		/// <summary>The SMTP settings Freedom holds, over the model's defaults.</summary>
 		public static SmtpConfiguration Smtp(Func<string, string?> managed) =>
