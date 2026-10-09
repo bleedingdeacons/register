@@ -20,7 +20,7 @@ namespace TheBleedingDeacons.Intergroup.Register;
 [IntentFilter(
 	[Intent.ActionView],
 	Categories = [Intent.CategoryDefault, Intent.CategoryBrowsable],
-	DataScheme = "com.thebleedingdeacons.intergroup.register.freedom",
+	DataScheme = "org.thebleedingdeacons.intergroup.register.freedom",
 	DataHost = "auth")]
 public sealed class FreedomCallbackActivity : Microsoft.Maui.Authentication.WebAuthenticatorCallbackActivity
 {
