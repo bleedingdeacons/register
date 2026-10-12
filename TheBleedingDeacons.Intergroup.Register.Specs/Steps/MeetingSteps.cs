@@ -37,6 +37,18 @@ public sealed class MeetingSteps(World world)
 			? (HttpStatusCode.UnprocessableEntity, "rest_invalid_param")
 			: (HttpStatusCode.Conflict, "already_registered");
 
+	[Given(@"^Unity accepts new members again$")]
+	[When(@"^Unity accepts new members again$")]
+	public void AcceptsNewMembers() => world.Unity.Refusals.Remove(Routes["new members"]);
+
+	[Given(@"^Unity creates new members but the first reply is lost$")]
+	public void LosesFirstCreateReply() => world.Unity.LoseCreateReplies = 1;
+
+	[Given(@"^Unity has no registration to withdraw for (groups|officers)$")]
+	public void NothingToWithdraw(string what) =>
+		world.Unity.Refusals[what == "groups" ? "/unregister-group" : "/unregister-officer"] =
+			(HttpStatusCode.NotFound, "not_registered");
+
 	[When(@"^""([^""]*)""'s mobile number is changed to ""([^""]*)""$")]
 	public void MobileChanged(string name, string mobile) =>
 		world.Change(db => db.Members.Find(world.MemberId(name))!.MobileNumber = mobile);
@@ -79,8 +91,28 @@ public sealed class MeetingSteps(World world)
 	}
 
 	[Then(@"^Unity is asked to create ""([^""]*)""$")]
-	public void AskedToCreate(string name) =>
-		world.Unity.Posts("/members/create").ShouldHaveSingleItem().Str("anonymous_name").ShouldBe(name);
+	public void AskedToCreate(string name)
+	{
+		var call = world.Unity.Posts("/members/create").ShouldHaveSingleItem();
+		call.Str("anonymous_name").ShouldBe(name);
+		Guid.TryParse(call.Str("client_reference"), out var reference).ShouldBeTrue();
+		reference.ShouldNotBe(Guid.Empty);
+	}
+
+	[Then(@"^every request to create ""([^""]*)"" carried the same reference$")]
+	public void SameReference(string name)
+	{
+		var references = world.Unity.Posts("/members/create")
+			.Where(c => c.Str("anonymous_name") == name)
+			.Select(c => c.Str("client_reference"))
+			.ToList();
+		references.Count.ShouldBeGreaterThan(1);
+		references.Distinct(StringComparer.Ordinal).ShouldHaveSingleItem().ShouldNotBeNullOrEmpty();
+	}
+
+	[Then(@"^Unity has one member called ""([^""]*)""$")]
+	public void OneMemberCalled(string name) =>
+		world.Unity.Members.Count(m => m.AnonymousName == name).ShouldBe(1);
 
 	[Then(@"^Unity is not told about ""([^""]*)""$")]
 	public void NotTold(string group)

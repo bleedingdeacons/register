@@ -402,6 +402,9 @@ public partial class EditGroupViewModel : BaseViewModel
 				var newMember = new Member
 				{
 					Id = TemporaryIdGenerator.Next(),
+					// Fixed now, so every attempt to create this member on
+					// Unity names the same create and a retry can't duplicate it.
+					ClientReference = Guid.NewGuid(),
 					HomeGroupId = _group.Id,
 					AnonymousName = EditName?.Trim() ?? string.Empty,
 					MobileNumber = EditPhone?.Trim(),

@@ -59,6 +59,9 @@ public class MemberConfiguration : IEntityTypeConfiguration<Member>
         // the other GDPR fields and shows up in EF model snapshots.
         builder.Property(m => m.GdprAcceptancePolicyId);
 
+        // Set only on members created on the tablet; see Member.ClientReference.
+        builder.Property(m => m.ClientReference);
+
         // HomeGroup FK is configured from GroupConfiguration (WithOne → HasForeignKey)
 
         // Many-to-one: multiple members can hold the same position

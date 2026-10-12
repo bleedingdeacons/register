@@ -55,6 +55,15 @@ public sealed partial class FakeUnity : HttpMessageHandler
 	/// <summary>The id the next created member is given.</summary>
 	public int NextMemberId { get; set; } = 900;
 
+	/// <summary>
+	/// How many creates to carry out and then answer with a 502, as a
+	/// proxy does when the site's reply is lost on the way back.
+	/// </summary>
+	public int LoseCreateReplies { get; set; }
+
+	/// <summary>Members created under each client reference, as Integrity records them.</summary>
+	private Dictionary<Guid, UnityModels.Member> CreatedByReference { get; } = [];
+
 	public int PageSize { get; set; } = 500;
 
 	public IEnumerable<Call> Posts(string suffix) =>
@@ -92,8 +101,26 @@ public sealed partial class FakeUnity : HttpMessageHandler
 		if (route == "members/create")
 		{
 			var created = JsonSerializer.Deserialize<UnityModels.CreateMemberRequest>(body!, Json)!;
+
+			// A repeat of a create Integrity has seen returns that member.
+			if (created.ClientReference is { } seen && CreatedByReference.TryGetValue(seen, out var existing))
+			{
+				return Ok(existing);
+			}
+
 			var member = new UnityModels.Member { Id = NextMemberId++, AnonymousName = created.AnonymousName };
 			Members.Add(member);
+			if (created.ClientReference is { } reference)
+			{
+				CreatedByReference[reference] = member;
+			}
+
+			if (LoseCreateReplies > 0)
+			{
+				LoseCreateReplies--;
+				return Error(HttpStatusCode.BadGateway, "bad_gateway");
+			}
+
 			return Ok(member);
 		}
 

@@ -61,6 +61,10 @@ sync ─▶ snapshot ─▶ register / accept (local DB + fsync'd log) ─▶ fi
   position, and per member. A replay rebuilds the database from them.
 - **Temporary id**: a negative id given to a member added at the meeting.
   Unity has never seen it, and replaces it on creation.
+- **Client reference**: a UUID given to a member added at the meeting, and
+  sent with every attempt to create them. Unity recognises a create it has
+  already carried out and returns that member, so a retry after a lost reply
+  never makes a second one.
 - **Reconcile / finishing the meeting**: sending Unity everything that differs
   from the snapshot. The order is: new members, changed members, consent,
   then attendance.
@@ -77,6 +81,11 @@ depends on only two things: a SQLite write, and a log line flushed to disk.
 Unity hears about it when the meeting is finished, and receives only what
 changed since the snapshot. A new member is created first, so that the
 registrations that follow can use the id Unity gives them.
+
+Everything sent at the finish is safe to send twice, because a request can
+reach Unity and its reply still be lost. A create carries the member's
+client reference; Unity already having a registration counts as registered,
+and Unity having none to withdraw counts as withdrawn.
 
 If Unity refuses to create a member, the registrations that depend on that
 member are held back. They are not sent under the negative id, which Unity
