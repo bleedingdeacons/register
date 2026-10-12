@@ -75,6 +75,16 @@ public class Member
     /// </summary>
     public int? GdprAcceptancePolicyId { get; set; }
 
+    /// <summary>
+    /// A reference this tablet gave a member it created locally, sent with
+    /// the create so that Unity can recognise a repeat of it. A create that
+    /// is retried — on its own, inside a retried batch, or by a second
+    /// Finish after a response that never arrived — returns the member made
+    /// the first time instead of a duplicate. Null for members synced from
+    /// Unity, which already exist there.
+    /// </summary>
+    public Guid? ClientReference { get; set; }
+
     // FK to the member's home group (nullable — some members may not have a home group)
     public int? HomeGroupId { get; set; }
     public Group? HomeGroup { get; set; }

@@ -464,6 +464,9 @@ public partial class PositionEditViewModel : BaseViewModel
 				var newMember = new Member
 				{
 					Id = TemporaryIdGenerator.Next(),
+					// Fixed now, so every attempt to create this member on
+					// Unity names the same create and a retry can't duplicate it.
+					ClientReference = Guid.NewGuid(),
 					IntergroupPositionId = _position.Id,
 					AnonymousName = EditName?.Trim() ?? string.Empty,
 					MobileNumber = EditPhone?.Trim(),

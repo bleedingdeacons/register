@@ -214,6 +214,30 @@ public class ReconciliationService
 				Total: newMembers.Count));
 		}
 
+		// Every create names itself with the member's ClientReference, so
+		// Unity returns the member it already made when a create is sent
+		// again — after a lost response, a retried batch, or a second
+		// Finish. The tablet sets the reference when the member is entered;
+		// one that somehow has none gets it here, saved before anything is
+		// sent so every later attempt carries the same value. If it can't
+		// be saved the create is held back: sending it under a reference
+		// the next attempt won't know is how duplicates are made.
+		foreach (var member in newMembers.Where(m => m.ClientReference is null))
+		{
+			Guid? reference = Guid.NewGuid();
+			try
+			{
+				await db.Members
+					.Where(m => m.Id == member.Id)
+					.ExecuteUpdateAsync(set => set.SetProperty(m => m.ClientReference, reference), ct);
+				member.ClientReference = reference;
+			}
+			catch (Exception ex) when (ex is not OperationCanceledException)
+			{
+				Logger.Error(ex, "Could not save a client reference for new member {Name} (temp ID {TempId}); holding back its create until the next sync", member.AnonymousName, member.Id);
+			}
+		}
+
 		int createIndex = 0;
 		foreach (var member in newMembers)
 		{
@@ -224,10 +248,20 @@ public class ReconciliationService
 				Current: createIndex,
 				Total: newMembers.Count));
 
+			if (member.ClientReference is null)
+			{
+				// Logged above. Counted as a failed create so the logs are
+				// kept and its dependent registrations wait with it.
+				apiErrors++;
+				failedCreates.Add(member.Id);
+				continue;
+			}
+
 			try
 			{
 				var request = new CreateMemberRequest
 				{
+					ClientReference = member.ClientReference,
 					AnonymousName = member.AnonymousName,
 					PersonalEmail = member.PersonalEmail,
 					MobileNumber = member.MobileNumber,
@@ -685,6 +719,12 @@ public class ReconciliationService
 							unregisteredGroups++;
 							Logger.Information("Unregistered group {Name} (ID={Id}) on Unity", group.Name, group.Id);
 						}
+						else if (IsNotRegisteredError(response))
+						{
+							unregisteredGroups++;
+							Logger.Information("Group {Name} (ID={Id}) was already unregistered on Unity — treating as success",
+								group.Name, group.Id);
+						}
 						else
 						{
 							apiErrors++;
@@ -791,6 +831,11 @@ public class ReconciliationService
 						{
 							unregisteredPositions++;
 							Logger.Information("Unregistered officer {Id} on Unity", officerId);
+						}
+						else if (IsNotRegisteredError(response))
+						{
+							unregisteredPositions++;
+							Logger.Information("Officer {Id} was already unregistered on Unity — treating as success", officerId);
 						}
 						else
 						{
@@ -1036,6 +1081,20 @@ public class ReconciliationService
 		return code.Contains("already", StringComparison.Ordinal) || code.Contains("duplicate", StringComparison.Ordinal) || code.Contains("exists", StringComparison.Ordinal)
 			|| msg.Contains("already registered", StringComparison.Ordinal) || msg.Contains("already exists", StringComparison.Ordinal);
 	}
+
+	/// <summary>
+	/// Returns true when an unregister call failed only because Unity holds
+	/// no registration to remove — the outcome the call was after. Mirrors
+	/// <see cref="IsAlreadyRegisteredError{T}"/>: an unregister repeated
+	/// after it already ran (a retried request, or a second Finish after a
+	/// lost response) gets HTTP 404 <c>not_registered</c>, and counting that
+	/// as an error would keep the logs and fail every later attempt the same
+	/// way. The code is checked as well as the status so that a 404 for a
+	/// missing route (<c>rest_no_route</c>) or meeting is still an error.
+	/// </summary>
+	private static bool IsNotRegisteredError<T>(ApiResponse<T> response) where T : class =>
+		response.StatusCode == 404
+		&& string.Equals(response.Error?.Code, "not_registered", StringComparison.Ordinal);
 
 	/// <summary>
 	/// Formats every diagnostic field on an <see cref="ApiResponse{T}"/> into a

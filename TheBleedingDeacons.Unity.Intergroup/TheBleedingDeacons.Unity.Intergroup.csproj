@@ -67,7 +67,7 @@
   <!-- One reference covers both assemblies: the Models types ship bundled
        inside Integrity.Client rather than as a package of their own. -->
   <ItemGroup Condition="'$(UseLocalIntegritySharp)' != 'true'">
-    <PackageReference Include="Integrity.Client" Version="1.10.3" />
+    <PackageReference Include="Integrity.Client" Version="1.12.0" />
   </ItemGroup>
 
   <!-- Both projects must be referenced in local mode. The client marks its own
