@@ -327,6 +327,8 @@ public static class MauiProgram
 		builder.Services.AddTransient<VerifyPositionViewModel>();
 		builder.Services.AddTransient<VerifyPositionPage>();
 		builder.Services.AddTransient<RegistrationOverviewViewModel>();
+		builder.Services.AddTransient<MoveMemberPage>();
+		builder.Services.AddTransient<MoveMemberViewModel>();
 
 #if DEBUG
 		builder.Services.AddLogging();
