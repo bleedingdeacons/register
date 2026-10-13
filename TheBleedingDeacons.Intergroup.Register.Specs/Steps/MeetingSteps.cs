@@ -41,6 +41,21 @@ public sealed class MeetingSteps(World world)
 	public void MobileChanged(string name, string mobile) =>
 		world.Change(db => db.Members.Find(world.MemberId(name))!.MobileNumber = mobile);
 
+	/// <summary>What the position editor's Done does to a holder it removes.</summary>
+	[When(@"^""([^""]*)"" is removed as the holder of ""([^""]*)""$")]
+	public void RemovedAsHolder(string name, string position) =>
+		world.Change(db =>
+		{
+			var member = db.Members.Find(world.MemberId(name))!;
+			member.IntergroupPositionId.ShouldBe(world.PositionId(position));
+			member.IntergroupPositionId = null;
+			member.IntergroupPositionRotation = null;
+		});
+
+	[When(@"^""([^""]*)"" is taken out of their home group$")]
+	public void TakenOutOfHomeGroup(string name) =>
+		world.Change(db => db.Members.Find(world.MemberId(name))!.HomeGroupId = null);
+
 	[Then(@"^Unity is sent nothing$")]
 	public void SentNothing() => world.Unity.Calls.Where(c => c.Method == "POST").ShouldBeEmpty();
 
@@ -99,6 +114,23 @@ public sealed class MeetingSteps(World world)
 		call.Has("anonymous_name").ShouldBeFalse();
 		call.Has("personal_email").ShouldBeFalse();
 		call.Has("home_group_id").ShouldBeFalse();
+	}
+
+	[Then(@"^Unity is told ""([^""]*)"" no longer holds a position$")]
+	public void NoLongerHolds(string name)
+	{
+		var call = world.Unity.Posts($"/members/{world.MemberId(name)}/update").ShouldHaveSingleItem();
+		call.Int("intergroup_position_id").ShouldBe(0);
+		call.Str("intergroup_position_rotation").ShouldBe(string.Empty);
+		call.Has("home_group_id").ShouldBeFalse();
+	}
+
+	[Then(@"^Unity is told ""([^""]*)"" no longer has a home group$")]
+	public void NoLongerHasHomeGroup(string name)
+	{
+		var call = world.Unity.Posts($"/members/{world.MemberId(name)}/update").ShouldHaveSingleItem();
+		call.Int("home_group_id").ShouldBe(0);
+		call.Has("intergroup_position_id").ShouldBeFalse();
 	}
 
 	[Then(@"^Unity is told ""([^""]*)"" accepted version ""([^""]*)"" of policy (\d+)$")]
