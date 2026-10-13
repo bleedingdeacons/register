@@ -29,6 +29,9 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels;
 /// <see cref="VerifyGroupPage"/> / <see cref="VerifyPositionPage"/>,
 /// which in turn allow jumping into the edit flow. This keeps a single
 /// source of truth for validation and edit UX.
+///
+/// The Members tab lists every member with the group and position they
+/// are assigned to, and opens <see cref="MoveMemberPage"/> to move one.
 /// </summary>
 public partial class RegistrationOverviewViewModel : BaseViewModel
 {
@@ -36,9 +39,16 @@ public partial class RegistrationOverviewViewModel : BaseViewModel
 
 	private readonly IGroupRepository _groupRepository;
 	private readonly IPositionRepository _positionRepository;
+	private readonly IMemberRepository _memberRepository;
 	private readonly IAttendanceRegistration<Group> _groupAttendance;
 	private readonly IAttendanceRegistration<Position> _positionAttendance;
 	private readonly IPopupNotification _popupService;
+
+	/// <summary>
+	/// Every member from the last load, unfiltered. <see cref="Members"/>
+	/// is this list narrowed by <see cref="MemberSearchText"/>.
+	/// </summary>
+	private List<OverviewMember> _allMembers = [];
 
 	/// <summary>
 	/// Flag used to suppress the change-handlers on OverviewGroup.IsRegistered /
@@ -50,12 +60,19 @@ public partial class RegistrationOverviewViewModel : BaseViewModel
 
 	public ObservableCollection<OverviewGroup> Groups { get; } = new();
 	public ObservableCollection<OverviewPosition> Positions { get; } = new();
+	public ObservableCollection<OverviewMember> Members { get; } = new();
 
 	[ObservableProperty]
+	[NotifyPropertyChangedFor(nameof(IsGroupsTabSelected))]
 	[NotifyPropertyChangedFor(nameof(IsPositionsTabSelected))]
-	private bool isGroupsTabSelected = true;
+	[NotifyPropertyChangedFor(nameof(IsMembersTabSelected))]
+	private OverviewTab selectedTab = OverviewTab.Groups;
 
-	public bool IsPositionsTabSelected => !IsGroupsTabSelected;
+	public bool IsGroupsTabSelected => SelectedTab == OverviewTab.Groups;
+
+	public bool IsPositionsTabSelected => SelectedTab == OverviewTab.Positions;
+
+	public bool IsMembersTabSelected => SelectedTab == OverviewTab.Members;
 
 	[ObservableProperty]
 	private bool isLoading;
@@ -66,15 +83,23 @@ public partial class RegistrationOverviewViewModel : BaseViewModel
 	[ObservableProperty]
 	private string positionsSummary = string.Empty;
 
+	[ObservableProperty]
+	private string membersSummary = string.Empty;
+
+	[ObservableProperty]
+	private string memberSearchText = string.Empty;
+
 	public RegistrationOverviewViewModel(
 		IGroupRepository groupRepository,
 		IPositionRepository positionRepository,
+		IMemberRepository memberRepository,
 		IAttendanceRegistration<Group> groupAttendance,
 		IAttendanceRegistration<Position> positionAttendance,
 		IPopupNotification popupService)
 	{
 		_groupRepository = groupRepository;
 		_positionRepository = positionRepository;
+		_memberRepository = memberRepository;
 		_groupAttendance = groupAttendance;
 		_positionAttendance = positionAttendance;
 		_popupService = popupService;
@@ -86,10 +111,13 @@ public partial class RegistrationOverviewViewModel : BaseViewModel
 	// =================================================================
 
 	[RelayCommand]
-	private void ShowGroupsTab() => IsGroupsTabSelected = true;
+	private void ShowGroupsTab() => SelectedTab = OverviewTab.Groups;
 
 	[RelayCommand]
-	private void ShowPositionsTab() => IsGroupsTabSelected = false;
+	private void ShowPositionsTab() => SelectedTab = OverviewTab.Positions;
+
+	[RelayCommand]
+	private void ShowMembersTab() => SelectedTab = OverviewTab.Members;
 
 	// =================================================================
 	// Load
@@ -130,6 +158,10 @@ public partial class RegistrationOverviewViewModel : BaseViewModel
 				groupsWithMembers.Add(full);
 			}
 
+			// GetAllAsync already includes each member's home group and
+			// position, which is all the Members tab shows.
+			var members = await _memberRepository.GetAllAsync(Token);
+
 			MainThread.BeginInvokeOnMainThread(() =>
 			{
 				Groups.Clear();
@@ -139,6 +171,12 @@ public partial class RegistrationOverviewViewModel : BaseViewModel
 				Positions.Clear();
 				foreach (var p in positionsWithHolders)
 					Positions.Add(new OverviewPosition(p, OnPositionToggledAsync));
+
+				_allMembers = members
+					.OrderBy(m => m.AnonymousName, StringComparer.CurrentCulture)
+					.Select(m => new OverviewMember(m))
+					.ToList();
+				ApplyMemberFilter();
 
 				UpdateSummaries();
 			});
@@ -164,6 +202,45 @@ public partial class RegistrationOverviewViewModel : BaseViewModel
 		var positionRegistered = Positions.Count(p => p.IsRegistered);
 		GroupsSummary = $"{groupRegistered} of {Groups.Count} registered";
 		PositionsSummary = $"{positionRegistered} of {Positions.Count} registered";
+
+		var inGroup = _allMembers.Count(m => m.Entity.HomeGroupId != null);
+		var inPosition = _allMembers.Count(m => m.Entity.IntergroupPositionId != null);
+		MembersSummary = $"{_allMembers.Count} members · {inGroup} in a group · {inPosition} in a position";
+	}
+
+	// =================================================================
+	// Members tab
+	// =================================================================
+
+	partial void OnMemberSearchTextChanged(string value) => ApplyMemberFilter();
+
+	/// <summary>
+	/// Rebuilds <see cref="Members"/> from <see cref="_allMembers"/>,
+	/// keeping rows whose name, group or position contains the search
+	/// text. An empty search shows everyone.
+	/// </summary>
+	private void ApplyMemberFilter()
+	{
+		var term = MemberSearchText?.Trim();
+		var matches = string.IsNullOrEmpty(term)
+			? _allMembers
+			: _allMembers.Where(m => m.Matches(term));
+
+		Members.Clear();
+		foreach (var m in matches)
+			Members.Add(m);
+	}
+
+	[RelayCommand]
+	private async Task MoveMember(OverviewMember row)
+	{
+		if (row is null) return;
+
+		var parameters = new Dictionary<string, object>(StringComparer.Ordinal)
+		{
+			{ "memberId", row.Entity.Id.ToString(System.Globalization.CultureInfo.InvariantCulture) },
+		};
+		await Shell.Current.GoToAsync(nameof(MoveMemberPage), parameters);
 	}
 
 	// =================================================================
@@ -453,4 +530,54 @@ public partial class OverviewPosition : ObservableObject
 		_lastAppliedValue = registered;
 		IsRegistered = registered;
 	}
+}
+
+public enum OverviewTab
+{
+	Groups,
+	Positions,
+	Members,
+}
+
+/// <summary>
+/// Read-only row for the Members tab: a member and the group and position
+/// they are currently assigned to. Moving happens on
+/// <see cref="MoveMemberPage"/>, and the list reloads on return, so a row
+/// never changes in place.
+/// </summary>
+public sealed class OverviewMember
+{
+	public OverviewMember(Member entity) => Entity = entity;
+
+	public Member Entity { get; }
+
+	public bool HasGroup => Entity.HomeGroup is not null;
+
+	public bool HasPosition => Entity.IntergroupPosition is not null;
+
+	public string DisplayGroup
+	{
+		get
+		{
+			if (Entity.HomeGroup is null) return "No group";
+			return Entity.IsGsr ? $"{Entity.HomeGroup.Name} · GSR" : Entity.HomeGroup.Name;
+		}
+	}
+
+	public string DisplayPosition
+	{
+		get
+		{
+			if (Entity.IntergroupPosition is null) return "No position";
+			var name = Entity.IntergroupPosition.ShortDescription;
+			return string.IsNullOrWhiteSpace(Entity.IntergroupPositionRotation)
+				? name
+				: $"{name} · rotates {Entity.IntergroupPositionRotation}";
+		}
+	}
+
+	public bool Matches(string term) =>
+		Entity.AnonymousName.Contains(term, StringComparison.CurrentCultureIgnoreCase)
+		|| (Entity.HomeGroup?.Name.Contains(term, StringComparison.CurrentCultureIgnoreCase) ?? false)
+		|| (Entity.IntergroupPosition?.ShortDescription.Contains(term, StringComparison.CurrentCultureIgnoreCase) ?? false);
 }

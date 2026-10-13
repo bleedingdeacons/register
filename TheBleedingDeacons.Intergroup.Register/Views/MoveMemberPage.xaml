@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage x:Class="TheBleedingDeacons.Intergroup.Register.Views.MoveMemberPage"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:TheBleedingDeacons.Intergroup.Register.ViewModels"
+             xmlns:controls="clr-namespace:TheBleedingDeacons.Intergroup.Register.Controls"
+             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+             x:DataType="vm:MoveMemberViewModel"
+             Title="{Binding Title}">
+
+    <ContentPage.Behaviors>
+        <toolkit:StatusBarBehavior StatusBarColor="{AppThemeBinding Light=White, Dark=Black}"
+                                   StatusBarStyle="{AppThemeBinding Light=DarkContent, Dark=LightContent}"/>
+    </ContentPage.Behaviors>
+
+    <controls:PageScaffold IsBusy="{Binding IsLoading}"
+                           BusyMessage="Loading..."
+                           HasActionBar="True">
+
+        <controls:PageScaffold.ContentBody>
+            <ScrollView>
+                <VerticalStackLayout Spacing="16" MaximumWidthRequest="640">
+
+                    <!-- ═══ Current assignments ═══ -->
+                    <Border Style="{StaticResource M3CardStyle}">
+                        <VerticalStackLayout Spacing="6">
+                            <Label Text="{Binding MemberName}"
+                                   FontSize="20"
+                                   FontAttributes="Bold"
+                                   TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"/>
+                            <Label FontSize="14" Style="{StaticResource SecondaryTextStyle}">
+                                <Label.FormattedText>
+                                    <FormattedString>
+                                        <Span Text="Current group: " FontAttributes="Bold"/>
+                                        <Span Text="{Binding CurrentGroupText}"/>
+                                    </FormattedString>
+                                </Label.FormattedText>
+                            </Label>
+                            <Label FontSize="14" Style="{StaticResource SecondaryTextStyle}">
+                                <Label.FormattedText>
+                                    <FormattedString>
+                                        <Span Text="Current position: " FontAttributes="Bold"/>
+                                        <Span Text="{Binding CurrentPositionText}"/>
+                                    </FormattedString>
+                                </Label.FormattedText>
+                            </Label>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- ═══ Group ═══ -->
+                    <Border Style="{StaticResource M3CardStyle}">
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="Group" Style="{StaticResource FieldLabelStyle}"/>
+                            <Picker Title="Choose a group"
+                                    ItemsSource="{Binding GroupOptions}"
+                                    ItemDisplayBinding="{Binding Name, x:DataType=vm:AssignmentOption}"
+                                    SelectedItem="{Binding SelectedGroup, Mode=TwoWay}"
+                                    FontSize="18"
+                                    BackgroundColor="{AppThemeBinding Light={StaticResource Surface}, Dark={StaticResource Gray800}}"
+                                    TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"/>
+                            <Label Text="{Binding GroupNote}"
+                                   IsVisible="{Binding HasGroupNote}"
+                                   FontSize="13"
+                                   Style="{StaticResource SecondaryTextStyle}"/>
+                            <Grid ColumnDefinitions="*,Auto"
+                                  IsVisible="{Binding HasGroup}">
+                                <Label Grid.Column="0"
+                                       Text="GSR for this group"
+                                       FontSize="16"
+                                       VerticalOptions="Center"
+                                       TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"/>
+                                <Switch Grid.Column="1"
+                                        IsToggled="{Binding IsGsr, Mode=TwoWay}"
+                                        VerticalOptions="Center"/>
+                            </Grid>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- ═══ Position ═══ -->
+                    <Border Style="{StaticResource M3CardStyle}">
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="Position" Style="{StaticResource FieldLabelStyle}"/>
+                            <Picker Title="Choose a position"
+                                    ItemsSource="{Binding PositionOptions}"
+                                    ItemDisplayBinding="{Binding Name, x:DataType=vm:AssignmentOption}"
+                                    SelectedItem="{Binding SelectedPosition, Mode=TwoWay}"
+                                    FontSize="18"
+                                    BackgroundColor="{AppThemeBinding Light={StaticResource Surface}, Dark={StaticResource Gray800}}"
+                                    TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"/>
+                            <Label Text="{Binding PositionNote}"
+                                   IsVisible="{Binding HasPositionNote}"
+                                   FontSize="13"
+                                   Style="{StaticResource SecondaryTextStyle}"/>
+                            <VerticalStackLayout Spacing="4" IsVisible="{Binding HasPosition}">
+                                <Label Text="Rotation Date" Style="{StaticResource FieldLabelStyle}"/>
+                                <DatePicker Date="{Binding RotationDate, Mode=TwoWay}"
+                                            Format="yyyy-MM-dd"
+                                            MinimumDate="2020-01-01"
+                                            MaximumDate="2040-12-31"
+                                            FontSize="18"
+                                            BackgroundColor="{AppThemeBinding Light={StaticResource Surface}, Dark={StaticResource Gray800}}"
+                                            TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"/>
+                            </VerticalStackLayout>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <Label Text="Changes are saved on this tablet and sent to Unity when the meeting is finished."
+                           FontSize="13"
+                           HorizontalTextAlignment="Center"
+                           Style="{StaticResource SecondaryTextStyle}"/>
+
+                </VerticalStackLayout>
+            </ScrollView>
+        </controls:PageScaffold.ContentBody>
+
+        <!-- ═══ Action bar: Cancel / Move, centred in the middle 50% ═══ -->
+        <controls:PageScaffold.ActionBarBody>
+            <Grid ColumnDefinitions="*,2*,*">
+                <Grid Grid.Column="1"
+                      ColumnDefinitions="*,*"
+                      ColumnSpacing="12">
+                    <Button Grid.Column="0"
+                            Text="Cancel"
+                            Command="{Binding CancelCommand}"
+                            HorizontalOptions="Fill"
+                            Style="{StaticResource M3SecondaryButtonStyle}"/>
+                    <Button Grid.Column="1"
+                            Text="Move"
+                            Command="{Binding SaveCommand}"
+                            HorizontalOptions="Fill"
+                            Style="{StaticResource M3PrimaryButtonStyle}"/>
+                </Grid>
+            </Grid>
+        </controls:PageScaffold.ActionBarBody>
+
+    </controls:PageScaffold>
+
+</ContentPage>
