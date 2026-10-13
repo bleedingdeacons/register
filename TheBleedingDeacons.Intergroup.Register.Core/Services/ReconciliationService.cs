@@ -324,17 +324,23 @@ public class ReconciliationService
 
 			try
 			{
+				// UpdateMemberRequest leaves null fields out of the body, and
+				// Integrity reads an absent field as "keep". So a group or
+				// position cleared locally has to go as Unity's own "none" —
+				// 0 for an id, "" for a rotation (MemberController accepts
+				// both and skips the existence check for 0) — or the clear
+				// never reaches Unity.
 				var request = new UpdateMemberRequest
 				{
 					AnonymousName = changedProps.Contains(nameof(Member.AnonymousName)) ? member.AnonymousName : null,
 					PersonalEmail = changedProps.Contains(nameof(Member.PersonalEmail)) ? member.PersonalEmail : null,
 					MobileNumber = changedProps.Contains(nameof(Member.MobileNumber)) ? member.MobileNumber : null,
-					HomeGroupId = changedProps.Contains(nameof(Member.HomeGroupId)) ? member.HomeGroupId : null,
+					HomeGroupId = changedProps.Contains(nameof(Member.HomeGroupId)) ? member.HomeGroupId ?? 0 : null,
 					IsGsr = changedProps.Contains(nameof(Member.IsGsr)) ? member.IsGsr : null,
 					IntergroupPositionId = changedProps.Contains(nameof(Member.IntergroupPositionId))
-						? member.IntergroupPositionId : null,
+						? member.IntergroupPositionId ?? 0 : null,
 					IntergroupPositionRotation = changedProps.Contains(nameof(Member.IntergroupPositionRotation))
-						? member.IntergroupPositionRotation : null,
+						? member.IntergroupPositionRotation ?? string.Empty : null,
 				};
 
 				var response = await client.UpdateMemberAsync(member.Id, request, ct);

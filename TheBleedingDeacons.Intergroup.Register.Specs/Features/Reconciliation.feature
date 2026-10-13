@@ -97,6 +97,21 @@ Feature: Finishing the meeting
       And the meeting is finished
       Then Unity is told only "Ann B"'s new mobile number
 
+    # A field cleared on the tablet is a change like any other. Unity reads a
+    # field left out as "keep", so a clear is sent as Unity's own "none".
+
+    Scenario: A holder taken off their position is sent as holding none
+      Given "Ann B" holds the position "Treasurer" from "2026-09-01"
+      And the meeting has started
+      When "Ann B" is removed as the holder of "Treasurer"
+      And the meeting is finished
+      Then Unity is told "Ann B" no longer holds a position
+
+    Scenario: A member taken out of their home group is sent as having none
+      When "Ann B" is taken out of their home group
+      And the meeting is finished
+      Then Unity is told "Ann B" no longer has a home group
+
     Scenario: An acceptance is sent with its version and policy
       Given the cached privacy policy is version "2.1"
       And "Ann B" has accepted the privacy policy

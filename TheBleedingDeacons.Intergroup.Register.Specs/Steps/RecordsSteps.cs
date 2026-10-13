@@ -51,6 +51,13 @@ public sealed class RecordsSteps(World world)
 		world.Change(db => db.Members.Find(world.MemberId(name))!.IntergroupPositionId = positionId);
 	}
 
+	[Given(@"^""([^""]*)"" holds the position ""([^""]*)"" from ""([^""]*)""$")]
+	public void HoldsFrom(string name, string position, string rotation)
+	{
+		Holds(name, position);
+		world.Change(db => db.Members.Find(world.MemberId(name))!.IntergroupPositionRotation = rotation);
+	}
+
 	[Given(@"^""([^""]*)"" has never accepted the privacy policy$")]
 	public void NeverAccepted(string name) =>
 		world.Change(db => db.Members.Find(world.MemberId(name))!.GdprAccepted = null);
