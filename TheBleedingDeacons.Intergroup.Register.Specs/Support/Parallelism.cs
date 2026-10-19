@@ -9,4 +9,4 @@
 // The alternative is turning those statics into instances threaded through
 // the app, which is a production change made to suit a test host. This
 // suite is a few dozen in-memory scenarios; serialising it costs seconds.
-[assembly: CollectionBehavior(DisableTestParallelization = true)]
+[assembly: Xunit.v3.Parallelization(Mode = Xunit.Sdk.ParallelMode.None)]
