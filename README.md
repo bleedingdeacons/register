@@ -69,11 +69,11 @@ brings its officers with it, the last thing said about a group is what
 counts, a refused registration keeps the logs for next time.
 
 ```bash
-dotnet test TheBleedingDeacons.Intergroup.Register.Tests
+dotnet test --project TheBleedingDeacons.Intergroup.Register.Tests
 ```
 
 ```bash
-dotnet test TheBleedingDeacons.Intergroup.Register.Specs
+dotnet test --project TheBleedingDeacons.Intergroup.Register.Specs
 ```
 
 All three run in CI. The specs are a gate, not a contribution to the
