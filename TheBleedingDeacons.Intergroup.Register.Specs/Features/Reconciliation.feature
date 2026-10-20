@@ -45,6 +45,16 @@ Feature: Finishing the meeting
     When the meeting is finished
     Then Unity is told "Wednesday Steps" is no longer attending
 
+  Scenario: Unity no longer having a registration to withdraw is not a failure
+    Given the group "Wednesday Steps", already registered when the meeting started
+    And "Wil G" is a GSR of "Wednesday Steps"
+    And the meeting has started
+    And "Wednesday Steps" has been unregistered
+    And Unity has no registration to withdraw for groups
+    When the meeting is finished
+    Then the meeting finished with 0 errors and 0 warnings
+    And both logs are cleared
+
   Scenario: Unity already having the registration is not a failure
     Given "Monday Step" has been registered
     And Unity already has registrations of groups
@@ -68,7 +78,9 @@ Feature: Finishing the meeting
 
     A member added on the tablet has a temporary negative id that Unity has
     never seen. They are created before anything else is sent, and what
-    follows uses the id Unity gives them.
+    follows uses the id Unity gives them. Each create carries a reference
+    the tablet chose for that member, the same on every attempt, so a
+    create Unity has already carried out is never carried out twice.
 
     Scenario: A new GSR is created, and their group registered under the id Unity gave them
       Given the group "Friday Newcomers"
@@ -89,6 +101,28 @@ Feature: Finishing the meeting
       Then Unity is not told about "Friday Newcomers"
       And the meeting finished with 1 error and 0 warnings
       And the logs are kept for next time
+
+    Scenario: A create whose reply is lost is not made twice
+      Given the group "Friday Newcomers"
+      And the meeting has started
+      And "Fay H" is added at the meeting as a GSR of "Friday Newcomers"
+      And "Friday Newcomers" has been registered
+      And Unity creates new members but the first reply is lost
+      When the meeting is finished
+      Then Unity has one member called "Fay H"
+      And Unity is told "Friday Newcomers" attended, represented by member 900
+      And the meeting finished with 0 errors and 0 warnings
+
+    Scenario: A new member Unity would not create is sent under the same reference next time
+      Given the group "Friday Newcomers"
+      And the meeting has started
+      And "Fay H" is added at the meeting as a GSR of "Friday Newcomers"
+      And Unity refuses new members
+      When the meeting is finished
+      And Unity accepts new members again
+      And the meeting is finished
+      Then every request to create "Fay H" carried the same reference
+      And Unity has one member called "Fay H"
 
   Rule: Only what changed is sent
 
