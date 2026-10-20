@@ -89,14 +89,8 @@ jobs:
         with:
           global-json-file: global.json
 
-      # Pinned to a workload set, not left to resolve the newest. 10.0.402.1
-      # went out naming microsoft.net.sdk.ios 27.1.10018, which nuget.org did
-      # not have, and installing any workload from a set installs every
-      # manifest in it — so maui-android failed on a missing iOS manifest.
-      # 10.0.402 is what the last green build on main used. Move this on
-      # deliberately, together with the Windows job below.
       - name: Install MAUI Android workload
-        run: dotnet workload install maui-android --version 10.0.402
+        run: dotnet workload install maui-android
 
       # appsettings.json is git-ignored (it can hold environment-specific
       # config) but is embedded unconditionally by the app. CI only needs the
@@ -154,9 +148,8 @@ jobs:
           global-json-file: global.json
 
       # No JDK and no Android SDK here — the Windows head needs neither.
-      # Same workload set as the Android job; see the comment there.
       - name: Install MAUI Windows workload
-        run: dotnet workload install maui-windows --version 10.0.402
+        run: dotnet workload install maui-windows
 
       # See the Android job for why this placeholder is needed.
       - name: Ensure git-ignored appsettings.json exists
