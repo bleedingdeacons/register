@@ -22,11 +22,12 @@
 		assemblies come from the MAUI workload and this project does not
 		have it.
 
-		That constraint is why three seams exist. The event logs take the
+		That constraint is why four seams exist. The event logs take the
 		directory they write to rather than reaching for FileSystem; the
 		email service takes a network probe rather than asking Connectivity,
 		and an SMTP client factory rather than newing one up; the temporary
-		id counter takes a store rather than writing to Preferences. Each of
+		id counter and the Unity site guard each take a store rather than
+		writing to Preferences. Each of
 		those is the seam a platform detail would otherwise have been
 		welded across, and each is the one a test drives.
 

@@ -98,22 +98,38 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 				var config = services.GetRequiredService<IConfigurationService>();
 				config.InvalidateCache();
 
-				var touched = change.Updated.Concat(change.Removed).ToList();
+				// Which parts of the running tablet hold what changed is
+				// FreedomChangePlan's to say, key by key; this only acts on it.
+				var plan = FreedomChangePlan.For(change.Updated, change.Removed);
 
-				if (touched.Any(k => k.StartsWith("smtp.", StringComparison.Ordinal)))
+				if (plan.Has(FreedomEffects.Smtp))
 				{
 					services.GetRequiredService<IEmailService>()
 						.UpdateConfigurationAsync(config.GetSmtpConfiguration())
 						.SafeFireAndForget("FreedomSmtpUpdate");
 				}
 
-				if (touched.Any(k => k.StartsWith("betterstack.", StringComparison.Ordinal)))
+				if (plan.Has(FreedomEffects.LogShipping))
 				{
 					services.GetRequiredService<ILogShipper>()
 						.Ship(config.GetBetterStackConfiguration());
 				}
 
-				Logger.Information("Freedom changed {Keys}; applied", string.Join(", ", touched));
+				if (plan.Has(FreedomEffects.UnitySite))
+				{
+					WarnIfUnitySiteChangedAsync(services).SafeFireAndForget("FreedomUnitySiteCheck");
+				}
+
+				if (plan.Unused.Count > 0)
+				{
+					Logger.Information(
+						"Freedom holds {Keys}, which this build does not read; the site may be set up for a newer build",
+						string.Join(", ", plan.Unused));
+				}
+
+				Logger.Information(
+					"Freedom changed {Keys}; applied {Effects}",
+					string.Join(", ", change.Updated.Concat(change.Removed)), plan.Effects);
 			}
 			catch (Exception ex)
 			{
@@ -121,6 +137,35 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 				// whatever happens here.
 				Logger.Warning(ex, "Freedom: a configuration change could not be applied until the next start");
 			}
+		}
+
+		/// <summary>
+		/// Tells the operator, as soon as it happens, that the tablet now
+		/// points at a different Unity site from the one its records came
+		/// from — rather than leaving them to find out at Finish Meeting.
+		/// Nothing is changed here: <see cref="UnitySiteGuard"/> refuses the
+		/// load or finish that would mix the two, whenever it is tried.
+		/// </summary>
+		private static async Task WarnIfUnitySiteChangedAsync(IServiceProvider services)
+		{
+			var check = await services.GetRequiredService<UnitySiteGuard>().CheckAsync().ConfigureAwait(false);
+			if (!check.Changed)
+				return;
+
+			Logger.Warning(
+				"Freedom moved Unity from {RecordsFrom} to {ConfiguredSite}; unsent work: {HasUnsentWork}",
+				check.RecordsFrom, check.ConfiguredSite, check.HasUnsentWork);
+
+			var message = check.HasUnsentWork
+				? $"This tablet's records came from {check.RecordsFrom}, and have not all been sent. " +
+				  $"Freedom now points it at {check.ConfiguredSite}, so they will not be sent there. " +
+				  $"Point Freedom back at {check.RecordsFrom} and finish the meeting, or Reset Device to discard them."
+				: $"This tablet's records came from {check.RecordsFrom}. Freedom now points it at " +
+				  $"{check.ConfiguredSite}: Load Unity before the next meeting.";
+
+			using var scope = services.CreateScope();
+			var popups = scope.ServiceProvider.GetRequiredService<IPopupNotification>();
+			await MainThread.InvokeOnMainThreadAsync(() => popups.ShowErrorAsync("Unity site changed", message)).ConfigureAwait(false);
 		}
 	}
 }

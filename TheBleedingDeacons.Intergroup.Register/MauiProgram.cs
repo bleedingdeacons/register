@@ -122,6 +122,11 @@ public static class MauiProgram
 		builder.Services.AddSingleton(_ => new RegistrationEventLog(Path.Combine(eventLogDirectory, RegistrationEventLog.FileName)));
 		builder.Services.AddSingleton(_ => new ComplianceEventLog(Path.Combine(eventLogDirectory, ComplianceEventLog.FileName)));
 
+		// Which Unity site the records came from, so a Freedom change to
+		// unity.base_url cannot send them to another. See UnitySiteGuard.
+		builder.Services.AddSingleton<IUnitySiteStore, PreferencesUnitySiteStore>();
+		builder.Services.AddSingleton<UnitySiteGuard>();
+
 		// Before anything can create a member: until this runs the temporary
 		// id counter lives in memory only. See TemporaryIdGenerator.
 		TemporaryIdGenerator.Use(new PreferencesTemporaryIdStore());

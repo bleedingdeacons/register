@@ -143,3 +143,33 @@ Feature: Finishing the meeting
     And "Monday Step" has been registered
     When the meeting is finished
     Then Unity is not told about "Monday Step"
+
+  Rule: Records go back to the Unity site they came from
+
+    An id means something only on the site that issued it: group 12 on the
+    test site is not group 12 on the live one. Load Unity records which site
+    the tablet's records came from. If Freedom has since pointed the tablet
+    at another, finishing sends nothing at all and keeps everything, so the
+    operator can point Freedom back and finish, or Reset Device to discard.
+
+    Scenario: Freedom moved the tablet to another site, and nothing is sent
+      Given the tablet's records came from "https://aa-bristol.org/amber"
+      And Freedom now points Unity at "https://aa-bristol.org"
+      And "Monday Step" has been registered
+      When the meeting is finished
+      Then finishing is refused because the Unity site changed
+      And Unity is sent nothing
+      And the logs are kept for next time
+
+    Scenario: The same site written differently is the same site
+      Given the tablet's records came from "https://aa-bristol.org/amber"
+      And Freedom now points Unity at "HTTPS://AA-Bristol.org/amber/"
+      And "Monday Step" has been registered
+      When the meeting is finished
+      Then Unity is told "Monday Step" attended, represented by "Ann B"
+
+    Scenario: A tablet that never recorded its site finishes as it always did
+      Given Freedom now points Unity at "https://aa-bristol.org"
+      And "Monday Step" has been registered
+      When the meeting is finished
+      Then Unity is told "Monday Step" attended, represented by "Ann B"

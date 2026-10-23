@@ -131,6 +131,20 @@ has no Freedom sign-in and so runs with no settings.
 - **Nothing waits on the network.** Each start reads what Freedom stored last
   time, then syncs in the background; a change is applied as it arrives — the
   email service and Better Stack sink are reconfigured, no restart needed.
+- **Each key says what a change to it sets off**, in
+  `Register.Core/Services/FreedomChangePlan.cs`: the mail queue, the log
+  shipper, a Unity site check, or nothing because it is read afresh each time.
+  A test fails if a key in `FreedomSettings` has no entry, so a new key cannot
+  be added without deciding that. A key the site holds and this build does not
+  read is logged as unused — usually the site was set up for a newer build.
+- **A tablet will not send one Unity site's records to another.** Load Unity
+  records which site it fetched from (`UnitySiteGuard`). If Freedom then points
+  `unity.base_url` somewhere else, the tablet says so as soon as the change
+  arrives. Finish Meeting then sends nothing, and Load Unity refuses to load
+  over unsent registrations or consent. Nothing is discarded: point Freedom
+  back and finish, or Reset Device, which deletes both logs and forgets the
+  site. The same site with a trailing slash or in different case is the same
+  site; `/amber` and the root are not.
 - **There is no `devsettings.json` any more**, and no `UseDevCredentials`
   switch. A Debug build used to embed one — whose Unity address was the live
   site, which is how a test tablet ended up synced from live. Any copies left

@@ -24,6 +24,7 @@ public class DataService
     private readonly IPositionRepository _positionRepository;
     private readonly IScrutinyClient _scrutinyClient;
     private readonly IPrivacyPolicyCache _privacyPolicyCache;
+    private readonly UnitySiteGuard _siteGuard;
 
     public DataService(
         UnitySyncService syncService,
@@ -32,7 +33,8 @@ public class DataService
         IMeetingRepository meetingRepository,
         IPositionRepository positionRepository,
         IScrutinyClient scrutinyClient,
-        IPrivacyPolicyCache privacyPolicyCache)
+        IPrivacyPolicyCache privacyPolicyCache,
+        UnitySiteGuard siteGuard)
     {
         _syncService = syncService;
         _snapshotService = snapshotService;
@@ -41,6 +43,7 @@ public class DataService
         _positionRepository = positionRepository;
         _scrutinyClient = scrutinyClient;
         _privacyPolicyCache = privacyPolicyCache;
+        _siteGuard = siteGuard;
     }
 
     // ====================================================================
@@ -69,6 +72,11 @@ public class DataService
         {
             Logger.Information("Starting Unity sync with snapshot capture");
 
+            // Before the policy refresh, which asks the configured site
+            // too: unsent work from another site must not be buried under
+            // this one's records, nor its policy cached over theirs.
+            await _siteGuard.EnsureCanReplaceAsync();
+
             // Privacy-policy gate — runs before the main data sync so
             // the meeting can't be started against a missing policy.
             // On 404 this throws NoActivePrivacyPolicyException, which
@@ -81,6 +89,9 @@ public class DataService
 
             var sync = await _syncService.SyncAsync(cancellationToken, progress);
             var snap = await _snapshotService.CaptureAsync(cancellationToken, progress);
+
+            // The replica is now this site's, whatever it held before.
+            await _siteGuard.RecordAsync();
 
             progress?.Report(new SyncProgress(SyncStage.Complete, "Done"));
 
@@ -121,6 +132,10 @@ public class DataService
         try
         {
             Logger.Information("Starting Unity reconciliation");
+
+            // ReconcileAsync checks this too, but by then the policy
+            // refresh below would have cached the other site's policy.
+            await _siteGuard.EnsureCanSendAsync();
 
             // Same privacy-policy gate as ImportWithSnapshotAsync.
             // The reconciliation flow no longer pulls fresh state from
