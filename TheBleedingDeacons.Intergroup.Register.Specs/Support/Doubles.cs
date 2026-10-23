@@ -222,3 +222,13 @@ public sealed class InMemoryTemporaryIdStore : ITemporaryIdStore
 
 	public void Set(int value) => Value = value;
 }
+
+/// <summary>The site the tablet's records came from. The real one is a Preferences key.</summary>
+public sealed class InMemoryUnitySiteStore : IUnitySiteStore
+{
+	public string? Site { get; set; }
+
+	public string? Get() => Site;
+
+	public void Set(string? site) => Site = site;
+}

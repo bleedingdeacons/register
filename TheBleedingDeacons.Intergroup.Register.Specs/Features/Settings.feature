@@ -59,3 +59,31 @@ Feature: Where the tablet's settings come from
         | in.logs.example          | are     |
         | http://in.logs.example   | are not |
         |                          | are not |
+
+  Rule: A change from Freedom reaches whatever still holds the old value
+
+    A sync can change any key at any time, and the tablet does not restart
+    for it. Most settings are read afresh each time they are used, so
+    nothing needs doing. The mail queue and the log shipper hold theirs,
+    so they are given the new ones. A new Unity site is checked against the
+    site the tablet's records came from. A key this build does not read is
+    reported, not ignored: usually the site has been set up for a newer
+    build.
+
+    Scenario Outline: What a change to a key sets off
+      When Freedom changes "<key>"
+      Then the tablet <does>
+
+      Examples:
+        | key                      | does                                  |
+        | smtp.password            | gives the mail queue its new settings |
+        | smtp.port                | gives the mail queue its new settings |
+        | betterstack.source_token | restarts log shipping                 |
+        | unity.base_url           | checks which Unity site it is on      |
+        | unity.api_key            | rebuilds nothing                      |
+        | compliance.email         | rebuilds nothing                      |
+        | scrutiny.base_url        | reports a key it does not read        |
+
+    Scenario: A key Freedom stops holding is a change too
+      When Freedom stops holding "betterstack.endpoint"
+      Then the tablet restarts log shipping

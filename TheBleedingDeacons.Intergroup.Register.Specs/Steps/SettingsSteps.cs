@@ -19,9 +19,37 @@ public sealed class SettingsSteps
 	private readonly RecordingLogShipper _shipper = new();
 	private bool _optionsRead;
 	private object? _options;
+	private FreedomChangePlan? _plan;
 
 	[Given(@"^Freedom holds ""([^""]*)"" for ""([^""]*)""$")]
 	public void FreedomHolds(string value, string key) => _managed[key] = value;
+
+	[When(@"^Freedom changes ""([^""]*)""$")]
+	public void FreedomChanges(string key) => _plan = FreedomChangePlan.For([key], []);
+
+	[When(@"^Freedom stops holding ""([^""]*)""$")]
+	public void FreedomStopsHolding(string key) => _plan = FreedomChangePlan.For([], [key]);
+
+	[Then(@"^the tablet (gives the mail queue its new settings|restarts log shipping|checks which Unity site it is on|rebuilds nothing|reports a key it does not read)$")]
+	public void ChangeSetsOff(string does)
+	{
+		var plan = _plan.ShouldNotBeNull();
+
+		// Exactly the one effect, so a key cannot quietly set off two.
+		var expected = does switch
+		{
+			"gives the mail queue its new settings" => FreedomEffects.Smtp,
+			"restarts log shipping" => FreedomEffects.LogShipping,
+			"checks which Unity site it is on" => FreedomEffects.UnitySite,
+			_ => FreedomEffects.None,
+		};
+		plan.Effects.ShouldBe(expected);
+
+		if (does == "reports a key it does not read")
+			plan.Unused.ShouldNotBeEmpty();
+		else
+			plan.Unused.ShouldBeEmpty();
+	}
 
 	[Given(@"^Freedom holds nothing$")]
 	public void FreedomHoldsNothing() => _managed.Clear();

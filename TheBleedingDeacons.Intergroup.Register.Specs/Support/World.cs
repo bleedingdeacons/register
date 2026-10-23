@@ -100,8 +100,13 @@ public sealed class World : IDisposable
 
 	public UnitySyncService Sync => new(Tablet, UnityClient, NullLogger<UnitySyncService>.Instance);
 
+	/// <summary>The Unity site the tablet's records came from.</summary>
+	public InMemoryUnitySiteStore RecordsSite { get; } = new();
+
+	public UnitySiteGuard SiteGuard => new(Settings, RecordsSite, RegistrationLog, ComplianceLog);
+
 	public ReconciliationService Reconciliation =>
-		new(Snapshots, Sync, Settings, UnityClient, Tablet, RegistrationLog, ComplianceLog);
+		new(Snapshots, Sync, Settings, UnityClient, Tablet, RegistrationLog, ComplianceLog, SiteGuard);
 
 	/// <summary>The real Unity client, talking to <see cref="Unity"/>.</summary>
 	public Func<Task<UnityRestSharp>> UnityClient => () => Task.FromResult(

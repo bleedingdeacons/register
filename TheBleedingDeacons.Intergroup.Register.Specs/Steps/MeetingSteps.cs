@@ -1,6 +1,7 @@
 using System.Net;
 using Reqnroll;
 using Shouldly;
+using TheBleedingDeacons.Intergroup.Register.Exceptions;
 using TheBleedingDeacons.Intergroup.Register.Specs.Support;
 
 namespace TheBleedingDeacons.Intergroup.Register.Specs.Steps;
@@ -29,7 +30,32 @@ public sealed class MeetingSteps(World world)
 	public void NoSnapshot() => world.Change(db => db.EntitySnapshots.RemoveRange(db.EntitySnapshots));
 
 	[When(@"^the meeting is finished$")]
-	public async Task Finished() => world.Reconciled = await world.Reconciliation.ReconcileAsync();
+	public async Task Finished()
+	{
+		try
+		{
+			world.Reconciled = await world.Reconciliation.ReconcileAsync();
+		}
+		catch (UnitySiteChangedException ex)
+		{
+			// The one refusal a scenario sets out to provoke; anything
+			// else still fails the scenario where it is thrown.
+			world.Failure = ex;
+		}
+	}
+
+	[Given(@"^the tablet's records came from ""([^""]*)""$")]
+	public void RecordsCameFrom(string site) => world.RecordsSite.Site = site;
+
+	[Given(@"^Freedom now points Unity at ""([^""]*)""$")]
+	public void FreedomPointsAt(string site) => world.Settings.Unity.BaseUrl = site;
+
+	[Then(@"^finishing is refused because the Unity site changed$")]
+	public void RefusedForSite()
+	{
+		world.Failure.ShouldBeOfType<UnitySiteChangedException>();
+		world.Reconciled.ShouldBeNull();
+	}
 
 	[Given(@"^Unity (refuses|already has) (registrations of groups|registrations of officers|new members|consent records|member updates)$")]
 	public void Unity(string how, string what) =>

@@ -22,6 +22,8 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 		private readonly IConfigurationService _configService;
 		private readonly IDbContextFactory<UnityDbContext> _dbContextFactory;
 		private readonly RegistrationEventLog _eventLog;
+		private readonly ComplianceEventLog _complianceLog;
+		private readonly UnitySiteGuard _siteGuard;
 		private readonly ILogShipper _logShipper;
 		private readonly IScrutinyClient _scrutinyClient;
 		private readonly IPrivacyPolicyCache _privacyPolicyCache;
@@ -149,6 +151,8 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 			IConfigurationService configService,
 			IDbContextFactory<UnityDbContext> dbContextFactory,
 			RegistrationEventLog eventLog,
+			ComplianceEventLog complianceLog,
+			UnitySiteGuard siteGuard,
 			ILogShipper logShipper,
 			IScrutinyClient scrutinyClient,
 			IPrivacyPolicyCache privacyPolicyCache)
@@ -156,6 +160,8 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 			_configService = configService;
 			_dbContextFactory = dbContextFactory;
 			_eventLog = eventLog;
+			_complianceLog = complianceLog;
+			_siteGuard = siteGuard;
 			_logShipper = logShipper;
 			_scrutinyClient = scrutinyClient;
 			_privacyPolicyCache = privacyPolicyCache;
@@ -583,7 +589,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 
 		/// <summary>
 		/// Resets the device: purges all data from the local database AND
-		/// deletes the registration event log if present. The two actions
+		/// deletes both event logs if present. The two actions
 		/// are logically paired — leaving the log behind after a database
 		/// purge would cause the next startup replay to resurrect rows
 		/// that no longer have corresponding groups/positions, producing
@@ -599,7 +605,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 		{
 			bool confirmed = await Shell.Current.DisplayAlertAsync(
 				"Reset Device",
-				"This will permanently delete ALL local data including groups, members, meetings, positions, and snapshots, and clear the registration event log.\n\nThis action cannot be undone. Are you sure?",
+				"This will permanently delete ALL local data including groups, members, meetings, positions, and snapshots, and clear the registration and compliance event logs.\n\nThis action cannot be undone. Are you sure?",
 				"Yes, Reset Device",
 				"No, Keep Data");
 
@@ -638,7 +644,17 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 				// already been successfully wiped, and reporting "reset
 				// failed" would mislead the operator into retrying a
 				// destructive action that already completed.
-				TryDeleteRegistrationLog();
+				//
+				// Both logs. The compliance log was left behind until
+				// 2026-10-23, though OnDevice.feature says both go: a
+				// reset could then replay one site's consent into the
+				// next site's members.
+				TryDeleteLog("Registration", _eventLog.LogPath);
+				TryDeleteLog("Compliance", _complianceLog.LogPath);
+
+				// No records left, so they come from no site, and the next
+				// Load Unity may come from any. See UnitySiteGuard.
+				_siteGuard.Forget();
 
 				ShowPurgeStatus("Device reset successfully.", false);
 				Logger.Information("Device reset successfully from Settings");
@@ -654,15 +670,14 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 			}
 		}
 
-		private void TryDeleteRegistrationLog()
+		private static void TryDeleteLog(string which, string path)
 		{
 			try
 			{
-				var path = _eventLog.LogPath;
 				if (File.Exists(path))
 				{
 					File.Delete(path);
-					Logger.Information("Registration event log deleted as part of device reset: {Path}", path);
+					Logger.Information("{Which} event log deleted as part of device reset: {Path}", which, path);
 				}
 			}
 			catch (Exception ex)
@@ -670,7 +685,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 				// Swallow — see comment in PurgeDatabase. The DB has
 				// already been purged; surfacing this as a user-facing
 				// failure would do more harm than good.
-				Logger.Warning(ex, "Failed to delete registration event log during device reset");
+				Logger.Warning(ex, "Failed to delete {Which} event log during device reset", which);
 			}
 		}
 

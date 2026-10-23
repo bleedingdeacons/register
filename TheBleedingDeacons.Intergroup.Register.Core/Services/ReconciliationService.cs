@@ -65,6 +65,7 @@ public class ReconciliationService
 	private readonly IDbContextFactory<UnityDbContext> _dbContextFactory;
 	private readonly RegistrationEventLog _eventLog;
 	private readonly ComplianceEventLog _complianceLog;
+	private readonly UnitySiteGuard _siteGuard;
 
 	public ReconciliationService(
 		SnapshotService snapshotService,
@@ -73,7 +74,8 @@ public class ReconciliationService
 		Func<Task<UnityRestSharp>> clientFactory,
 		IDbContextFactory<UnityDbContext> dbContextFactory,
 		RegistrationEventLog eventLog,
-		ComplianceEventLog complianceLog)
+		ComplianceEventLog complianceLog,
+		UnitySiteGuard siteGuard)
 	{
 		_snapshotService = snapshotService;
 		_syncService = syncService;
@@ -82,6 +84,7 @@ public class ReconciliationService
 		_dbContextFactory = dbContextFactory;
 		_eventLog = eventLog;
 		_complianceLog = complianceLog;
+		_siteGuard = siteGuard;
 	}
 
 	// =====================================================================
@@ -120,6 +123,12 @@ public class ReconciliationService
 		CancellationToken ct = default,
 		IProgress<SyncProgress>? progress = null)
 	{
+		// Before anything is replayed, detected or sent: the records came
+		// from one Unity site, and Freedom may since have pointed the
+		// tablet at another. Refused, the logs and replica stay as they
+		// are for whichever way the operator resolves it. See UnitySiteGuard.
+		await _siteGuard.EnsureCanSendAsync().ConfigureAwait(false);
+
 		// One context for the whole reconcile — detect / push / stamp
 		// all share a consistent view of local state.
 		await using var db = await _dbContextFactory.CreateDbContextAsync(ct);
