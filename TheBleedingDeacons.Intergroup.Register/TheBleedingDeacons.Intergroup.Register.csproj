@@ -198,9 +198,10 @@
 
 			This used to be an unconditional AndroidKeyStore=True alongside
 			AndroidSigningKeyStore=register.keystore — a file that has never
-			existed in this repo. The real signing key is badi.keystore, which
-			lives outside the tree and is passed in by build-register.ps1, so
-			the declared default was dead weight that only ever fired as
+			existed in this repo. The real key is the Play upload key,
+			register-upload.keystore, which lives in C:\Data\dev\auth outside the
+			tree and is passed in by /acceptance (acceptance.ps1), so the
+			declared default was dead weight that only ever fired as
 			XA4310 ("keystore file could not be found") the moment anyone ran a
 			plain `dotnet publish -c Release`. Signing a release is a
 			deliberate act with a password attached; it should not be the
@@ -213,9 +214,13 @@
 			no-keystore case goes unsigned, which is what CI and any local
 			size/verification build actually wants.
 
-			Explicit values always win, so build-register.ps1 — which passes
-			AndroidKeyStore=true along with the key path and passwords — is
+			Explicit values always win, so acceptance.ps1 — which passes the key
+			path and alias, with the password through the environment — is
 			untouched by either condition.
+
+			build-register.ps1, which signed an APK with badi.keystore, is gone:
+			Google holds the app signing key since the move to Play, so a
+			badi-signed build could no longer update any tablet.
 		-->
 		<AndroidKeyStore Condition="'$(AndroidKeyStore)' == '' and '$(AndroidSigningKeyStore)' != ''">true</AndroidKeyStore>
 		<AndroidKeyStore Condition="'$(AndroidKeyStore)' == ''">false</AndroidKeyStore>
