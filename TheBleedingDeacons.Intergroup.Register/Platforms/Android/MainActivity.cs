@@ -1,4 +1,5 @@
 ﻿using Android.App;
+using Android.Content;
 using Android.Content.PM;
 using Android.OS;
 using Android.Views;
@@ -16,6 +17,15 @@ public class MainActivity : MauiAppCompatActivity
 	{
 		base.OnCreate(savedInstanceState);
 		HideNavigationBar();
+	}
+
+	protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
+	{
+		// The screen-lock prompt below Android 11 answers here.
+		if (Services.AndroidScreenLockPrompt.OnActivityResult(requestCode, resultCode))
+			return;
+
+		base.OnActivityResult(requestCode, resultCode, data);
 	}
 
 	public override void OnWindowFocusChanged(bool hasFocus)

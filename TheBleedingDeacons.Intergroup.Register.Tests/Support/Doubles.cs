@@ -316,3 +316,13 @@ public sealed class FakeTemporaryIdStore : ITemporaryIdStore
 		Value = value;
 	}
 }
+
+/// <summary>A clock that moves only when told to.</summary>
+public sealed class ManualTimeProvider : TimeProvider
+{
+	private DateTimeOffset _now = new(2026, 10, 27, 19, 30, 0, TimeSpan.Zero);
+
+	public override DateTimeOffset GetUtcNow() => _now;
+
+	public void Advance(TimeSpan by) => _now += by;
+}

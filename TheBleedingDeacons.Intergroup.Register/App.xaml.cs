@@ -1,20 +1,33 @@
 ﻿using Serilog;
+using TheBleedingDeacons.Intergroup.Register.Services;
+using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 
 namespace TheBleedingDeacons.Intergroup.Register;
 
 public partial class App : Application
 {
-	public App()
+	private readonly OperatorLock _operatorLock;
+	private readonly IScreenLockPrompt _screenLockPrompt;
+
+	public App(OperatorLock operatorLock, IScreenLockPrompt screenLockPrompt)
 	{
+		_operatorLock = operatorLock;
+		_screenLockPrompt = screenLockPrompt;
+
 		InitializeComponent();
 	}
 
 	protected override Window CreateWindow(IActivationState? activationState)
 	{
-		var window = new Window(new AppShell())
+		var shell = new AppShell(_operatorLock, _screenLockPrompt);
+		var window = new Window(shell)
 		{
 			Title = "Intergroup"
 		};
+
+		// The operator's pages close behind an app that was away too long.
+		window.Stopped += (_, _) => shell.OnAppStopped();
+		window.Resumed += (_, _) => shell.OnAppResumed();
 
 		// ── Lifecycle breadcrumbs for reconstructing sessions in Better Stack ──
 		//
