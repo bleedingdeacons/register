@@ -130,6 +130,17 @@ public sealed class World : IDisposable
 
 	public int MemberId(string name) => _members.TryGetValue(name, out var id) ? id : throw new KeyNotFoundException($"No member called \"{name}\" in this scenario.");
 
+	/// <summary>
+	/// The id the tablet holds the member under now. A member added at the
+	/// meeting starts with a temporary id and takes Unity's when a finish
+	/// creates them, so after one this can differ from <see cref="MemberId"/>.
+	/// </summary>
+	public int CurrentMemberId(string name)
+	{
+		using var db = Db();
+		return db.Members.AsNoTracking().Single(m => m.AnonymousName == name).Id;
+	}
+
 	public bool HasGroup(string name) => _groups.ContainsKey(name);
 
 	public bool HasPosition(string name) => _positions.ContainsKey(name);

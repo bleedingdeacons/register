@@ -90,6 +90,42 @@ Feature: Finishing the meeting
       And the meeting finished with 1 error and 0 warnings
       And the logs are kept for next time
 
+    Scenario: A new member is held under the id Unity gave them as soon as they are created
+      Given the group "Friday Newcomers"
+      And the meeting has started
+      And "Fay H" is added at the meeting as a GSR of "Friday Newcomers"
+      When the meeting is finished
+      Then the tablet holds "Fay H" as member 900
+
+    # Retry Sync used to create every new member again: the id Unity gave
+    # them was kept only in memory, so the next attempt still saw a
+    # temporary member. Each retry put another copy of their details on Unity.
+
+    Scenario: Finishing again after a refusal does not create the new member twice
+      Given the group "Friday Newcomers"
+      And the meeting has started
+      And "Fay H" is added at the meeting as a GSR of "Friday Newcomers"
+      And "Friday Newcomers" has been registered
+      And Unity refuses registrations of groups
+      When the meeting is finished
+      And Unity accepts registrations of groups again
+      And the meeting is finished
+      Then Unity is asked to create "Fay H"
+      And the last registration of "Friday Newcomers" was represented by member 900
+      And the meeting finished with 0 errors and 0 warnings
+      And both logs are cleared
+
+    Scenario: A new member's consent is sent under the id Unity gave them
+      Given the cached privacy policy is version "2.1"
+      And the group "Friday Newcomers"
+      And the meeting has started
+      And "Fay H" is added at the meeting as a GSR of "Friday Newcomers"
+      And "Fay H" has accepted the privacy policy
+      When the meeting is finished
+      Then Unity is asked to create "Fay H"
+      And Unity is told "Fay H" accepted version "2.1" of policy 42
+      And the meeting finished with 0 errors and 0 warnings
+
   Rule: Only what changed is sent
 
     Scenario: A changed phone number is sent on its own
