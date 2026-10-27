@@ -25,7 +25,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Models
         /// The privacy / GDPR statement the recipient accepted at
         /// registration, included in the welcome email so they have a
         /// written record of the wording they consented to. Resolves
-        /// into the <c>{{Policy}}</c> placeholder in
+        /// into the <c>{{{Policy}}}</c> placeholder (raw HTML) in
         /// <c>Templates/WelcomeEmail.html</c>.
         ///
         /// Populated per-recipient from <c>Member.GdprAcceptanceStatement</c>
