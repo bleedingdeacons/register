@@ -63,6 +63,19 @@ public sealed class MeetingSteps(World world)
 			? (HttpStatusCode.UnprocessableEntity, "rest_invalid_param")
 			: (HttpStatusCode.Conflict, "already_registered");
 
+	[When(@"^Unity accepts (registrations of groups|registrations of officers|new members|consent records|member updates) again$")]
+	public void UnityAcceptsAgain(string what) => world.Unity.Refusals.Remove(Routes[what]);
+
+	[Then(@"^the last registration of ""([^""]*)"" was represented by member (\d+)$")]
+	public void LastGroupRegistration(string group, int memberId)
+	{
+		var id = world.GroupId(group);
+		world.Unity.Posts("/register-group").Last(c => c.Int("group_id") == id).Int("member_id").ShouldBe(memberId);
+	}
+
+	[Then(@"^the tablet holds ""([^""]*)"" as member (\d+)$")]
+	public void HeldAs(string name, int memberId) => world.CurrentMemberId(name).ShouldBe(memberId);
+
 	[When(@"^""([^""]*)""'s mobile number is changed to ""([^""]*)""$")]
 	public void MobileChanged(string name, string mobile) =>
 		world.Change(db => db.Members.Find(world.MemberId(name))!.MobileNumber = mobile);
@@ -162,7 +175,7 @@ public sealed class MeetingSteps(World world)
 	[Then(@"^Unity is told ""([^""]*)"" accepted version ""([^""]*)"" of policy (\d+)$")]
 	public void ConsentSent(string name, string version, int policyId)
 	{
-		var call = world.Unity.Posts($"/members/{world.MemberId(name)}/compliance").ShouldHaveSingleItem();
+		var call = world.Unity.Posts($"/members/{world.CurrentMemberId(name)}/compliance").ShouldHaveSingleItem();
 		call.Bool("accepted").ShouldBe(true);
 		call.Str("version").ShouldBe(version);
 		call.Int("policy_id").ShouldBe(policyId);

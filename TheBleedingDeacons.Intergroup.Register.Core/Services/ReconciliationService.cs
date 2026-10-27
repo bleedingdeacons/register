@@ -6,6 +6,7 @@ using TheBleedingDeacons.Unity.Client;
 using TheBleedingDeacons.Unity.Intergroup.Data;
 using TheBleedingDeacons.Unity.Intergroup.Services;
 using TheBleedingDeacons.Unity.Models;
+using EntitySnapshot = TheBleedingDeacons.Unity.Intergroup.Entities.EntitySnapshot;
 using Group = TheBleedingDeacons.Unity.Intergroup.Entities.Group;
 using Member = TheBleedingDeacons.Unity.Intergroup.Entities.Member;
 using Position = TheBleedingDeacons.Unity.Intergroup.Entities.Position;
@@ -35,6 +36,14 @@ namespace TheBleedingDeacons.Intergroup.Register.Services;
 /// must be created on Unity first so a real ID is returned. That real ID
 /// is then used for any subsequent registration calls that reference
 /// the member.
+///
+/// <b>A created member is created once, however many attempts it takes.</b>
+/// The real ID is written into the local row the moment Unity hands it
+/// back, together with a snapshot of the member as Unity now holds it, so
+/// a retry after a later refusal finds an ordinary member rather than a
+/// temporary one. Before this the mapping lived only in memory, and every
+/// Retry Sync after an error created each new member again — another copy
+/// of their name, email and phone number on Unity each time.
 ///
 /// <b>Durability ordering</b>: the event log is purged only AFTER a clean
 /// reconcile (no API errors). If anything goes wrong the log is preserved
@@ -200,6 +209,13 @@ public class ReconciliationService
 		// create automatically — and the dependent registration along with it.
 		var failedCreates = new HashSet<int>();
 
+		// Temporary IDs whose real ID is now in the local row (see
+		// AdoptRealIdAsync). Their consent, if any, goes out with every
+		// other member's in Phase 2.5, because the row now has a snapshot
+		// to differ from; only one whose adoption failed needs the
+		// new-member path there.
+		var adopted = new HashSet<int>();
+
 		// ── Phase 1: Create new members on Unity ─────────────────────
 		// These have negative temporary IDs assigned by TemporaryIdGenerator.
 		var newMembers = await db.Members
@@ -254,6 +270,9 @@ public class ReconciliationService
 					Logger.Information(
 						"Created member {Name} on Unity: temp {TempId} → real {RealId}",
 						member.AnonymousName, member.Id, response.Data.Id);
+
+					if (await AdoptRealIdAsync(db, member.Id, response.Data.Id, ct))
+						adopted.Add(member.Id);
 				}
 				else
 				{
@@ -401,8 +420,12 @@ public class ReconciliationService
 		// the loop below guards on Id < 0. Collect them separately now
 		// that tempIdToRealId is fully populated; only include those
 		// whose create succeeded (i.e. have a resolved real ID).
+		//
+		// A member whose real ID was adopted is not among them: it is in
+		// the snapshot now, without consent, so its consent shows up as a
+		// change in modifiedMemberChanges like anyone else's.
 		var newMembersWithCompliance = newMembers
-			.Where(m => m.GdprAccepted is not null && tempIdToRealId.ContainsKey(m.Id))
+			.Where(m => m.GdprAccepted is not null && tempIdToRealId.ContainsKey(m.Id) && !adopted.Contains(m.Id))
 			.ToList();
 
 		// Pre-count compliance pushes for the same reason as Phase 2:
@@ -891,6 +914,87 @@ public class ReconciliationService
 			registeredPositions, unregisteredPositions,
 			recordedCompliance,
 			apiErrors, apiWarnings);
+	}
+
+	/// <summary>
+	/// Gives a member Unity has just created the ID Unity gave it, in the
+	/// local row, and records in the snapshot what Unity now holds for it:
+	/// everything the create sent, and no consent yet. So a later attempt
+	/// treats it as an existing member — nothing to create, only what has
+	/// changed since to send — instead of creating it a second time.
+	///
+	/// <para>Safe to rewrite the key: nothing in the replica refers to a
+	/// member by ID. The member points at its group and position, not the
+	/// other way round. The ID change and the snapshot row are one
+	/// transaction, so a failure leaves the temporary member exactly as it
+	/// was, and false is returned: that attempt carries on with the ID in
+	/// memory, as it always did.</para>
+	/// </summary>
+	private static async Task<bool> AdoptRealIdAsync(UnityDbContext db, int tempId, int realId, CancellationToken ct)
+	{
+		try
+		{
+			if (await db.Members.AsNoTracking().AnyAsync(m => m.Id == realId, ct))
+			{
+				Logger.Error(
+					"Unity created member {RealId} for temp {TempId}, but the tablet already holds a member with that ID; keeping the temporary ID",
+					realId, tempId);
+				return false;
+			}
+
+			await using var transaction = await db.Database.BeginTransactionAsync(ct);
+
+			var moved = await db.Database.ExecuteSqlInterpolatedAsync(
+				$"UPDATE Members SET Id = {realId} WHERE Id = {tempId}", ct);
+			if (moved != 1)
+			{
+				await transaction.RollbackAsync(ct);
+				Logger.Error("Could not give temp member {TempId} its Unity ID {RealId}: {Rows} row(s) matched", tempId, realId, moved);
+				return false;
+			}
+
+			// The member as it now stands, without navigations — the shape
+			// SnapshotService.CaptureAsync records — and without consent,
+			// which Unity does not have until Phase 2.5 sends it.
+			var created = await db.Members.AsNoTracking().SingleAsync(m => m.Id == realId, ct);
+			created.GdprAccepted = null;
+			created.GdprAcceptedAt = null;
+			created.GdprAcceptanceVersion = null;
+			created.GdprAcceptanceMethod = null;
+			created.GdprAcceptanceStatement = null;
+			created.GdprAcceptancePolicyId = null;
+
+			db.SuppressUpdatedStamp = true;
+			try
+			{
+				db.EntitySnapshots.Add(new EntitySnapshot
+				{
+					EntityType = "Member",
+					EntityKey = realId,
+					JsonData = SnapshotService.Serialise(created),
+					SnapshotUtc = DateTime.UtcNow,
+				});
+				await db.SaveChangesAsync(ct);
+			}
+			finally
+			{
+				db.SuppressUpdatedStamp = false;
+			}
+
+			await transaction.CommitAsync(ct);
+			return true;
+		}
+		catch (Exception ex)
+		{
+			Logger.Error(ex, "Could not give temp member {TempId} its Unity ID {RealId}; keeping the temporary ID for this attempt", tempId, realId);
+			return false;
+		}
+		finally
+		{
+			// Whatever the context was tracking under the temporary ID is
+			// stale now, or the snapshot row is; read afresh from here on.
+			db.ChangeTracker.Clear();
+		}
 	}
 
 	// =====================================================================
