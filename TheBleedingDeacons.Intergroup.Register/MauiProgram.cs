@@ -239,6 +239,14 @@ public static class MauiProgram
 
 		builder.Services.AddScoped<IPopupNotification, PopupNotificationService>();
 
+		// Administration and Settings ask for the tablet's screen code.
+		builder.Services.AddSingleton(_ => new OperatorLock(AppShell.OperatorRoutes));
+#if ANDROID
+		builder.Services.AddSingleton<IScreenLockPrompt, AndroidScreenLockPrompt>();
+#else
+		builder.Services.AddSingleton<IScreenLockPrompt, NoScreenLockPrompt>();
+#endif
+
 		builder.Services.AddSingleton<IPhoneNumberService, PhoneNumberService>();
 
 		// Email templates. They are embedded in Register.Core, beside the
