@@ -1,4 +1,5 @@
 using TheBleedingDeacons.Intergroup.Register.Exceptions;
+using TheBleedingDeacons.Intergroup.Register.Models;
 using TheBleedingDeacons.Intergroup.Register.Services;
 using TheBleedingDeacons.Intergroup.Register.Support;
 using TheBleedingDeacons.Intergroup.Register.Tests.Support;
@@ -246,5 +247,82 @@ public sealed class EmailTemplateServiceTests
 	public void AnEmptyTemplateRendersAsNothing() =>
 		Assert.Equal(string.Empty, _templates.RenderTemplate(string.Empty, new { }));
 
+	/// <summary>
+	/// The hole this closes: a name typed at the tablet went into the email
+	/// as markup, so a link in it arrived as a link, from the intergroup's
+	/// own mail server, to whatever address was typed beside it.
+	/// </summary>
+	[Fact]
+	public void AValueIsInsertedAsTextNotMarkup() =>
+		Assert.Equal(
+			"<h2>Hello &lt;a href=&quot;https://evil.example&quot;&gt;Verify&lt;/a&gt;</h2>",
+			_templates.RenderTemplate("<h2>Hello {{Name}}</h2>", new Model("<a href=\"https://evil.example\">Verify</a>")));
+
+	[Fact]
+	public void AmpersandsAndQuotesAreEncodedSoAnAttributeCannotBeBrokenOutOf() =>
+		Assert.Equal(
+			"<a title=\"Bob &amp; Sue&#39;s &quot;group&quot;\">",
+			_templates.RenderTemplate("<a title=\"{{Name}}\">", new Model("Bob & Sue's \"group\"")));
+
+	[Fact]
+	public void TripleBracesInsertTheValueAsItIs() =>
+		Assert.Equal(
+			"<div><p>We keep <b>your</b> data.</p></div>",
+			_templates.RenderTemplate("<div>{{{Name}}}</div>", new Model("<p>We keep <b>your</b> data.</p>")));
+
+	[Fact]
+	public void AValueThatLooksLikeAPlaceholderIsNotFilledIn()
+	{
+		var html = _templates.RenderTemplate("{{Name}} / {{Email}}", new Contact("{{Email}}", "jo@example.org"));
+
+		Assert.Equal("&#123;&#123;Email&#125;&#125; / jo@example.org", html);
+	}
+
+	[Fact]
+	public void AValueCannotCloseOrOpenAConditional()
+	{
+		var html = _templates.RenderTemplate(
+			"{{#if Email}}[{{Name}}]{{/if}}",
+			new Contact("x{{/if}}{{#if Email}}y", "jo@example.org"));
+
+		Assert.Equal("[x&#123;&#123;/if&#125;&#125;&#123;&#123;#if Email&#125;&#125;y]", html);
+	}
+
+	[Fact]
+	public void ALoopItemsValuesAreEncodedAndNotReadAgainByTheModelsPass()
+	{
+		var model = new Group("Tuesday", [new Contact("<b>Jo</b>", "{{GroupName}}")]);
+
+		var html = _templates.RenderTemplate("{{#each Contacts}}{{Name}} {{Email}} in {{GroupName}};{{/each}}", model);
+
+		Assert.Equal("&lt;b&gt;Jo&lt;/b&gt; &#123;&#123;GroupName&#125;&#125; in Tuesday;", html);
+	}
+
+	[Fact]
+	public void ANestedPathIsEncodedToo() =>
+		Assert.Equal(
+			"Hi &lt;i&gt;Jo&lt;/i&gt;",
+			_templates.RenderTemplate("Hi {{Member.Name}}", new { Member = new Model("<i>Jo</i>") }));
+
+	[Fact]
+	public async Task TheComplianceEmailEncodesTheNameAndKeepsThePolicyWording()
+	{
+		var html = await _templates.RenderTemplateAsync("ComplianceAcceptanceEmail", new ComplianceEmail
+		{
+			AnonymousName = "<a href=\"https://evil.example\">Click</a>",
+			RecipientEmail = "jo@example.org",
+			PolicyStatementHtml = "<p>We keep <strong>your</strong> details.</p>",
+		});
+
+		Assert.DoesNotContain("<a href=\"https://evil.example\">", html, StringComparison.Ordinal);
+		Assert.Contains("&lt;a href=&quot;https://evil.example&quot;&gt;Click&lt;/a&gt;", html, StringComparison.Ordinal);
+		Assert.Contains("<p>We keep <strong>your</strong> details.</p>", html, StringComparison.Ordinal);
+		Assert.DoesNotContain("{{", html, StringComparison.Ordinal);
+	}
+
 	private sealed record Model(string? Name);
+
+	private sealed record Contact(string Name, string Email);
+
+	private sealed record Group(string GroupName, List<Contact> Contacts);
 }

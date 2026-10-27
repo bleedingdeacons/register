@@ -1,4 +1,5 @@
-﻿using System.Reflection;
+﻿using System.Net;
+using System.Reflection;
 using System.Text.RegularExpressions;
 using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Exceptions;
@@ -7,12 +8,38 @@ using Serilog;
 
 namespace TheBleedingDeacons.Intergroup.Register.Services
 {
+	/// <summary>
+	/// Fills the email templates from a model.
+	///
+	/// <para><b><c>{{Name}}</c> is text; <c>{{{Name}}}</c> is HTML.</b> A
+	/// value in double braces is HTML-encoded, braces included, so whatever
+	/// was typed at the tablet arrives as the words that were typed. Before
+	/// this, a member's name went into the email as markup: anyone at a
+	/// meeting could put a link in their name, give someone else's address,
+	/// and have the intergroup's own mail server deliver it. Triple braces
+	/// insert the value as it is, and are for HTML the app itself wrote or
+	/// took from the site — the policy wording, nothing typed in.</para>
+	///
+	/// <para><b>A value is never read as template.</b> Loops and
+	/// conditionals are worked out on the template first, and placeholders
+	/// are then filled in a single pass, so a value containing
+	/// <c>{{Email}}</c> or <c>{{/if}}</c> is inserted as those characters
+	/// rather than expanded.</para>
+	/// </summary>
 	public class EmailTemplateService : IEmailTemplateService
 	{
 		private static readonly ILogger Logger = AppLogger.ForContext<EmailTemplateService>();
 
 		// Guards the template regexes against pathological (ReDoS) input.
 		private static readonly TimeSpan RegexTimeout = TimeSpan.FromSeconds(2);
+
+		// {{{Path}}} raw, or {{Path}} encoded; Path as in {{Member.Name}} or {{Name()}}.
+		private const string PathPattern = @"[a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*(?:\(\))?";
+
+		private static readonly Regex Placeholder = new(
+			@"\{\{\{(?<raw>" + PathPattern + @")\}\}\}|\{\{(?<text>" + PathPattern + @")\}\}",
+			RegexOptions.CultureInvariant,
+			RegexTimeout);
 
 		private readonly string _templateDirectory;
 		private readonly Dictionary<string, string> _templateCache;
@@ -84,29 +111,12 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 				if (string.IsNullOrEmpty(template))
 					return string.Empty;
 
-				// Handle loops: {{#each CollectionProperty}}...{{/each}}
-				var result = template;
-				result = ProcessLoops(result, model);
-
-				var properties = typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance);
-
-				// Handle simple property replacements: {{PropertyName}}
-				foreach (var prop in properties)
-				{
-					var placeholder = $"{{{{{prop.Name}}}}}";
-					var value = prop.GetValue(model)?.ToString() ?? string.Empty;
-					result = result.Replace(placeholder, value);
-				}
-
-				// Handle nested property access: {{Property.SubProperty}}
-				result = ReplaceNestedProperties(result, model);
-
-				// Handle simple conditionals: {{#if PropertyName}}...{{/if}}
+				// The template's shape first — loops, then {{#if}} — and only
+				// then the values, in one pass, so nothing inserted is ever
+				// read as template.
+				var result = ProcessLoops(template, model);
 				result = ProcessConditionals(result, model);
-
-
-
-				return result;
+				return ReplacePlaceholders(result, model);
 			}
 			catch (Exception ex)
 			{
@@ -177,26 +187,35 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			}
 		}
 
-		private static string ReplaceNestedProperties<T>(string template, T model)
-		{
-			// Match patterns like {{Property.SubProperty}} or {{Property.Method()}}
-			var pattern = @"\{\{([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*(?:\(\))?)\}\}";
-			var regex = new Regex(pattern, RegexOptions.None, RegexTimeout);
-
-			return regex.Replace(template, match =>
+		/// <summary>
+		/// Fills every <c>{{Path}}</c> and <c>{{{Path}}}</c> from the model in
+		/// one pass. A path the model does not have renders as nothing; one
+		/// whose lookup throws is left as it was.
+		/// </summary>
+		private static string ReplacePlaceholders<T>(string template, T model) =>
+			Placeholder.Replace(template, match =>
 			{
-				var propertyPath = match.Groups[1].Value;
+				var raw = match.Groups["raw"].Success;
+				var path = raw ? match.Groups["raw"].Value : match.Groups["text"].Value;
 				try
 				{
-					var value = GetNestedPropertyValue(model, propertyPath);
-					return value?.ToString() ?? string.Empty;
+					var value = GetNestedPropertyValue(model, path)?.ToString() ?? string.Empty;
+					return raw ? value : Encode(value);
 				}
 				catch
 				{
-					return match.Value; // Return original if can't resolve
+					return match.Value;
 				}
 			});
-		}
+
+		/// <summary>
+		/// A value as text in HTML. Braces are encoded too, so that nothing
+		/// inserted can form a placeholder for a later pass to fill.
+		/// </summary>
+		internal static string Encode(string value) =>
+			WebUtility.HtmlEncode(value)
+				.Replace("{", "&#123;", StringComparison.Ordinal)
+				.Replace("}", "&#125;", StringComparison.Ordinal);
 
 		private static object? GetNestedPropertyValue<T>(T obj, string propertyPath)
 		{
@@ -331,37 +350,38 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			return result;
 		}
 
-		// Complete item processing method
+		/// <summary>
+		/// Fills one loop item's own placeholders, encoded or raw by the same
+		/// rule as the model's, in one pass. Placeholders the item has no
+		/// property for are left for the model's pass; an encoded value
+		/// cannot be mistaken for one, since its braces are encoded.
+		/// </summary>
 		private static string ProcessSingleItemTemplate<T>(string itemTemplate, T item)
 		{
 			if (item == null) return itemTemplate;
 
-			var result = itemTemplate;
 			var itemType = item.GetType();
-			var properties = itemType.GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
 
-
-
-			foreach (var prop in properties)
+			return Placeholder.Replace(itemTemplate, match =>
 			{
+				var raw = match.Groups["raw"].Success;
+				var name = raw ? match.Groups["raw"].Value : match.Groups["text"].Value;
+
+				var prop = itemType.GetProperty(name, BindingFlags.Public | BindingFlags.Instance);
+				if (prop is null)
+					return match.Value;
+
 				try
 				{
-					var placeholder = $"{{{{{prop.Name}}}}}";
 					var value = prop.GetValue(item)?.ToString() ?? string.Empty;
-
-					if (result.Contains(placeholder, StringComparison.Ordinal))
-					{
-						result = result.Replace(placeholder, value);
-
-					}
+					return raw ? value : Encode(value);
 				}
 				catch (Exception ex)
 				{
 					Logger.Debug(ex, "Error processing property {PropertyName}", prop.Name);
+					return match.Value;
 				}
-			}
-
-			return result;
+			});
 		}
 	}
 }
