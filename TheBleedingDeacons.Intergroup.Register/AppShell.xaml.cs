@@ -102,8 +102,17 @@ public partial class AppShell : Shell
             return;
         }
 
+        // One prompt at a time: a second tap while the first is up would
+        // otherwise stack another on top of it.
+        if (_asking)
+        {
+            args.Cancel();
+            return;
+        }
+
         var deferral = args.GetDeferral();
         var result = ScreenLockResult.Declined;
+        Exception? failure = null;
         _asking = true;
         try
         {
@@ -113,6 +122,7 @@ public partial class AppShell : Shell
         }
         catch (Exception ex)
         {
+            failure = ex;
             Logger.Error(ex, "The screen-lock prompt failed; {Target} stays closed", target);
         }
         finally
@@ -136,7 +146,16 @@ public partial class AppShell : Shell
 
         Logger.Information("Operator access to {Target} refused: {Result}", target, result);
 
-        if (result == ScreenLockResult.NoScreenLock)
+        // A prompt that cannot be shown must say so: refused silently, the
+        // operator's pages simply never open and nothing says why.
+        if (failure is not null)
+        {
+            await DisplayAlertAsync(
+                "Could not ask for the screen code",
+                $"Administration and Settings stay closed. {failure.Message}",
+                "OK");
+        }
+        else if (result == ScreenLockResult.NoScreenLock)
         {
             await DisplayAlertAsync(
                 "Set a screen lock first",
