@@ -93,7 +93,11 @@ public static class MauiProgram
 			// Not the app name, which has a space in it: adb logcat -s Register:V
 			LogcatTag = "Register",
 			AppVersion = AppVersion,
-			Configure = cfg => cfg.ReadFrom.Configuration(builder.Configuration),
+			// The level is the tablet's Debug Logging switch, Debug unless
+			// Settings turns it off; appsettings.json's per-source overrides
+			// still apply. See DebugLogging.
+			Configure = cfg => cfg.ReadFrom.Configuration(builder.Configuration)
+				.MinimumLevel.ControlledBy(DebugLogging.Level.Switch),
 			// Email addresses become per-tablet tokens before any sink sees
 			// them, exception text included; see EmailRedactor. Names are
 			// left as they are.

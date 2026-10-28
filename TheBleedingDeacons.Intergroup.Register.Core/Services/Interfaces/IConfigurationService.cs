@@ -215,6 +215,19 @@ namespace TheBleedingDeacons.Intergroup.Register.Services.Interfaces
 		void SetScreenCodeRequired(bool required);
 
 		/// <summary>
+		/// When true, everything is logged from Debug up; when false, from
+		/// Information up. Defaults to true. The tablet's own switch, not
+		/// Freedom's.
+		/// </summary>
+		bool IsDebugLoggingEnabled { get; }
+
+		/// <summary>
+		/// Persists the debug-logging switch. Takes effect from the next line
+		/// logged.
+		/// </summary>
+		void SetDebugLoggingEnabled(bool enabled);
+
+		/// <summary>
 		/// The compliance contact, from Freedom (<c>compliance.email</c>) —
 		/// used as the Reply-To on acceptance confirmations. Empty when
 		/// Freedom holds none, which callers treat as "no compliance contact"
