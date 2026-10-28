@@ -398,6 +398,50 @@ public sealed class ComplianceEventLog : IAsyncDisposable
 		}
 	}
 
+	/// <summary>
+	/// Moves the log aside, beside where it was, as
+	/// <c>compliance-refused-&lt;UTC timestamp&gt;.log</c>: the record of
+	/// consent Unity would not store, kept on the tablet instead of being
+	/// purged. The next acceptance starts a new log. Reset Device deletes
+	/// the log by name, so an archive outlives it.
+	/// </summary>
+	/// <returns>The archive's path; null when there was no log to move.</returns>
+	public async Task<string?> ArchiveAsync(CancellationToken ct = default)
+	{
+		await _writeLock.WaitAsync(ct).ConfigureAwait(false);
+		try
+		{
+			if (!File.Exists(_logPath))
+				return null;
+
+			var directory = Path.GetDirectoryName(_logPath) ?? string.Empty;
+			var stamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss", System.Globalization.CultureInfo.InvariantCulture);
+			var archive = Path.Combine(directory, $"compliance-refused-{stamp}.log");
+			var n = 1;
+			while (File.Exists(archive))
+			{
+				n++;
+				archive = Path.Combine(directory, $"compliance-refused-{stamp}-{n}.log");
+			}
+
+			File.Move(_logPath, archive);
+			Logger.Warning("Compliance log archived at {Archive}", archive);
+			return archive;
+		}
+		catch (Exception ex)
+		{
+			// Loud, like a failed purge: the log is still where it was, so
+			// nothing is lost, but finishing anyway must not carry on as if
+			// it had been put aside.
+			Logger.Error(ex, "Failed to archive compliance log at {Path}", _logPath);
+			throw;
+		}
+		finally
+		{
+			_writeLock.Release();
+		}
+	}
+
 	public ValueTask DisposeAsync()
 	{
 		_writeLock.Dispose();

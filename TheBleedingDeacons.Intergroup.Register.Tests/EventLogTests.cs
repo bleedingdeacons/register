@@ -185,6 +185,43 @@ public sealed class ComplianceEventLogTests : IDisposable
 	}
 
 	[Fact]
+	public async Task ArchivingNothingIsFine() =>
+		Assert.Null(await _log.ArchiveAsync());
+
+	/// <summary>
+	/// Finish anyway puts the log aside rather than deleting it: the record
+	/// of consent Unity would not store stays on the tablet, whole.
+	/// </summary>
+	[Fact]
+	public async Task AnArchiveKeepsTheLogWholeAndTheNextAcceptanceStartsAfresh()
+	{
+		await _log.AppendAcceptanceAsync(1, At, "2.1", "register-app", null, 42);
+		var before = await File.ReadAllTextAsync(_log.LogPath);
+
+		var archive = await _log.ArchiveAsync();
+
+		Assert.NotNull(archive);
+		Assert.StartsWith("compliance-refused-", Path.GetFileName(archive), StringComparison.Ordinal);
+		Assert.Equal(before, await File.ReadAllTextAsync(archive));
+		Assert.False(_log.HasPendingEntries());
+
+		await _log.AppendAcceptanceAsync(2, At, "2.1", "register-app", null, 42);
+		Assert.Equal(2, Assert.Single(await _log.ReadLatestStatesAsync()).Key);
+	}
+
+	[Fact]
+	public async Task TwoArchivesInOneSecondDoNotOverwriteEachOther()
+	{
+		await _log.AppendAcceptanceAsync(1, At, "2.1", "register-app", null, 42);
+		var first = await _log.ArchiveAsync();
+		await _log.AppendAcceptanceAsync(2, At, "2.1", "register-app", null, 42);
+		var second = await _log.ArchiveAsync();
+
+		Assert.NotEqual(first, second);
+		Assert.Equal(2, Directory.GetFiles(_dir.Path, "compliance-refused-*.log").Length);
+	}
+
+	[Fact]
 	public async Task ARevocationAfterAnAcceptanceWins()
 	{
 		await _log.AppendAcceptanceAsync(1, At, "2.1", "register-app", null, 42);
