@@ -188,6 +188,17 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 		[ObservableProperty]
 		private string finishSummary = string.Empty;
 
+		/// <summary>
+		/// True when the last finish was stopped only by consent Unity
+		/// refuses, so Finish Anyway is offered beside Retry Sync.
+		/// </summary>
+		[ObservableProperty]
+		private bool canFinishAnyway;
+
+		// The last finish's result: what Finish Anyway acts on, and what
+		// Purge names before it deletes changes Unity refused.
+		private ReconciliationService.ReconcileResult? _lastFinish;
+
 		// ── Meeting list (shown during SelectMeeting phase) ──────────
 		//
 		// Wrap each IntergroupMeeting in a tiny row-view-model so the
@@ -520,57 +531,34 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 			try
 			{
 				HasFinishSyncError = false;
+				CanFinishAnyway = false;
 				ShowStatus("Pushing changes to Unity...", false);
 				ResetProgress();
 
 				var progress = new Progress<SyncProgress>(OnSyncProgress);
 
-				var (created, modified, registered, complianceRecorded, errors, warnings) =
-					await _dataService.ImportWithReconciliationAsync(Token, progress);
+				var result = await _dataService.ImportWithReconciliationAsync(Token, progress);
+				_lastFinish = result;
 
-				// If any non-recoverable errors occurred, stay in Finishing phase
-				// so the user sees Retry Sync. Purge is only available after a
-				// fully clean reconciliation. Note: "already registered" responses
-				// from Unity are treated as success in ReconciliationService and
-				// do not count as errors here.
-				if (errors > 0)
+				// Any error stays in the Finishing phase, with Retry Sync:
+				// Purge is only offered after a finish that lost nothing.
+				// A consent record Unity did not store is always an error.
+				// When refused consent is all that is left, Finish Anyway
+				// is offered too, since a retry would only be refused again.
+				// "Already registered" is a success, not an error.
+				if (result.ApiErrors > 0)
 				{
 					HasFinishSyncError = true;
-					ShowStatus(
-						$"Reconciliation completed with {errors} error(s). Tap Retry Sync to try again.",
-						true);
+					CanFinishAnyway = result.OnlyRefusedConsentRemains;
+					ShowStatus(DescribeErrors(result), true);
 					ResetProgress();
 					Logger.Warning(
 						"Finish Meeting reconciliation reported {Errors} errors — staying in Finishing phase",
-						errors);
+						result.ApiErrors);
 					return;
 				}
 
-				// Clear the active meeting
-				await _configService.SaveActiveIntergroupMeetingAsync(null);
-				ActiveMeetingId = null;
-				ActiveMeetingDate = string.Empty;
-				ActiveMeetingTitle = string.Empty;
-
-				FinishSummary =
-					$"Pushed to Unity:\n" +
-					$"  • {created} new members created\n" +
-					$"  • {modified} members updated\n" +
-					$"  • {registered} registrations recorded\n" +
-					$"  • {complianceRecorded} compliance records recorded" +
-					(errors > 0 ? $"\n  • {errors} API errors" : "");
-
-				if (warnings > 0)
-					Logger.Warning("Meeting finished with {Warnings} API warnings (non-fatal)", warnings);
-
-				Phase = MeetingPhase.Completed;
-				HideStatus();
-				ResetProgress();
-
-				Logger.Information(
-					"Meeting finished: {Created} created, {Modified} modified, {Registered} registered, " +
-					"{Compliance} compliance recorded, {Errors} errors, {Warnings} warnings",
-					created, modified, registered, complianceRecorded, errors, warnings);
+				await CompleteFinishAsync(result, archivedConsent: null);
 			}
 			catch (Exception ex)
 			{
@@ -581,6 +569,118 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 				// Remain at Finishing phase so the retry button is visible
 			}
 		}
+
+		/// <summary>
+		/// Finishes past consent records Unity refuses, once a retry has
+		/// shown they will only be refused again. They are kept in a file
+		/// on the tablet, not deleted; the operator is told which first.
+		/// </summary>
+		[RelayCommand]
+		private async Task FinishAnyway()
+		{
+			if (_lastFinish is not { OnlyRefusedConsentRemains: true } refused)
+				return;
+
+			bool confirmed = await Shell.Current.DisplayAlertAsync(
+				"Finish Anyway",
+				"Unity has not stored these consent records:\n\n" +
+				ListRefusals(refused, ReconciliationService.ReconcileRefusalKind.Consent) +
+				"\n\nThey will be kept in a file on this tablet instead, not on Unity. Finish the meeting anyway?",
+				"Yes, Finish Anyway",
+				"Cancel");
+
+			if (!confirmed) return;
+
+			try
+			{
+				var archive = await _dataService.AcceptRefusedConsentAsync(refused, Token);
+				HasFinishSyncError = false;
+				CanFinishAnyway = false;
+				await CompleteFinishAsync(refused, archive);
+			}
+			catch (Exception ex)
+			{
+				Logger.Error(ex, "Finish Anyway failed");
+				ShowStatus($"Could not finish: {ex.Message}", true);
+			}
+		}
+
+		/// <summary>
+		/// The end of a finish: the active meeting cleared, the summary
+		/// written — naming anything Unity refused — and Purge offered.
+		/// </summary>
+		private async Task CompleteFinishAsync(ReconciliationService.ReconcileResult result, string? archivedConsent)
+		{
+			await _configService.SaveActiveIntergroupMeetingAsync(null);
+			ActiveMeetingId = null;
+			ActiveMeetingDate = string.Empty;
+			ActiveMeetingTitle = string.Empty;
+
+			var summary =
+				$"Pushed to Unity:\n" +
+				$"  • {result.CreatedMembers} new members created\n" +
+				$"  • {result.ModifiedMembers} members updated\n" +
+				$"  • {result.RegisteredGroups + result.RegisteredPositions} registrations recorded\n" +
+				$"  • {result.RecordedCompliance} compliance records recorded";
+
+			if (result.Refusals.Any(r => r.Kind == ReconciliationService.ReconcileRefusalKind.MemberUpdate))
+			{
+				summary +=
+					"\n\nUnity refused these changes. Purging deletes them from this tablet:\n" +
+					ListRefusals(result, ReconciliationService.ReconcileRefusalKind.MemberUpdate);
+			}
+
+			if (archivedConsent is not null)
+			{
+				summary +=
+					"\n\nUnity refused these consent records. They are kept on this tablet in " +
+					$"{Path.GetFileName(archivedConsent)}:\n" +
+					ListRefusals(result, ReconciliationService.ReconcileRefusalKind.Consent);
+			}
+
+			FinishSummary = summary;
+
+			if (result.ApiWarnings > 0)
+				Logger.Warning("Meeting finished with {Warnings} API warnings (non-fatal)", result.ApiWarnings);
+
+			Phase = MeetingPhase.Completed;
+			HideStatus();
+			ResetProgress();
+
+			Logger.Information(
+				"Meeting finished: {Created} created, {Modified} modified, {Registered} registered, " +
+				"{Compliance} compliance recorded, {Errors} errors, {Warnings} warnings",
+				result.CreatedMembers, result.ModifiedMembers,
+				result.RegisteredGroups + result.RegisteredPositions,
+				result.RecordedCompliance, result.ApiErrors, result.ApiWarnings);
+		}
+
+		private static string DescribeErrors(ReconciliationService.ReconcileResult result)
+		{
+			var refusedConsent = result.Refusals.Count(r => r.Kind == ReconciliationService.ReconcileRefusalKind.Consent);
+			var unreached = result.ApiErrors - refusedConsent;
+			var text = string.Empty;
+
+			if (refusedConsent > 0)
+			{
+				text += "Unity refused these consent records:\n" +
+					ListRefusals(result, ReconciliationService.ReconcileRefusalKind.Consent) + "\n\n";
+			}
+
+			if (unreached > 0)
+				text += $"{unreached} change(s) could not reach Unity.\n\n";
+
+			return text + (result.OnlyRefusedConsentRemains
+				? "Tap Retry Sync to try again, or Finish Anyway to keep them on this tablet and finish."
+				: "Tap Retry Sync to try again.");
+		}
+
+		private static string ListRefusals(
+			ReconciliationService.ReconcileResult result,
+			ReconciliationService.ReconcileRefusalKind kind) =>
+			string.Join("\n", result.Refusals
+				.Where(r => r.Kind == kind)
+				.Select(r => $"  • {r.MemberName} — {r.What}: {r.Reason}"));
 
 		/// <summary>
 		/// Purges all data from the local database and resets the session.
@@ -595,8 +695,17 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 				return;
 			}
 
+			// Changes Unity refused exist only on this tablet: name them, so
+			// the operator can note them down before they go.
+			var refusedUpdates = _lastFinish is { } last &&
+				last.Refusals.Any(r => r.Kind == ReconciliationService.ReconcileRefusalKind.MemberUpdate)
+					? "Unity refused these changes, and purging loses them:\n" +
+						ListRefusals(last, ReconciliationService.ReconcileRefusalKind.MemberUpdate) + "\n\n"
+					: string.Empty;
+
 			bool confirmed = await Shell.Current.DisplayAlertAsync(
 				"Purge Database",
+				refusedUpdates +
 				"This will permanently delete ALL local data including groups, members, meetings, positions, and snapshots.\n\nThis action cannot be undone. Are you sure?",
 				"Yes, Purge Everything",
 				"No, Keep Data");
@@ -612,6 +721,7 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 
 				Phase = MeetingPhase.NotStarted;
 				FinishSummary = string.Empty;
+				_lastFinish = null;
 				Meetings.Clear();
 				HideStatus();
 

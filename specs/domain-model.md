@@ -64,8 +64,16 @@ sync ─▶ snapshot ─▶ register / accept (local DB + fsync'd log) ─▶ fi
 - **Reconcile / finishing the meeting**: sending Unity everything that differs
   from the snapshot. The order is: new members, changed members, consent,
   then attendance.
-- **Error / warning**: a refusal during reconcile. Only *errors* keep the logs
-  for another attempt; see the findings below.
+- **Error / warning**: a change Unity did not take during reconcile. An
+  *error* keeps the logs for another attempt: Unity unreachable (no answer, a
+  5xx, a timeout, a rate limit, a refused key), or any consent record Unity
+  did not store. A *warning* is a member update Unity answered and refused;
+  it is named for the operator, because a retry would only be refused again.
+- **Refusal**: a change Unity answered and refused, carried in the reconcile
+  result with the member, what was sent and Unity's own words.
+- **Finish anyway**: the way past consent Unity refuses, once a retry has
+  shown it will only be refused again. The compliance log is archived on the
+  tablet, not deleted.
 - **Managed value**: a setting held by the site's Freedom plugin. For
   credentials and endpoints it is the only value there is: nothing is built
   in and nothing is typed in on the tablet.
@@ -126,10 +134,6 @@ never counts: that is the venue's network, and it comes back on its own.
 These were found while writing the specification. Each is pinned by a
 scenario or a test so that changing it is a decision. None was fixed here.
 
-- **A consent record Unity refuses is a warning, and the logs are cleared
-  anyway.** The same is true of a refused member update. Only errors keep the
-  logs. An acceptance Unity never stored is gone from the tablet after Finish
-  Meeting and Purge. (`Reconciliation.feature`)
 - **With no intergroup meeting chosen, attendance is not sent, and the logs
   are cleared anyway.** Reconcile logs "skipping registration push" and counts
   no error. The app's meeting phases probably prevent finishing without a
@@ -160,6 +164,15 @@ Fixed since:
   `ProcessQueueAsync` still returns `false` and never throws, for the Email
   Status page. The email itself is still left untried, on purpose.
   (`EmailQueue.feature`)
+- **A consent record Unity refused was a warning, and the logs were cleared
+  anyway.** So was any member update Unity did not take, reachable or not. An
+  acceptance or a withdrawal Unity never stored was gone from the tablet after
+  Finish Meeting and Purge, and a phone number that failed to send because
+  the server was down was lost the same way. Now an unreachable Unity is an
+  error that keeps the logs; a consent record Unity did not store is always an
+  error, and can only be finished past by Finish anyway, which archives the
+  compliance log instead of deleting it; and a member update Unity refuses is
+  named in the finish summary and in Purge's warning. (`Reconciliation.feature`)
 
 ## Locked design decisions
 
@@ -187,8 +200,9 @@ Fixed since:
 
 - Finishing a meeting with no intergroup meeting chosen is assumed to be
   impossible through the app's phases. Core does not enforce it.
-- Warnings, as opposed to errors, are assumed not to need a retry. For a
-  consent record that is a judgement worth revisiting.
+- A member update Unity refuses is assumed to need a person, not a retry, so
+  it is named and the meeting finishes. Unity refusing a field it accepted
+  last week would show up as a run of these.
 - The cascade reads membership from the database, but welcome-email
   recipients come from the group the Verify page loaded. The two agree today
   because the page loads the group fresh.

@@ -124,8 +124,7 @@ public class DataService
     /// <see cref="ReconciliationService.ReconcileAsync"/>.
     /// </para>
     /// </summary>
-    public async Task<(int Created, int Modified, int Registered, int ComplianceRecorded,
-                        int ApiErrors, int ApiWarnings)> ImportWithReconciliationAsync(
+    public async Task<ReconciliationService.ReconcileResult> ImportWithReconciliationAsync(
         CancellationToken cancellationToken = default,
         IProgress<SyncProgress>? progress = null)
     {
@@ -156,10 +155,10 @@ public class DataService
                 result.RegisteredGroups, result.RegisteredPositions, result.RecordedCompliance,
                 result.ApiErrors, result.ApiWarnings);
 
-            return (result.CreatedMembers, result.ModifiedMembers,
-                    result.RegisteredGroups + result.RegisteredPositions,
-                    result.RecordedCompliance,
-                    result.ApiErrors, result.ApiWarnings);
+            // The whole result, refusals included: the Admin page names
+            // each change Unity refused, and decides from it whether
+            // Finish anyway is on offer.
+            return result;
         }
         catch (Exception ex)
         {
@@ -167,6 +166,16 @@ public class DataService
             throw;
         }
     }
+
+    /// <summary>
+    /// Finish past consent Unity refuses; see
+    /// <see cref="ReconciliationService.AcceptRefusedConsentAsync"/>.
+    /// </summary>
+    /// <returns>Where the compliance log was archived; null if there was none.</returns>
+    public Task<string?> AcceptRefusedConsentAsync(
+        ReconciliationService.ReconcileResult result,
+        CancellationToken cancellationToken = default) =>
+        _reconciliationService.AcceptRefusedConsentAsync(result, cancellationToken);
 
     // ====================================================================
     // Privacy-policy cache refresh (sync-stage gate)

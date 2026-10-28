@@ -154,18 +154,75 @@ Feature: Finishing the meeting
       When the meeting is finished
       Then Unity is told "Ann B" accepted version "2.1" of policy 42
 
-  Rule: What a finished meeting does not hold on to
+  Rule: What Unity does not take is not lost
 
-    These pin behaviour found while writing the specification, recorded in
-    specs/domain-model.md rather than changed here.
+    Unity can fail to take a change in two ways. Unreachable — no answer, a
+    server error, a rate limit, a refused key — a retry may get past, so it is
+    an error and the logs are kept. Refused — Unity answered and said no — a
+    retry will not change, so it is named for the operator instead.
 
-    Scenario: A consent record Unity refuses is a warning, and the logs are cleared anyway
+    A consent record is the exception: one Unity did not store is always an
+    error, so the compliance log is kept and the meeting does not finish on
+    its own. Finishing anyway is offered only once refused consent is all
+    that is left, and it keeps the log on the tablet rather than deleting it.
+
+    Scenario: A consent record Unity refuses keeps the compliance log, and the meeting does not finish
       Given the cached privacy policy is version "2.1"
       And "Ann B" has accepted the privacy policy
       And Unity refuses consent records
       When the meeting is finished
-      Then the meeting finished with 0 errors and 1 warning
+      Then the meeting finished with 1 error and 0 warnings
+      And "Ann B"'s consent is named as refused
+      And the compliance log is kept
+      And the meeting can be finished anyway
+
+    Scenario: Finishing anyway past refused consent keeps it on the tablet
+      Given the cached privacy policy is version "2.1"
+      And "Ann B" has accepted the privacy policy
+      And "Monday Step" has been registered
+      And Unity refuses consent records
+      When the meeting is finished
+      And the meeting is finished anyway
+      Then the compliance log is archived on the tablet
       And both logs are cleared
+
+    Scenario: A consent record Unity cannot take is kept for a retry, and cannot be finished past
+      Given the cached privacy policy is version "2.1"
+      And "Ann B" has accepted the privacy policy
+      And Unity cannot take consent records
+      When the meeting is finished
+      Then the meeting finished with 1 error and 0 warnings
+      And nothing is named as refused
+      And the compliance log is kept
+      And the meeting cannot be finished anyway
+
+    Scenario: A member update Unity refuses is named, and the meeting finishes
+      Given Unity refuses member updates
+      When "Ann B"'s mobile number is changed to "07400 654321"
+      And the meeting is finished
+      Then the meeting finished with 0 errors and 1 warning
+      And "Ann B"'s mobile number is named as refused
+
+    Scenario: A member update Unity cannot take is an error, kept for a retry
+      Given Unity cannot take member updates
+      When "Ann B"'s mobile number is changed to "07400 654321"
+      And the meeting is finished
+      Then the meeting finished with 1 error and 0 warnings
+      And nothing is named as refused
+      And the meeting cannot be finished anyway
+
+    Scenario: A retry once Unity can take the update again sends it
+      Given Unity cannot take member updates
+      When "Ann B"'s mobile number is changed to "07400 654321"
+      And the meeting is finished
+      And Unity accepts member updates again
+      And the meeting is finished
+      Then the meeting finished with 0 errors and 0 warnings
+
+  Rule: What a finished meeting does not hold on to
+
+    These pin behaviour found while writing the specification, recorded in
+    specs/domain-model.md rather than changed here.
 
     Scenario: With no intergroup meeting chosen, attendance is not sent and the logs are cleared anyway
       Given there is no active intergroup meeting

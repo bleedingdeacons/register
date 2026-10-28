@@ -2,6 +2,7 @@ using System.Net;
 using Reqnroll;
 using Shouldly;
 using TheBleedingDeacons.Intergroup.Register.Exceptions;
+using TheBleedingDeacons.Intergroup.Register.Services;
 using TheBleedingDeacons.Intergroup.Register.Specs.Support;
 
 namespace TheBleedingDeacons.Intergroup.Register.Specs.Steps;
@@ -57,11 +58,53 @@ public sealed class MeetingSteps(World world)
 		world.Reconciled.ShouldBeNull();
 	}
 
-	[Given(@"^Unity (refuses|already has) (registrations of groups|registrations of officers|new members|consent records|member updates)$")]
+	[Given(@"^Unity (refuses|already has|cannot take) (registrations of groups|registrations of officers|new members|consent records|member updates)$")]
 	public void Unity(string how, string what) =>
-		world.Unity.Refusals[Routes[what]] = how == "refuses"
-			? (HttpStatusCode.UnprocessableEntity, "rest_invalid_param")
-			: (HttpStatusCode.Conflict, "already_registered");
+		world.Unity.Refusals[Routes[what]] = how switch
+		{
+			"refuses" => (HttpStatusCode.UnprocessableEntity, "rest_invalid_param"),
+			"already has" => (HttpStatusCode.Conflict, "already_registered"),
+			// A server in trouble, which a retry may get past.
+			_ => (HttpStatusCode.ServiceUnavailable, "server_error"),
+		};
+
+	[When(@"^the meeting is finished anyway$")]
+	public async Task FinishedAnyway() =>
+		await world.Reconciliation.AcceptRefusedConsentAsync(world.Reconciled.ShouldNotBeNull());
+
+	[Then(@"^""([^""]*)""'s (consent|mobile number) is named as refused$")]
+	public void NamedAsRefused(string name, string what)
+	{
+		var refusal = world.Reconciled.ShouldNotBeNull().Refusals.ShouldHaveSingleItem();
+		refusal.MemberName.ShouldBe(name);
+		refusal.Reason.ShouldNotBeNullOrWhiteSpace();
+		if (what == "consent")
+		{
+			refusal.Kind.ShouldBe(ReconciliationService.ReconcileRefusalKind.Consent);
+		}
+		else
+		{
+			refusal.Kind.ShouldBe(ReconciliationService.ReconcileRefusalKind.MemberUpdate);
+			refusal.What.ShouldBe(what);
+		}
+	}
+
+	[Then(@"^nothing is named as refused$")]
+	public void NothingRefused() => world.Reconciled.ShouldNotBeNull().Refusals.ShouldBeEmpty();
+
+	[Then(@"^the meeting (can|cannot) be finished anyway$")]
+	public void CanFinishAnyway(string can) =>
+		world.Reconciled.ShouldNotBeNull().OnlyRefusedConsentRemains.ShouldBe(can == "can");
+
+	[Then(@"^the compliance log is kept$")]
+	public void ComplianceLogKept() => world.ComplianceLog.HasPendingEntries().ShouldBeTrue();
+
+	[Then(@"^the compliance log is archived on the tablet$")]
+	public void ComplianceLogArchived()
+	{
+		world.ComplianceLog.HasPendingEntries().ShouldBeFalse();
+		world.ArchivedComplianceLogs().ShouldHaveSingleItem();
+	}
 
 	[When(@"^Unity accepts (registrations of groups|registrations of officers|new members|consent records|member updates) again$")]
 	public void UnityAcceptsAgain(string what) => world.Unity.Refusals.Remove(Routes[what]);

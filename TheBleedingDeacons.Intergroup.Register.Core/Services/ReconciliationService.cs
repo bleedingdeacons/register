@@ -109,7 +109,47 @@ public class ReconciliationService
 		int UnregisteredPositions,
 		int RecordedCompliance,
 		int ApiErrors,
-		int ApiWarnings);
+		int ApiWarnings)
+	{
+		/// <summary>
+		/// What Unity answered and would not take: a refusal a retry cannot
+		/// change. Each consent refusal is also counted in
+		/// <see cref="ApiErrors"/>; each member-update refusal in
+		/// <see cref="ApiWarnings"/>.
+		/// </summary>
+		public IReadOnlyList<ReconcileRefusal> Refusals { get; init; } = [];
+
+		/// <summary>
+		/// True when every error left is a consent record Unity refused:
+		/// retrying would only be refused again, so the operator may finish
+		/// anyway (see <see cref="AcceptRefusedConsentAsync"/>).
+		/// </summary>
+		public bool OnlyRefusedConsentRemains =>
+			ApiErrors > 0 && ApiErrors == Refusals.Count(r => r.Kind == ReconcileRefusalKind.Consent);
+	}
+
+	/// <summary>What kind of change Unity refused.</summary>
+	public enum ReconcileRefusalKind
+	{
+		/// <summary>A member's details: name, email, phone, group or position.</summary>
+		MemberUpdate,
+
+		/// <summary>An acceptance or a withdrawal of consent.</summary>
+		Consent,
+	}
+
+	/// <summary>One change Unity refused, in words an operator can act on.</summary>
+	/// <param name="Kind">A member update or a consent record.</param>
+	/// <param name="MemberId">The member, by the id the tablet holds them under.</param>
+	/// <param name="MemberName">The member's anonymous name.</param>
+	/// <param name="What">What was being sent, e.g. "mobile number" or "accepted version 2.1".</param>
+	/// <param name="Reason">Unity's own message.</param>
+	public sealed record ReconcileRefusal(
+		ReconcileRefusalKind Kind,
+		int MemberId,
+		string MemberName,
+		string What,
+		string Reason);
 
 	// =====================================================================
 	// Reconcile — detect and push
@@ -196,6 +236,39 @@ public class ReconciliationService
 		int recordedCompliance = 0;
 		int apiErrors = 0;
 		int apiWarnings = 0;
+
+		// What Unity answered and would not take; see ReconcileRefusal.
+		var refusals = new List<ReconcileRefusal>();
+
+		// A consent record Unity did not store is always an error, so the
+		// consent log is kept and the meeting does not finish on its own:
+		// an acceptance or a withdrawal Unity never stored must not be
+		// cleared from the tablet as well. Refused rather than unreachable,
+		// it is also named, which is what lets the operator finish anyway
+		// once a retry has shown it will only be refused again.
+		void ConsentNotStored<T>(int memberId, string name, Member member, ApiResponse<T> response) where T : class
+		{
+			apiErrors++;
+			var temporary = IsTemporary(response);
+			if (!temporary)
+			{
+				refusals.Add(new ReconcileRefusal(
+					ReconcileRefusalKind.Consent,
+					memberId,
+					name,
+					DescribeConsent(member),
+					RefusalReason(response)));
+			}
+
+			Logger.Error(
+				"Unity did not store the consent record for member {Id} ({How}), keeping the compliance log: {ApiFailure}. StatusCode={StatusCode}, ErrorCode={ErrorCode}, Error={Error}",
+				memberId,
+				temporary ? "unreachable" : "refused",
+				FormatApiFailure(response),
+				response.StatusCode,
+				response.Error?.Code,
+				response.Error?.Message);
+		}
 
 		// Maps old temporary (negative) member ID → real Unity ID
 		var tempIdToRealId = new Dictionary<int, int>();
@@ -377,11 +450,34 @@ public class ReconciliationService
 					modifiedMembers++;
 					Logger.Information("Updated member {Name} (ID={Id}) on Unity", member.AnonymousName, member.Id);
 				}
+				else if (IsTemporary(response))
+				{
+					// Unity never really answered: a retry may well work,
+					// and until it does the change exists only in the
+					// tablet's database, which Purge would wipe.
+					apiErrors++;
+					Logger.Error(
+						"Could not update member {Id} on Unity, keeping it for a retry: {ApiFailure}. StatusCode={StatusCode}, ErrorCode={ErrorCode}, Error={Error}",
+						member.Id,
+						FormatApiFailure(response),
+						response.StatusCode,
+						response.Error?.Code,
+						response.Error?.Message);
+				}
 				else
 				{
+					// Refused: retrying would be refused again. A warning,
+					// so the meeting can finish, but named, so the operator
+					// is told what will be lost before Purge loses it.
 					apiWarnings++;
+					refusals.Add(new ReconcileRefusal(
+						ReconcileRefusalKind.MemberUpdate,
+						member.Id,
+						member.AnonymousName,
+						DescribeUpdate(changedProps),
+						RefusalReason(response)));
 					Logger.Warning(
-						"Failed to update member {Id} on Unity: {ApiFailure}. StatusCode={StatusCode}, ErrorCode={ErrorCode}, Error={Error}",
+						"Unity refused the update to member {Id}: {ApiFailure}. StatusCode={StatusCode}, ErrorCode={ErrorCode}, Error={Error}",
 						member.Id,
 						FormatApiFailure(response),
 						response.StatusCode,
@@ -519,14 +615,7 @@ public class ReconciliationService
 				}
 				else
 				{
-					apiWarnings++;
-					Logger.Warning(
-						"Failed to record compliance for member {Id} on Unity: {ApiFailure}. StatusCode={StatusCode}, ErrorCode={ErrorCode}, Error={Error}",
-						member.Id,
-						FormatApiFailure(response),
-						response.StatusCode,
-						response.Error?.Code,
-						response.Error?.Message);
+					ConsentNotStored(member.Id, member.AnonymousName, member, response);
 				}
 			}
 			catch (Exception ex)
@@ -568,14 +657,7 @@ public class ReconciliationService
 				}
 				else
 				{
-					apiWarnings++;
-					Logger.Warning(
-						"Failed to record compliance for new member {Id} on Unity: {ApiFailure}. StatusCode={StatusCode}, ErrorCode={ErrorCode}, Error={Error}",
-						realId,
-						FormatApiFailure(response),
-						response.StatusCode,
-						response.Error?.Code,
-						response.Error?.Message);
+					ConsentNotStored(realId, member.AnonymousName, member, response);
 				}
 			}
 			catch (Exception ex)
@@ -913,8 +995,82 @@ public class ReconciliationService
 			registeredGroups, unregisteredGroups,
 			registeredPositions, unregisteredPositions,
 			recordedCompliance,
-			apiErrors, apiWarnings);
+			apiErrors, apiWarnings)
+		{
+			Refusals = refusals,
+		};
 	}
+
+	/// <summary>
+	/// Finish anyway, when the only thing stopping a finish is consent
+	/// Unity refuses: the compliance log is archived on the tablet, not
+	/// deleted, so the acceptance or withdrawal is still on record
+	/// somewhere, and the registration log — everything in it was sent —
+	/// is purged as a clean finish would have.
+	/// </summary>
+	/// <param name="result">The reconcile that was refused. Anything but
+	/// refused consent left in it is refused here, since a retry could
+	/// still fix that.</param>
+	/// <returns>Where the compliance log was archived; null if there was none.</returns>
+	public async Task<string?> AcceptRefusedConsentAsync(ReconcileResult result, CancellationToken ct = default)
+	{
+		ArgumentNullException.ThrowIfNull(result);
+		if (!result.OnlyRefusedConsentRemains)
+		{
+			throw new InvalidOperationException(
+				"Only refused consent may be finished past. Retry Sync for the other errors.");
+		}
+
+		var archive = await _complianceLog.ArchiveAsync(ct).ConfigureAwait(false);
+		await _eventLog.PurgeAsync(ct).ConfigureAwait(false);
+
+		Logger.Warning(
+			"Finished past {Count} consent record(s) Unity refused; compliance log archived at {Archive}",
+			result.Refusals.Count(r => r.Kind == ReconcileRefusalKind.Consent),
+			archive);
+		return archive;
+	}
+
+	/// <summary>
+	/// Whether a failed call is one a retry may fix: Unity unreachable or
+	/// not answering as itself (no response, a 5xx, a timeout or rate
+	/// limit, an HTML page from something in front of it), or refusing
+	/// this tablet's key, which is fixed in configuration, not by losing
+	/// the change. Anything else is Unity refusing the change itself.
+	/// </summary>
+	private static bool IsTemporary<T>(ApiResponse<T> response) where T : class =>
+		response.StatusCode is 0 or 401 or 403 or 408 or 429 or >= 500
+		|| response.Error?.Code is "network_error" or "parse_error" or "unexpected_response";
+
+	private static string RefusalReason<T>(ApiResponse<T> response) where T : class =>
+		response.Error?.Message is { Length: > 0 } message
+			? message
+			: $"HTTP {response.StatusCode}";
+
+	private static string DescribeUpdate(HashSet<string> changedProps)
+	{
+		var fields = changedProps
+			.Where(p => p != GdprComplianceKey)
+			.Select(p => p switch
+			{
+				nameof(Member.AnonymousName) => "name",
+				nameof(Member.PersonalEmail) => "email",
+				nameof(Member.MobileNumber) => "mobile number",
+				nameof(Member.HomeGroupId) => "home group",
+				nameof(Member.IsGsr) => "GSR",
+				nameof(Member.IntergroupPositionId) => "position",
+				nameof(Member.IntergroupPositionRotation) => "rotation",
+				_ => p,
+			})
+			.OrderBy(f => f, StringComparer.Ordinal);
+
+		return string.Join(", ", fields);
+	}
+
+	private static string DescribeConsent(Member member) =>
+		member.GdprAccepted == true
+			? $"accepted version {member.GdprAcceptanceVersion}".TrimEnd()
+			: "withdrew consent";
 
 	/// <summary>
 	/// Gives a member Unity has just created the ID Unity gave it, in the

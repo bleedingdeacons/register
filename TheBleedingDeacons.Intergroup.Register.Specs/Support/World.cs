@@ -116,6 +116,9 @@ public sealed class World : IDisposable
 
 	public ReconciliationService.ReconcileResult? Reconciled { get; set; }
 
+	/// <summary>The compliance logs a finish anyway has put aside, beside the live one.</summary>
+	public string[] ArchivedComplianceLogs() => Directory.GetFiles(_directory, "compliance-refused-*.log");
+
 	public ConsentOutcome? ConsentOutcome { get; set; }
 
 	public List<string> AskedForConsent { get; } = [];

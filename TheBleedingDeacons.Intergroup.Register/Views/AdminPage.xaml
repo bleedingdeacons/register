@@ -391,6 +391,13 @@
                             IsVisible="{Binding HasFinishSyncError}"
                             Style="{StaticResource M3SecondaryButtonStyle}"
                             Text="Retry Sync" />
+
+                        <!--  Only when all that is left is consent Unity refuses: see AdminViewModel.FinishAnyway.  -->
+                        <Button
+                            Command="{Binding FinishAnywayCommand}"
+                            IsVisible="{Binding CanFinishAnyway}"
+                            Style="{StaticResource DangerButtonStyle}"
+                            Text="Finish Anyway" />
                     </VerticalStackLayout>
 
 
