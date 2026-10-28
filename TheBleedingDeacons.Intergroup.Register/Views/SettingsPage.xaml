@@ -485,6 +485,46 @@
                 </StackLayout>
             </Border>
 
+            <Border
+                Padding="15,12"
+                BackgroundColor="{AppThemeBinding Light=White,
+                                                  Dark=#2D2D30}"
+                Stroke="{AppThemeBinding Light=#E0E0E0,
+                                         Dark=#424242}"
+                StrokeShape="RoundRectangle 10"
+                StrokeThickness="1">
+                <Grid
+                    ColumnDefinitions="*,Auto"
+                    ColumnSpacing="12"
+                    RowDefinitions="Auto,Auto"
+                    RowSpacing="4">
+
+                    <Label
+                        Grid.Row="0"
+                        Grid.Column="0"
+                        FontAttributes="Bold"
+                        FontSize="16"
+                        Text="Debug Logging"
+                        VerticalOptions="Center" />
+
+                    <Switch
+                        Grid.Row="0"
+                        Grid.Column="1"
+                        IsToggled="{Binding IsDebugLoggingEnabled, Mode=TwoWay}"
+                        VerticalOptions="Center" />
+
+                    <Label
+                        Grid.Row="1"
+                        Grid.Column="0"
+                        Grid.ColumnSpan="2"
+                        FontSize="13"
+                        LineBreakMode="WordWrap"
+                        Text="When on, the logs sent to Better Stack include Debug detail as well as Information, warnings and errors. Turn off to send less. Takes effect at once. On by default."
+                        TextColor="{AppThemeBinding Light={StaticResource Gray600},
+                                                    Dark={StaticResource Gray300}}" />
+                </Grid>
+            </Border>
+
             <!--
                 ═══════════════════════════════════════════════════════
                 Privacy Policy

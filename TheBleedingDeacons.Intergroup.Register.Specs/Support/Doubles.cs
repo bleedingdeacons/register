@@ -136,6 +136,7 @@ public sealed class FakeConfigurationService : IConfigurationService
 
 	public bool IsButtonSoundEnabled { get; set; } = true;
 	public bool IsScreenCodeRequired { get; set; } = true;
+	public bool IsDebugLoggingEnabled { get; set; } = true;
 
 	public string ComplianceEmail { get; set; } = "privacy@aa-bristol.org";
 
@@ -173,6 +174,7 @@ public sealed class FakeConfigurationService : IConfigurationService
 
 	public void SetButtonSoundEnabled(bool enabled) => IsButtonSoundEnabled = enabled;
 	public void SetScreenCodeRequired(bool required) => IsScreenCodeRequired = required;
+	public void SetDebugLoggingEnabled(bool enabled) => IsDebugLoggingEnabled = enabled;
 
 	public void InvalidateCache()
 	{

@@ -561,6 +561,23 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 			}
 		}
 
+		/// <summary>
+		/// Two-way bound to a Switch on SettingsPage. When on, everything is
+		/// logged from Debug up. See
+		/// <see cref="IConfigurationService.IsDebugLoggingEnabled"/>. Defaults
+		/// to on.
+		/// </summary>
+		public bool IsDebugLoggingEnabled
+		{
+			get => _configService.IsDebugLoggingEnabled;
+			set
+			{
+				if (_configService.IsDebugLoggingEnabled == value) return;
+				_configService.SetDebugLoggingEnabled(value);
+				OnPropertyChanged();
+			}
+		}
+
 		// =================================================================
 		// Navigation
 		// =================================================================

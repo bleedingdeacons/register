@@ -193,6 +193,20 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		}
 
 		// =================================================================
+		// Debug logging — the tablet's own
+		// =================================================================
+
+		/// <summary>Kept by <see cref="DebugLogging"/>, which the logger is built from.</summary>
+		public bool IsDebugLoggingEnabled => DebugLogging.IsEnabled;
+
+		public void SetDebugLoggingEnabled(bool enabled)
+		{
+			// Information, so the line is logged whichever way it goes.
+			Logger.Information("Debug logging {State}", enabled ? "ON" : "OFF");
+			DebugLogging.Set(enabled);
+		}
+
+		// =================================================================
 		// Active intergroup meeting — the tablet's own
 		// =================================================================
 
