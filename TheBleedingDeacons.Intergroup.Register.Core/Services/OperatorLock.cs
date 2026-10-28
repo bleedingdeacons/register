@@ -24,6 +24,11 @@ namespace TheBleedingDeacons.Intergroup.Register.Services;
 /// Away for less than <see cref="DefaultGrace"/> keeps the window; any
 /// longer and the code is asked for again.</para>
 ///
+/// <para><b>It can be switched off</b>, per tablet, from Settings: a tablet
+/// that never leaves the operator need not ask. Off, nothing is guarded, so
+/// nothing is asked and nothing is closed. Switching it off is itself behind
+/// the code, since Settings is.</para>
+///
 /// <para>This decides only when to ask. Asking is the platform's, in the app,
 /// because the screen-lock prompt is Android's own.</para>
 /// </summary>
@@ -36,6 +41,7 @@ public sealed class OperatorLock
 	public static readonly TimeSpan DefaultGrace = TimeSpan.FromMinutes(2);
 
 	private readonly HashSet<string> _guarded;
+	private readonly Func<bool> _required;
 	private readonly TimeProvider _time;
 	private readonly TimeSpan _window;
 	private readonly TimeSpan _grace;
@@ -47,17 +53,23 @@ public sealed class OperatorLock
 	/// <param name="time">The clock; the system's unless a test supplies one.</param>
 	/// <param name="window">How long a correct code lasts; <see cref="DefaultWindow"/> unless given.</param>
 	/// <param name="grace">How long the app may be away; <see cref="DefaultGrace"/> unless given.</param>
+	/// <param name="required">
+	/// Whether the code is asked for at all, read at each navigation so the
+	/// switch takes effect at once. Always, unless given.
+	/// </param>
 	public OperatorLock(
 		IEnumerable<string> guardedRoutes,
 		TimeProvider? time = null,
 		TimeSpan? window = null,
-		TimeSpan? grace = null)
+		TimeSpan? grace = null,
+		Func<bool>? required = null)
 	{
 		ArgumentNullException.ThrowIfNull(guardedRoutes);
 
 		_window = Positive(window ?? DefaultWindow, nameof(window));
 		_grace = Positive(grace ?? DefaultGrace, nameof(grace));
 		_guarded = new HashSet<string>(guardedRoutes, StringComparer.Ordinal);
+		_required = required ?? (static () => true);
 		_time = time ?? TimeProvider.System;
 	}
 
@@ -77,11 +89,12 @@ public sealed class OperatorLock
 	/// Whether a Shell location reaches an operator's page. Any segment
 	/// counts, so <c>//SettingsPage/MailSettingsPage</c> and a bare
 	/// <c>MailSettingsPage</c> pushed from Settings are both guarded; a
-	/// query string is not part of the route.
+	/// query string is not part of the route. Nothing is guarded while the
+	/// code is switched off.
 	/// </summary>
 	public bool Guards(string? location)
 	{
-		if (string.IsNullOrWhiteSpace(location))
+		if (string.IsNullOrWhiteSpace(location) || !_required())
 			return false;
 
 		var query = location.IndexOf('?', StringComparison.Ordinal);

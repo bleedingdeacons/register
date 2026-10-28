@@ -34,6 +34,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		private const string WELCOME_EMAIL_ENABLED_KEY = "welcome_email_on_registration_enabled";
 		private const string DEVICE_LABEL_KEY = "device_label";
 		private const string BUTTON_SOUND_ENABLED_KEY = "button_sound_enabled";
+		private const string SCREEN_CODE_REQUIRED_KEY = "screen_code_required";
 
 		// Null when the build names no Freedom site, or off Android. Every
 		// credential and endpoint is then empty. See FreedomSettings.
@@ -147,6 +148,47 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			catch (Exception ex)
 			{
 				Logger.Warning(ex, "Failed to save button-sound switch");
+			}
+		}
+
+		// =================================================================
+		// Screen code for the operator's pages — the tablet's own
+		// =================================================================
+
+		/// <summary>
+		/// Reads the switch from Preferences. Defaults to <c>true</c> when it
+		/// has never been written, and fails safe to on if Preferences cannot
+		/// be read or holds something unreadable: off is the one that lets the
+		/// room into Administration.
+		/// </summary>
+		public bool IsScreenCodeRequired
+		{
+			get
+			{
+				try
+				{
+					var raw = Preferences.Get(SCREEN_CODE_REQUIRED_KEY, string.Empty);
+					if (string.IsNullOrEmpty(raw)) return true;
+					return !bool.TryParse(raw, out var value) || value;
+				}
+				catch (Exception ex)
+				{
+					Logger.Warning(ex, "Failed to read screen-code switch — defaulting to on");
+					return true;
+				}
+			}
+		}
+
+		public void SetScreenCodeRequired(bool required)
+		{
+			try
+			{
+				Preferences.Set(SCREEN_CODE_REQUIRED_KEY, required ? "true" : "false");
+				Logger.Information("Screen code for the operator's pages {State}", required ? "REQUIRED" : "NOT REQUIRED");
+			}
+			catch (Exception ex)
+			{
+				Logger.Warning(ex, "Failed to save screen-code switch");
 			}
 		}
 

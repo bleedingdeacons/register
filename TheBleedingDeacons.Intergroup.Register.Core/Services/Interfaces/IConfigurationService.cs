@@ -202,6 +202,19 @@ namespace TheBleedingDeacons.Intergroup.Register.Services.Interfaces
 		void SetButtonSoundEnabled(bool enabled);
 
 		/// <summary>
+		/// When true, Administration and Settings ask for the tablet's screen
+		/// code before they open; see <see cref="OperatorLock"/>. Defaults to
+		/// true. The tablet's own switch, not Freedom's.
+		/// </summary>
+		bool IsScreenCodeRequired { get; }
+
+		/// <summary>
+		/// Persists the screen-code switch. Takes effect on the next
+		/// navigation to an operator's page.
+		/// </summary>
+		void SetScreenCodeRequired(bool required);
+
+		/// <summary>
 		/// The compliance contact, from Freedom (<c>compliance.email</c>) —
 		/// used as the Reply-To on acceptance confirmations. Empty when
 		/// Freedom holds none, which callers treat as "no compliance contact"

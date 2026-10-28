@@ -374,6 +374,48 @@
                                                         Dark={StaticResource Gray300}}" />
                     </Grid>
                 </Border>
+
+                <Border
+                    Grid.Row="1"
+                    Grid.Column="1"
+                    Padding="15,12"
+                    BackgroundColor="{AppThemeBinding Light=White,
+                                                      Dark=#2D2D30}"
+                    Stroke="{AppThemeBinding Light=#E0E0E0,
+                                             Dark=#424242}"
+                    StrokeShape="RoundRectangle 10"
+                    StrokeThickness="1">
+                    <Grid
+                        ColumnDefinitions="*,Auto"
+                        ColumnSpacing="12"
+                        RowDefinitions="Auto,Auto"
+                        RowSpacing="4">
+
+                        <Label
+                            Grid.Row="0"
+                            Grid.Column="0"
+                            FontAttributes="Bold"
+                            FontSize="16"
+                            Text="Screen Code for Admin and Settings"
+                            VerticalOptions="Center" />
+
+                        <Switch
+                            Grid.Row="0"
+                            Grid.Column="1"
+                            IsToggled="{Binding IsScreenCodeRequired, Mode=TwoWay}"
+                            VerticalOptions="Center" />
+
+                        <Label
+                            Grid.Row="1"
+                            Grid.Column="0"
+                            Grid.ColumnSpan="2"
+                            FontSize="13"
+                            LineBreakMode="WordWrap"
+                            Text="When on, Administration and Settings ask for this tablet's screen code before they open, so the room cannot reset the device or copy the database. Turn off only for a tablet that never leaves the operator. On by default."
+                            TextColor="{AppThemeBinding Light={StaticResource Gray600},
+                                                        Dark={StaticResource Gray300}}" />
+                    </Grid>
+                </Border>
             </Grid>
 
             <!--

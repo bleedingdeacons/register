@@ -193,6 +193,7 @@ public sealed class FakeConfigurationService : IConfigurationService
 	public bool IsComplianceAcceptanceEmailEnabled { get; set; } = true;
 
 	public bool IsButtonSoundEnabled { get; set; } = true;
+	public bool IsScreenCodeRequired { get; set; } = true;
 
 	public string ComplianceEmail { get; set; } = string.Empty;
 
@@ -229,6 +230,7 @@ public sealed class FakeConfigurationService : IConfigurationService
 	public void SetComplianceAcceptanceEmailEnabled(bool enabled) => IsComplianceAcceptanceEmailEnabled = enabled;
 
 	public void SetButtonSoundEnabled(bool enabled) => IsButtonSoundEnabled = enabled;
+	public void SetScreenCodeRequired(bool required) => IsScreenCodeRequired = required;
 
 	public void InvalidateCache()
 	{

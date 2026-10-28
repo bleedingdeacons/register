@@ -544,6 +544,23 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 			}
 		}
 
+		/// <summary>
+		/// Two-way bound to a Switch on SettingsPage. When on, Administration
+		/// and Settings ask for the tablet's screen code. See
+		/// <see cref="IConfigurationService.IsScreenCodeRequired"/> and
+		/// <see cref="OperatorLock"/>. Defaults to on.
+		/// </summary>
+		public bool IsScreenCodeRequired
+		{
+			get => _configService.IsScreenCodeRequired;
+			set
+			{
+				if (_configService.IsScreenCodeRequired == value) return;
+				_configService.SetScreenCodeRequired(value);
+				OnPropertyChanged();
+			}
+		}
+
 		// =================================================================
 		// Navigation
 		// =================================================================

@@ -258,4 +258,33 @@ public sealed class OperatorLockTests
 
 		Assert.True(gate.IsOpen);
 	}
+
+	[Theory]
+	[InlineData("//AdminPage")]
+	[InlineData("//SettingsPage/MailSettingsPage")]
+	public void Switched_off_nothing_is_guarded(string location)
+	{
+		var gate = new OperatorLock(Guarded, _time, Window, required: () => false);
+
+		Assert.False(gate.Guards(location));
+	}
+
+	[Fact]
+	public void The_switch_is_read_at_each_navigation()
+	{
+		var required = true;
+		var gate = new OperatorLock(Guarded, _time, Window, required: () => required);
+
+		Assert.True(gate.Guards("//SettingsPage"));
+
+		required = false;
+		Assert.False(gate.Guards("//SettingsPage"));
+
+		required = true;
+		Assert.True(gate.Guards("//SettingsPage"));
+	}
+
+	[Fact]
+	public void Without_a_switch_the_code_is_always_asked_for() =>
+		Assert.True(new OperatorLock(Guarded, _time).Guards("//AdminPage"));
 }
