@@ -103,9 +103,16 @@ public sealed class EmailServiceTests : IDisposable
 		Assert.Equal(EmailStatus.Sent, Assert.Single(await _service.GetQueuedEmailsAsync()).Status);
 	}
 
+	/// <summary>
+	/// Every port but 465 must upgrade with STARTTLS, required rather than
+	/// "when available": a port off the usual list used to get Auto, which a
+	/// network in the middle could talk out of encrypting.
+	/// </summary>
 	[Theory]
 	[InlineData(587, SecureSocketOptions.StartTls)]
 	[InlineData(465, SecureSocketOptions.SslOnConnect)]
+	[InlineData(25, SecureSocketOptions.StartTls)]
+	[InlineData(2525, SecureSocketOptions.StartTls)]
 	public async Task ThePortChoosesTheTls(int port, SecureSocketOptions expected)
 	{
 		await _service.UpdateConfigurationAsync(new SmtpConfiguration { Host = "smtp.example.org", Port = port, Username = "u", Password = "p", EnableSsl = true });
@@ -113,6 +120,56 @@ public sealed class EmailServiceTests : IDisposable
 		await _service.SendEmailAsync("dave@example.org", "Welcome", "Hello");
 
 		Assert.Equal(expected, Assert.Single(_smtp.Connections).Options);
+	}
+
+	[Fact]
+	public async Task WithTlsSwitchedOffThePasswordIsNeverSent()
+	{
+		await _service.UpdateConfigurationAsync(new SmtpConfiguration { Host = "smtp.example.org", Port = 587, Username = "u", Password = "p", EnableSsl = false });
+
+		Assert.False(await _service.SendEmailAsync("dave@example.org", "Welcome", "Hello"));
+
+		Assert.Equal(SecureSocketOptions.None, Assert.Single(_smtp.Connections).Options);
+		Assert.Empty(_smtp.Authentications);
+		Assert.Empty(_smtp.Sent);
+		var failure = Assert.Single(_failures);
+		Assert.False(failure.IsRetryable);
+		Assert.Contains("smtp.enable_ssl", failure.Error, StringComparison.Ordinal);
+	}
+
+	[Fact]
+	public async Task AServerWithoutTlsIsRefusedNotSpokenToInClear()
+	{
+		_smtp.OffersTls = false;
+
+		Assert.False(await _service.SendEmailAsync("dave@example.org", "Welcome", "Hello"));
+
+		Assert.Empty(_smtp.Authentications);
+		Assert.Empty(_smtp.Sent);
+		Assert.False(Assert.Single(_failures).IsRetryable);
+	}
+
+	[Fact]
+	public async Task TheProbeNamesTlsSwitchedOffAsATlsProblemAndSendsNoPassword()
+	{
+		var config = Valid();
+		config.EnableSsl = false;
+
+		var result = await _service.TestSmtpReachabilityAsync(config);
+
+		Assert.False(result.IsReachable);
+		Assert.Equal(SmtpReachabilityKind.Tls, result.Kind);
+		Assert.Empty(_smtp.Authentications);
+	}
+
+	[Fact]
+	public async Task TheTestButtonFailsWithTlsSwitchedOffAndSendsNoPassword()
+	{
+		var config = Valid();
+		config.EnableSsl = false;
+
+		Assert.False(await _service.TestSmtpConnectionAsync(config));
+		Assert.Empty(_smtp.Authentications);
 	}
 
 	[Fact]

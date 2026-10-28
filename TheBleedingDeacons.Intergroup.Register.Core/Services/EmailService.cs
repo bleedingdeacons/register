@@ -7,6 +7,7 @@ using MimeKit.Utils;
 using Serilog;
 using System.Diagnostics;
 using TheBleedingDeacons.Intergroup.Register.Data;
+using TheBleedingDeacons.Intergroup.Register.Exceptions;
 using TheBleedingDeacons.Intergroup.Register.Models;
 using TheBleedingDeacons.Intergroup.Register.Services.Interfaces;
 using TheBleedingDeacons.Intergroup.Register.Support;
@@ -323,7 +324,8 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 				Logger.Debug("[{OperationId}] Connected successfully, authenticating as {Username}",
 					operationId, username);
 
-				// Authenticate
+				// Authenticate, over an encrypted connection only
+				EnsureEncrypted(client, host, secureSocketOptions);
 				await client.AuthenticateAsync(username, password, cts.Token);
 
 				Logger.Debug("[{OperationId}] Authenticated successfully, sending message", operationId);
@@ -391,19 +393,36 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		/// <summary>
 		/// Resolves MailKit's SecureSocketOptions from the SSL flag and port number.
 		/// Extracted from TrySendEmailWithMailKitAsync for reuse in batch connection setup.
+		///
+		/// <para>465 is TLS from the first byte; every other port must upgrade
+		/// with STARTTLS, and a server that does not offer it is refused. This
+		/// used to be <c>Auto</c> for any port but 465, 587 and 25, which is
+		/// STARTTLS only <i>when available</i>: anyone on the venue's network
+		/// could strip the offer and read the password. With TLS switched off
+		/// the connection is plain, and <see cref="EnsureEncrypted"/> then
+		/// refuses to send the password over it.</para>
 		/// </summary>
 		private static SecureSocketOptions ResolveSecureSocketOptions(bool enableSsl, int port)
 		{
 			if (!enableSsl)
 				return SecureSocketOptions.None;
 
-			return port switch
-			{
-				465 => SecureSocketOptions.SslOnConnect,
-				587 => SecureSocketOptions.StartTls,
-				25 => SecureSocketOptions.StartTls,
-				_ => SecureSocketOptions.Auto
-			};
+			return port == 465 ? SecureSocketOptions.SslOnConnect : SecureSocketOptions.StartTls;
+		}
+
+		/// <summary>
+		/// Called between connecting and authenticating, on every path that
+		/// sends the password: the password goes over an encrypted connection
+		/// or not at all.
+		/// </summary>
+		/// <exception cref="SmtpNotEncryptedException">The connection is not encrypted.</exception>
+		private static void EnsureEncrypted(ISmtpClient client, string host, SecureSocketOptions options)
+		{
+			if (client.IsSecure)
+				return;
+
+			Logger.Error("SMTP connection to {Host} is not encrypted ({Options}); not sending the password", host, options);
+			throw new SmtpNotEncryptedException(host, tlsSwitchedOff: options == SecureSocketOptions.None);
 		}
 
 		/// <summary>
@@ -422,6 +441,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 
 				using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(_timeoutSeconds + 10));
 				await client.ConnectAsync(host, port, secureSocketOptions, cts.Token);
+				EnsureEncrypted(client, host, secureSocketOptions);
 				await client.AuthenticateAsync(username, password, cts.Token);
 
 				Logger.Debug("SMTP client connected and authenticated to {Host}:{Port}", host, port);
@@ -1270,6 +1290,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 				await client.ConnectAsync(config.Host, port, secureSocketOptions, cts.Token);
 
 				Logger.Debug("Testing authentication for {Username}", config.Username);
+				EnsureEncrypted(client, config.Host, secureSocketOptions);
 				await client.AuthenticateAsync(config.Username, config.Password, cts.Token);
 
 				// Create test message
@@ -1340,6 +1361,7 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 			try
 			{
 				await client.ConnectAsync(config.Host, config.Port, secureSocketOptions, cts.Token);
+				EnsureEncrypted(client, config.Host, secureSocketOptions);
 				await client.AuthenticateAsync(config.Username, config.Password, cts.Token);
 				await client.DisconnectAsync(quit: true, cts.Token);
 				return SmtpReachabilityResult.Success();
