@@ -41,7 +41,18 @@ public sealed class FakeSmtpClient : SmtpClient
 
 	public int Disconnects { get; private set; }
 
+	/// <summary>
+	/// False for a server with no TLS at all. Asked for TLS outright, it is
+	/// refused the way MailKit refuses one; asked for STARTTLS only if
+	/// offered (<c>Auto</c>), or for no TLS, it connects in clear.
+	/// </summary>
+	public bool OffersTls { get; set; } = true;
+
+	private bool _secure;
+
 	public override bool IsConnected => _connected;
+
+	public override bool IsSecure => _connected && _secure;
 
 	public override Task ConnectAsync(string host, int port = 0, SecureSocketOptions options = SecureSocketOptions.Auto, CancellationToken cancellationToken = default)
 	{
@@ -51,6 +62,12 @@ public sealed class FakeSmtpClient : SmtpClient
 			throw FailOnConnect;
 		}
 
+		if (!OffersTls && options is SecureSocketOptions.StartTls or SecureSocketOptions.SslOnConnect)
+		{
+			throw new NotSupportedException("The SMTP server does not support the STARTTLS extension.");
+		}
+
+		_secure = OffersTls && options != SecureSocketOptions.None;
 		_connected = true;
 		return Task.CompletedTask;
 	}

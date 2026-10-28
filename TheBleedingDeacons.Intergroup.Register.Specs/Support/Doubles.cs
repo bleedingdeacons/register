@@ -41,8 +41,13 @@ public sealed class FakeSmtpServer
 	private sealed class ScriptedSmtpClient(FakeSmtpServer server) : SmtpClient
 	{
 		private bool _connected;
+		private bool _secure;
 
 		public override bool IsConnected => _connected;
+
+		// Encrypted whenever TLS was asked for: EmailService will not send
+		// the password over anything else.
+		public override bool IsSecure => _connected && _secure;
 
 		public override Task ConnectAsync(string host, int port = 0, SecureSocketOptions options = SecureSocketOptions.Auto, CancellationToken cancellationToken = default)
 		{
@@ -52,6 +57,7 @@ public sealed class FakeSmtpServer
 				throw refusal;
 			}
 
+			_secure = options != SecureSocketOptions.None;
 			_connected = true;
 			return Task.CompletedTask;
 		}
