@@ -122,6 +122,11 @@ jobs:
 
   build-windows:
     name: Build & analyze (net10.0-windows)
+    # Switched off for now (2026-10-28): it is the slowest job by far (7–8
+    # minutes against ~2.5 for Android) and the Windows head does not ship.
+    # Delete this line to switch it back on; `-p:RegisterWindowsOnly=true`
+    # still builds it locally in the meantime.
+    if: false
     runs-on: windows-latest
 
     steps:
