@@ -165,9 +165,22 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
                 var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
                 var backupFileName = $"backup_{Path.GetFileNameWithoutExtension(originalFileName)}_{timestamp}{Path.GetExtension(originalFileName)}";
 
-                // Through the same path as the logs: on Android 10+ a raw
-                // File.Copy into public Downloads is not allowed at all.
-                await PublishToDownloadsAsync(SelectedDatabaseFile, backupFileName, "application/vnd.sqlite3");
+                // A snapshot rather than the file itself: the database runs in
+                // WAL mode, and a copy of the .db alone misses whatever has not
+                // been checkpointed yet. See DatabaseSnapshot.
+                var snapshot = Path.Combine(FileSystem.CacheDirectory, $"{Guid.NewGuid():N}.db");
+                try
+                {
+                    await DatabaseSnapshot.WriteAsync(SelectedDatabaseFile, snapshot);
+
+                    // Through the same path as the logs: on Android 10+ a raw
+                    // File.Copy into public Downloads is not allowed at all.
+                    await PublishToDownloadsAsync(snapshot, backupFileName, "application/vnd.sqlite3");
+                }
+                finally
+                {
+                    File.Delete(snapshot);
+                }
 
                 StatusMessage = $"Backup completed successfully!\nSaved to {ExportFolderLabel}/{backupFileName}";
 

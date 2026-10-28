@@ -53,6 +53,45 @@ public sealed class DbContextTests : IDisposable
 	}
 
 	[Fact]
+	public async Task PurgeDatabaseAsync_ThatFailsPartWay_LeavesEveryTableAsItWas()
+	{
+		await using (var seed = new UnityDbContext(_options))
+		{
+			seed.Groups.Add(new Group { Id = 1, Name = "G" });
+			seed.Members.Add(new Member { Id = 1, AnonymousName = "M" });
+			seed.IntergroupMeetings.Add(new IntergroupMeeting { Id = 1, Title = "IM" });
+			await seed.SaveChangesAsync();
+		}
+
+		// Fails the Groups delete, after Members and the meetings have gone.
+		var failing = new DbContextOptionsBuilder<UnityDbContext>()
+			.UseSqlite(_connection)
+			.AddInterceptors(new FailDeleteFrom("Groups"))
+			.Options;
+		await using (var ctx = new UnityDbContext(failing))
+		{
+			await Assert.ThrowsAsync<InvalidOperationException>(() => ctx.PurgeDatabaseAsync());
+		}
+
+		await using var check = new UnityDbContext(_options);
+		Assert.Equal(1, await check.Groups.CountAsync());
+		Assert.Equal(1, await check.Members.CountAsync());
+		Assert.Equal(1, await check.IntergroupMeetings.CountAsync());
+	}
+
+	private sealed class FailDeleteFrom(string table) : Microsoft.EntityFrameworkCore.Diagnostics.DbCommandInterceptor
+	{
+		public override ValueTask<Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<int>> NonQueryExecutingAsync(
+			System.Data.Common.DbCommand command,
+			Microsoft.EntityFrameworkCore.Diagnostics.CommandEventData eventData,
+			Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<int> result,
+			CancellationToken cancellationToken = default) =>
+			command.CommandText.Contains($"DELETE FROM \"{table}\"", StringComparison.Ordinal)
+				? throw new InvalidOperationException("The disk is full")
+				: base.NonQueryExecutingAsync(command, eventData, result, cancellationToken);
+	}
+
+	[Fact]
 	public void SaveChanges_StampsUpdated_WhenNotSuppressed()
 	{
 		using var ctx = new UnityDbContext(_options);
