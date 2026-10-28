@@ -31,7 +31,14 @@ public partial class MainPageViewModel : BaseViewModel
 		_configService = configService;
 		Title = BaseTitle;
 
+		// A Debug build says so in the corner, so a tablet carrying one is
+		// never mistaken for the Play release of the same version. Only the
+		// label: the logs keep the bare version from MauiProgram.AppVersion.
+#if DEBUG
+		AppVersion = "Debug " + MauiProgram.AppVersion();
+#else
 		AppVersion = MauiProgram.AppVersion();
+#endif
 	}
 
 	// Called each time the page appears so meeting state refreshes.
