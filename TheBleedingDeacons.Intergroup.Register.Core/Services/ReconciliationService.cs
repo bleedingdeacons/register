@@ -714,9 +714,11 @@ public class ReconciliationService
 					if (registered)
 					{
 						// Find the GSR for this group — resolve temp IDs
-						var gsr = await db.Members
-							.Where(m => m.HomeGroupId == group.Id && m.IsGsr)
-							.FirstOrDefaultAsync(ct);
+						var gsr = ChooseGsr(
+							await db.Members
+								.Where(m => m.HomeGroupId == group.Id && m.IsGsr)
+								.ToListAsync(ct),
+							failedCreates);
 
 						var gsrName = gsr?.AnonymousName ?? string.Empty;
 						var gsrFound = gsr != null;
@@ -1041,6 +1043,23 @@ public class ReconciliationService
 	private static bool IsTemporary<T>(ApiResponse<T> response) where T : class =>
 		response.StatusCode is 0 or 401 or 403 or 408 or 429 or >= 500
 		|| response.Error?.Code is "network_error" or "parse_error" or "unexpected_response";
+
+	/// <summary>
+	/// The GSR a group's registration is sent under. A group may have
+	/// several, and the database hands them back in no promised order, so
+	/// without a rule the same group could be registered under a different
+	/// member on each tablet or each sync. The rule: one already on Unity
+	/// before one still to be created, then the lowest id. One whose create
+	/// failed this sync is passed over while another can stand, so the
+	/// registration is not held back for it; if none can, it is still
+	/// returned and the caller skips the registration until the next sync.
+	/// </summary>
+	internal static Member? ChooseGsr(IEnumerable<Member> gsrs, IReadOnlySet<int> failedCreates) =>
+		gsrs
+			.OrderBy(m => failedCreates.Contains(m.Id))
+			.ThenBy(m => m.Id < 0)
+			.ThenBy(m => m.Id < 0 ? -m.Id : m.Id)
+			.FirstOrDefault();
 
 	private static string RefusalReason<T>(ApiResponse<T> response) where T : class =>
 		response.Error?.Message is { Length: > 0 } message

@@ -372,20 +372,21 @@ public static class MauiProgram
 			System.Diagnostics.Debug.WriteLine("Unity and Mail databases initialized.");
 		}
 
-		// ── Freedom: stored settings now, a sync in the background ────
-		// Before the Better Stack sink below, which reads its endpoint and
-		// token through ConfigurationService and so should see Freedom's.
-		FreedomStartup.Start(mauiapp.Services);
-
+		// ── Freedom: stored settings, then a sync, in the background ──
 		// ── Tell the log shipper where to ship ────────────────────────
 		// UseInventory started it holding, because nothing could be read
 		// before the container existed. Now it can: whatever was held since
-		// launch ships under these settings, with its own timestamps. The
-		// settings pages and FreedomStartup tell it again whenever the settings
+		// launch ships under these settings, with its own timestamps. With
+		// Freedom on, Freedom tells it once its stored settings are read, so
+		// it never acts on the tablet's settings without them. The settings
+		// pages and FreedomStartup tell it again whenever the settings
 		// change. ConfigurationService handles the dev/prod split and lays
 		// Freedom's values over the tablet's own.
-		mauiapp.Services.GetRequiredService<ILogShipper>()
-			.Ship(mauiapp.Services.GetRequiredService<IConfigurationService>().GetBetterStackConfiguration());
+		if (!FreedomStartup.Start(mauiapp.Services))
+		{
+			mauiapp.Services.GetRequiredService<ILogShipper>()
+				.Ship(mauiapp.Services.GetRequiredService<IConfigurationService>().GetBetterStackConfiguration());
+		}
 		return mauiapp;
 	}
 

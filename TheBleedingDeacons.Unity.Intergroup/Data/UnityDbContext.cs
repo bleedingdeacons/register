@@ -39,10 +39,17 @@ public class UnityDbContext : DbContext
 
     /// <summary>
     /// Deletes all rows from every table and clears the change tracker.
-    /// Tables are deleted dependents-first to respect foreign-key constraints.
+    /// Tables are deleted dependents-first to respect foreign-key constraints,
+    /// all in one transaction, so a purge that fails part-way leaves the
+    /// database as it was rather than half empty.
     /// </summary>
     public async Task PurgeDatabaseAsync(CancellationToken ct = default)
     {
+        // A caller's own transaction already covers it.
+        await using var transaction = Database.CurrentTransaction is null
+            ? await Database.BeginTransactionAsync(ct)
+            : null;
+
         await Meetings.ExecuteDeleteAsync(ct);
         await Contacts.ExecuteDeleteAsync(ct);
         await IntergroupMeetings.ExecuteDeleteAsync(ct);
@@ -50,6 +57,11 @@ public class UnityDbContext : DbContext
         await Members.ExecuteDeleteAsync(ct);
         await Groups.ExecuteDeleteAsync(ct);
         await EntitySnapshots.ExecuteDeleteAsync(ct);
+
+        if (transaction is not null)
+        {
+            await transaction.CommitAsync(ct);
+        }
 
         ChangeTracker.Clear();
     }

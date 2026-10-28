@@ -22,13 +22,13 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 	/// nothing is registered, <see cref="ConfigurationService"/> gets no
 	/// client, and the Windows head runs unconfigured.</para>
 	///
-	/// <para><b>Nothing waits on the network.</b> The start reads what Freedom
-	/// stored last time — a secure-storage read, no request — so the settings
-	/// the rest of startup builds from are already Freedom's. The sync then
-	/// runs in the background, and anything it changes is applied at once:
-	/// the configuration cache is cleared, the email service is given the new
-	/// SMTP settings, and the Better Stack sink is rebuilt. A tablet in a hall
-	/// with no signal starts on what it had.</para>
+	/// <para><b>Nothing waits on it.</b> The start reads what Freedom stored
+	/// last time — a secure-storage read, no request — in the background, so
+	/// a slow keystore cannot hold up the first screen. Once it is read, what
+	/// it holds is applied: the configuration cache is cleared, the email
+	/// service is given the SMTP settings, and the log shipper is told where
+	/// to ship. The sync follows, and anything it changes is applied the same
+	/// way. A tablet in a hall with no signal starts on what it had.</para>
 	/// </summary>
 	public static class FreedomStartup
 	{
@@ -54,29 +54,65 @@ namespace TheBleedingDeacons.Intergroup.Register.Services
 		}
 
 		/// <summary>
-		/// Read the stored configuration now, and sync in the background.
-		/// Call once the container is built and before anything reads settings.
+		/// Read the stored configuration and then sync, both in the background.
+		/// Call once the container is built.
 		/// </summary>
-		public static void Start(IServiceProvider services)
+		/// <returns>
+		/// Whether Freedom is on. If it is, Freedom tells the log shipper where
+		/// to ship once the stored settings are read, and the caller must not:
+		/// told before then, the shipper would act on the tablet's settings
+		/// without Freedom's, and with none it drops what it has been holding.
+		/// </returns>
+		public static bool Start(IServiceProvider services)
 		{
 			var freedom = services.GetService<FreedomClient>();
 			if (freedom is null)
-				return;
+				return false;
 
+			freedom.ConfigChanged += (_, e) => ApplyChanges(services, e);
+
+			StartAsync(services, freedom).SafeFireAndForget("FreedomStartup");
+			return true;
+		}
+
+		private static async Task StartAsync(IServiceProvider services, FreedomClient freedom)
+		{
 			try
 			{
-				// Local only: SecureStorage, no request. Bounded all the same,
-				// so a keystore that hangs cannot hold up the first screen.
-				Task.Run(() => freedom.LoadAsync()).Wait(TimeSpan.FromSeconds(3));
+				// Local only: SecureStorage, no request.
+				await freedom.LoadAsync().ConfigureAwait(false);
 			}
 			catch (Exception ex)
 			{
 				Logger.Warning(ex, "Freedom: the stored configuration could not be read; starting without it");
 			}
 
-			freedom.ConfigChanged += (_, e) => ApplyChanges(services, e);
+			ApplyLoaded(services);
 
-			SyncAsync(freedom).SafeFireAndForget("FreedomStartupSync");
+			await SyncAsync(freedom).ConfigureAwait(false);
+		}
+
+		/// <summary>
+		/// What was read from the store, applied to the parts of the running
+		/// tablet that may have read settings before it arrived.
+		/// </summary>
+		private static void ApplyLoaded(IServiceProvider services)
+		{
+			try
+			{
+				var config = services.GetRequiredService<IConfigurationService>();
+				config.InvalidateCache();
+
+				services.GetRequiredService<ILogShipper>().Ship(config.GetBetterStackConfiguration());
+
+				services.GetRequiredService<IEmailService>()
+					.UpdateConfigurationAsync(config.GetSmtpConfiguration())
+					.SafeFireAndForget("FreedomSmtpLoad");
+			}
+			catch (Exception ex)
+			{
+				Logger.Warning(ex, "Freedom: the stored configuration could not be applied");
+			}
 		}
 
 		public static async Task<SyncResult> SyncAsync(FreedomClient freedom)
