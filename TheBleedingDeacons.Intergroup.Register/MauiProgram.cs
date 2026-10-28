@@ -243,8 +243,13 @@ public static class MauiProgram
 
 		builder.Services.AddScoped<IPopupNotification, PopupNotificationService>();
 
-		// Administration and Settings ask for the tablet's screen code.
-		builder.Services.AddSingleton(_ => new OperatorLock(AppShell.OperatorRoutes));
+		// Administration and Settings ask for the tablet's screen code, unless
+		// Settings has it switched off for this tablet.
+		builder.Services.AddSingleton(sp =>
+		{
+			var config = sp.GetRequiredService<IConfigurationService>();
+			return new OperatorLock(AppShell.OperatorRoutes, required: () => config.IsScreenCodeRequired);
+		});
 #if ANDROID
 		builder.Services.AddSingleton<IScreenLockPrompt, AndroidScreenLockPrompt>();
 #else
