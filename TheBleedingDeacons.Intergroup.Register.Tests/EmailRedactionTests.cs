@@ -1,6 +1,7 @@
 using Serilog.Events;
 using Serilog.Parsing;
 using TheBleedingDeacons.Intergroup.Register.Support;
+using TheBleedingDeacons.Inventory.Redaction;
 
 namespace TheBleedingDeacons.Intergroup.Register.Tests;
 
@@ -133,8 +134,35 @@ public sealed class EmailRedactionTests
 		Assert.Same(name, logEvent.Properties["Name"]);
 	}
 
+	/// <summary>
+	/// What the enricher could never reach: an exception's own text, such as
+	/// an SMTP server refusing a recipient by address.
+	/// </summary>
+	[Fact]
+	public void An_exception_reaches_the_sinks_with_its_addresses_as_tokens()
+	{
+		var sink = new Collecting();
+		using (var logger = new Serilog.LoggerConfiguration()
+			.WriteToRedacted(_redactor.Redact, wt => wt.Sink(sink))
+			.CreateLogger())
+		{
+			logger.Error(new InvalidOperationException("550 No such user: jo@example.org"), "Send failed");
+		}
+
+		var text = Assert.Single(sink.Events).Exception!.ToString();
+		Assert.DoesNotContain("jo@example.org", text, StringComparison.Ordinal);
+		Assert.Contains("550 No such user: " + _redactor.Token("jo@example.org"), text, StringComparison.Ordinal);
+	}
+
+	private sealed class Collecting : Serilog.Core.ILogEventSink
+	{
+		public List<LogEvent> Events { get; } = [];
+
+		public void Emit(LogEvent logEvent) => Events.Add(logEvent);
+	}
+
 	private void Enrich(LogEvent logEvent) =>
-		new EmailRedactingEnricher(_redactor).Enrich(logEvent, null!);
+		new RedactingEnricher(_redactor.Redact).Enrich(logEvent, null!);
 
 	private static LogEvent Event(string template, params (string Name, LogEventPropertyValue Value)[] properties) =>
 		new(
