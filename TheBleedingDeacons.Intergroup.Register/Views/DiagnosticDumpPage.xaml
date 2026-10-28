@@ -182,7 +182,7 @@
                 FontAttributes="Bold"
                 FontSize="16"
                 HeightRequest="50"
-                Text="Export Logs to Documents"
+                Text="Export Logs to Downloads"
                 TextColor="White" />
 
             <!--  Progress Indicator  -->

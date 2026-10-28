@@ -11,11 +11,15 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
     public partial class DiagnosticDumpViewModel : ObservableObject
     {
         /// <summary>
-        /// Folder created under the user-visible Documents directory for
-        /// exported diagnostics. Kept in one place because the Android
-        /// MediaStore path and the desktop path both need it.
+        /// The one folder every export goes to, under the user-visible
+        /// Downloads directory: database backups and logs alike, so there is
+        /// a single place to look for anything the app has handed over.
+        /// Public on purpose. Kept in one place because the Android
+        /// MediaStore path and the direct path both need it.
         /// </summary>
-        private const string DocumentsSubfolder = "Intergroup Register Logs";
+        private const string ExportSubfolder = "Intergroup Register";
+
+        private static string ExportFolderLabel => $"Download/{ExportSubfolder}";
 
         [ObservableProperty]
         private bool isBackupInProgress;
@@ -158,20 +162,14 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 
                 // Create backup filename with timestamp
                 var originalFileName = Path.GetFileName(SelectedDatabaseFile);
-                var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
                 var backupFileName = $"backup_{Path.GetFileNameWithoutExtension(originalFileName)}_{timestamp}{Path.GetExtension(originalFileName)}";
 
-                // Get downloads folder path
-                var downloadsPath = GetDownloadsPath();
-                var backupFilePath = Path.Combine(downloadsPath, backupFileName);
+                // Through the same path as the logs: on Android 10+ a raw
+                // File.Copy into public Downloads is not allowed at all.
+                await PublishToDownloadsAsync(SelectedDatabaseFile, backupFileName, "application/vnd.sqlite3");
 
-                // Ensure downloads directory exists
-                Directory.CreateDirectory(downloadsPath);
-
-                // Copy the database file
-                await Task.Run(() => File.Copy(SelectedDatabaseFile, backupFilePath, true));
-
-                StatusMessage = $"Backup completed successfully!\nSaved to: {backupFilePath}";
+                StatusMessage = $"Backup completed successfully!\nSaved to {ExportFolderLabel}/{backupFileName}";
 
                 // Save the backup date
                 SaveLastBackupDate();
@@ -179,11 +177,12 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
             }
             catch (UnauthorizedAccessException)
             {
-                StatusMessage = "Access denied. Unable to write to downloads folder.";
+                StatusMessage = "Access denied. Unable to write to the Downloads folder.";
             }
             catch (Exception ex)
             {
                 StatusMessage = $"Backup failed: {ex.Message}";
+                Log.Warning(ex, "Database backup to Downloads failed");
             }
             finally
             {
@@ -231,24 +230,24 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
                     // dump. Prefixing with the timestamp keeps repeat exports
                     // apart and stops MediaStore appending "(1)" to the name.
                     var targetName = $"{timestamp}_{Path.GetFileName(logFile)}";
-                    await PublishToDocumentsAsync(logFile, targetName);
+                    await PublishToDownloadsAsync(logFile, targetName, "text/plain");
                     exported++;
                 }
 
                 StatusMessage =
-                    $"Exported {exported} log file(s) to Documents/{DocumentsSubfolder}.";
+                    $"Exported {exported} log file(s) to {ExportFolderLabel}.";
 
                 SaveLastLogExportDate();
                 LoadLastLogExportDate();
             }
             catch (UnauthorizedAccessException)
             {
-                StatusMessage = "Access denied. Unable to write to the Documents folder.";
+                StatusMessage = "Access denied. Unable to write to the Downloads folder.";
             }
             catch (Exception ex)
             {
                 StatusMessage = $"Log export failed: {ex.Message}";
-                Log.Warning(ex, "Log export to Documents failed");
+                Log.Warning(ex, "Log export to Downloads failed");
             }
             finally
             {
@@ -257,14 +256,16 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
         }
 
         /// <summary>
-        /// Copies one file into the user-visible Documents folder.
+        /// Copies one file into the export folder, <see cref="ExportSubfolder"/>
+        /// under the user-visible Downloads directory. Every export goes
+        /// through here, so they all land in the same place.
         ///
-        /// <para>On Android API 29+ the public Documents folder is not writable
+        /// <para>On Android API 29+ the public Downloads folder is not writable
         /// by raw path — scoped storage requires going through MediaStore, which
         /// hands back a stream rather than a filename. Older releases keep the
         /// direct-path behaviour, gated on the legacy storage permission.</para>
         /// </summary>
-        private static async Task PublishToDocumentsAsync(string sourcePath, string targetFileName)
+        private static async Task PublishToDownloadsAsync(string sourcePath, string targetFileName, string mimeType)
         {
 #if ANDROID
             if (OperatingSystem.IsAndroidVersionAtLeast(29))
@@ -274,17 +275,17 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
 
                 var values = new Android.Content.ContentValues();
                 values.Put(Android.Provider.MediaStore.IMediaColumns.DisplayName, targetFileName);
-                values.Put(Android.Provider.MediaStore.IMediaColumns.MimeType, "text/plain");
+                values.Put(Android.Provider.MediaStore.IMediaColumns.MimeType, mimeType);
                 values.Put(
                     Android.Provider.MediaStore.IMediaColumns.RelativePath,
-                    $"{Android.OS.Environment.DirectoryDocuments}/{DocumentsSubfolder}");
+                    $"{Android.OS.Environment.DirectoryDownloads}/{ExportSubfolder}");
 
                 // IS_PENDING hides the row until the write completes, so a file
-                // browser never shows a half-copied log.
+                // browser never shows a half-copied file.
                 values.Put(Android.Provider.MediaStore.IMediaColumns.IsPending, 1);
 
-                var collection = Android.Provider.MediaStore.Files.GetContentUri("external")
-                    ?? throw new IOException("Could not resolve the MediaStore Files collection.");
+                var collection = Android.Provider.MediaStore.Downloads.ExternalContentUri
+                    ?? throw new IOException("Could not resolve the MediaStore Downloads collection.");
 
                 var uri = resolver.Insert(collection, values)
                     ?? throw new IOException($"MediaStore refused to create {targetFileName}.");
@@ -310,15 +311,22 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
                 throw new UnauthorizedAccessException("Storage permission was not granted.");
             }
 
-            var publicDocuments = Android.OS.Environment
-                .GetExternalStoragePublicDirectory(Android.OS.Environment.DirectoryDocuments)?.AbsolutePath
-                ?? throw new IOException("Could not resolve the public Documents folder.");
+            var publicDownloads = Android.OS.Environment
+                .GetExternalStoragePublicDirectory(Android.OS.Environment.DirectoryDownloads)?.AbsolutePath
+                ?? throw new IOException("Could not resolve the public Downloads folder.");
 
-            var targetDirectory = Path.Combine(publicDocuments, DocumentsSubfolder);
-#else
+            var targetDirectory = Path.Combine(publicDownloads, ExportSubfolder);
+#elif WINDOWS
+            _ = mimeType; // Only MediaStore asks for one.
             var targetDirectory = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-                DocumentsSubfolder);
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                "Downloads",
+                ExportSubfolder);
+#else
+            _ = mimeType; // Only MediaStore asks for one.
+            // iOS and Mac have no shared Downloads folder an app can write to;
+            // the app's own Documents directory is what the Files app shows.
+            var targetDirectory = Path.Combine(FileSystem.AppDataDirectory, ExportSubfolder);
 #endif
 
             Directory.CreateDirectory(targetDirectory);
@@ -390,24 +398,6 @@ namespace TheBleedingDeacons.Intergroup.Register.ViewModels
             {
                 SelectedDatabaseFile = value.FullPath;
             }
-        }
-
-        private static string GetDownloadsPath()
-        {
-#if ANDROID
-            // For Android, use the public Downloads directory
-            var downloadsPath = Android.OS.Environment.GetExternalStoragePublicDirectory(Android.OS.Environment.DirectoryDownloads)?.AbsolutePath;
-            return downloadsPath ?? Path.Combine(FileSystem.AppDataDirectory, "Downloads");
-#elif WINDOWS
-            // For Windows, use the user's Downloads folder
-            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
-#elif IOS
-            // For iOS, use the app's Documents directory (iOS doesn't have a shared Downloads folder)
-            return FileSystem.AppDataDirectory;
-#else
-            // Fallback to app data directory
-            return Path.Combine(FileSystem.AppDataDirectory, "Downloads");
-#endif
         }
 
         private static void SaveLastBackupDate()
