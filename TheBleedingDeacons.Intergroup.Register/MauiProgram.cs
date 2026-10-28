@@ -93,10 +93,11 @@ public static class MauiProgram
 			// Not the app name, which has a space in it: adb logcat -s Register:V
 			LogcatTag = "Register",
 			AppVersion = AppVersion,
+			Configure = cfg => cfg.ReadFrom.Configuration(builder.Configuration),
 			// Email addresses become per-tablet tokens before any sink sees
-			// them; see EmailRedactor. Names are left as they are.
-			Configure = cfg => cfg.ReadFrom.Configuration(builder.Configuration)
-				.Enrich.With(new EmailRedactingEnricher(new EmailRedactor(LogRedactionKey.Get()))),
+			// them, exception text included; see EmailRedactor. Names are
+			// left as they are.
+			Redact = new EmailRedactor(LogRedactionKey.Get()).Redact,
 		});
 
 		// Framework is its own property rather than folded into the message so

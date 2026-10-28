@@ -91,7 +91,7 @@
 		<!-- Logging: CurrentLogger, ILogShipper and BetterStackConfiguration,
 		     shared with Link. The app references Inventory.Maui at the same
 		     version. -->
-		<PackageReference Include="Inventory" Version="0.1.1" />
+		<PackageReference Include="Inventory" Version="0.2.0" />
 		<!-- The managed-values overlay. The app references Freedom.Client.Maui
 		     at the same version, on Android. -->
 		<PackageReference Include="Freedom.Client" Version="0.2.1" />
