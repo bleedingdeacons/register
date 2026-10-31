@@ -107,10 +107,19 @@ the test-or-live choice: `/amber` is the test bed.
 
 ```json
 "Freedom": {
-  "BaseUrl": "https://aa-bristol.org/amber",
+  "BaseUrl": "https://aa-bristol.org",
   "Application": "register"
 }
 ```
+
+**The tablets use the live site, from 2026-10-31.** Play builds, which are
+what the tablets install, are made from this machine's `appsettings.json`, and
+that now names `https://aa-bristol.org`. Live's Freedom has its own `register`
+application, copied from `/amber`'s, with `unity.base_url` set to the live site.
+Its `unity.api_key` is live Unity's own key, not the test bed's. A tablet moving
+across signs in to live's Freedom afresh: its `/amber` sign-in does not carry
+over. Point a build at `/amber` only to test, and `/acceptance` then needs
+`test-bed` to accept it.
 
 `CallbackUri` defaults to
 `org.thebleedingdeacons.intergroup.register.freedom://auth`, which is what
